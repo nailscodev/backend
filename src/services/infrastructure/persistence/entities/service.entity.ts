@@ -1,0 +1,184 @@
+import { Table, Column, Model, DataType } from 'sequelize-typescript';
+import { ApiProperty } from '@nestjs/swagger';
+
+export enum ServiceCategory {
+  NAILS = 'NAILS',
+  FACIAL = 'FACIAL', 
+  BODY = 'BODY',
+  HAIR = 'HAIR',
+  ADDON = 'ADDON'
+}
+
+@Table({
+  tableName: 'services',
+  paranoid: true,
+  timestamps: true,
+})
+export class ServiceEntity extends Model<ServiceEntity> {
+  @ApiProperty({
+    description: 'The unique identifier for the service',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @Column({
+    primaryKey: true,
+    type: DataType.UUID,
+    defaultValue: DataType.UUIDV4,
+  })
+  declare id: string;
+
+  @ApiProperty({
+    description: 'Service name',
+    example: 'Manicure Clásica',
+  })
+  @Column({
+    type: DataType.STRING(255),
+    allowNull: false,
+  })
+  name: string;
+
+  @ApiProperty({
+    description: 'Service description',
+    example: 'Manicure completa con esmaltado tradicional',
+  })
+  @Column({
+    type: DataType.TEXT,
+    allowNull: true,
+  })
+  description?: string;
+
+  @ApiProperty({
+    description: 'Service category',
+    enum: ServiceCategory,
+    example: ServiceCategory.NAILS,
+  })
+  @Column({
+    type: DataType.ENUM(...Object.values(ServiceCategory)),
+    allowNull: false,
+  })
+  category: ServiceCategory;
+
+  @ApiProperty({
+    description: 'Service price in cents',
+    example: 2500,
+  })
+  @Column({
+    type: DataType.INTEGER,
+    allowNull: false,
+    validate: {
+      min: 0,
+    },
+  })
+  price: number;
+
+  @ApiProperty({
+    description: 'Service duration in minutes',
+    example: 60,
+  })
+  @Column({
+    type: DataType.INTEGER,
+    allowNull: false,
+    validate: {
+      min: 1,
+    },
+  })
+  duration: number;
+
+  @ApiProperty({
+    description: 'Buffer time after service in minutes',
+    example: 15,
+  })
+  @Column({
+    type: DataType.INTEGER,
+    allowNull: false,
+    defaultValue: 15,
+    validate: {
+      min: 0,
+    },
+  })
+  bufferTime: number;
+
+  @ApiProperty({
+    description: 'Whether the service is currently active',
+    example: true,
+  })
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: true,
+  })
+  isActive: boolean;
+
+  @ApiProperty({
+    description: 'Whether the service is marked as popular',
+    example: false,
+  })
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  })
+  isPopular: boolean;
+
+  @ApiProperty({
+    description: 'Service requirements or preparations',
+    example: ['Uñas cortas', 'Sin esmalte'],
+  })
+  @Column({
+    type: DataType.ARRAY(DataType.STRING),
+    allowNull: true,
+    defaultValue: [],
+  })
+  requirements?: string[];
+
+  @ApiProperty({
+    description: 'Compatible add-on service IDs',
+    example: ['123e4567-e89b-12d3-a456-426614174001'],
+  })
+  @Column({
+    type: DataType.ARRAY(DataType.UUID),
+    allowNull: true,
+    defaultValue: [],
+  })
+  compatibleAddOns?: string[];
+
+  @ApiProperty({
+    description: 'Service image URL',
+    example: 'https://example.com/service-image.jpg',
+  })
+  @Column({
+    type: DataType.STRING(500),
+    allowNull: true,
+  })
+  imageUrl?: string;
+
+  @ApiProperty({
+    description: 'Display order for service listings',
+    example: 1,
+  })
+  @Column({
+    type: DataType.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+  })
+  displayOrder: number;
+
+  @ApiProperty({
+    description: 'When the service was created',
+    example: '2025-09-21T13:00:00Z',
+  })
+  declare createdAt: Date;
+
+  @ApiProperty({
+    description: 'When the service was last updated',
+    example: '2025-09-21T13:00:00Z',
+  })
+  declare updatedAt: Date;
+
+  @ApiProperty({
+    description: 'When the service was deleted (null if not deleted)',
+    example: null,
+  })
+  declare deletedAt: Date;
+}
+
+export default ServiceEntity;

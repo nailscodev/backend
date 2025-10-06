@@ -1,0 +1,491 @@
+import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
+import { InjectModel } from '@nestjs/sequelize';
+import { Op, WhereOptions } from 'sequelize';
+import { CreateStaffDto } from './dto/create-staff.dto';
+import { UpdateStaffDto } from './dto/update-staff.dto';
+import { StaffResponseDto } from './dto/staff-response.dto';
+import { StaffStatisticsResponseDto } from './dto/staff-statistics-response.dto';
+import { PaginatedStaffResponseDto } from './dto/paginated-staff-response.dto';
+import { StaffEntity } from '../infrastructure/persistence/entities/staff.entity';
+import { StaffRole, StaffStatus } from '../domain/staff.types';
+
+interface PaginationParams {
+  page: number;
+  limit: number;
+}
+
+interface StaffFilters {
+  search?: string;
+  role?: StaffRole;
+  status?: StaffStatus;
+  isActive?: boolean;
+}
+
+@Injectable()
+export class StaffService {
+  private readonly logger = new Logger(StaffService.name);
+  private readonly DEFAULT_PAGE = 1;
+  private readonly DEFAULT_LIMIT = 10;
+  private readonly MAX_LIMIT = 100;
+
+  constructor(
+    @InjectModel(StaffEntity)
+    private readonly staffModel: typeof StaffEntity
+  ) {}
+
+  /**
+   * Creates a new staff member
+   */
+  async createStaff(createStaffDto: CreateStaffDto): Promise<StaffResponseDto> {
+    this.logger.log(`Creating staff member with email: ${createStaffDto.email}`);
+
+    await this.validateEmailUniqueness(createStaffDto.email);
+    this.validateBusinessRules(createStaffDto);
+
+    const staffData = this.prepareStaffData(createStaffDto);
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      const createdStaff = await this.staffModel.create(staffData as any);
+      this.logger.log(`Staff member created successfully with ID: ${createdStaff.id}`);
+      return this.mapToResponseDto(createdStaff);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Failed to create staff member: ${errorMessage}`, errorStack);
+      throw new BadRequestException(`Failed to create staff member: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Retrieves paginated staff members with optional filters
+   */
+  async findAllStaff(
+    pagination: PaginationParams = { page: this.DEFAULT_PAGE, limit: this.DEFAULT_LIMIT },
+    filters: StaffFilters = {}
+  ): Promise<PaginatedStaffResponseDto> {
+    this.logger.log(`Finding staff with pagination: ${JSON.stringify(pagination)}`);
+
+    const validatedPagination = this.validatePagination(pagination);
+    const whereClause = this.buildWhereClause(filters);
+
+    try {
+      const { rows: staff, count: total } = await this.staffModel.findAndCountAll({
+        where: whereClause,
+        offset: (validatedPagination.page - 1) * validatedPagination.limit,
+        limit: validatedPagination.limit,
+        order: [['firstName', 'ASC'], ['lastName', 'ASC']],
+      });
+
+      return {
+        staff: staff.map(s => this.mapToResponseDto(s)),
+        total,
+        page: validatedPagination.page,
+        limit: validatedPagination.limit,
+        totalPages: Math.ceil(total / validatedPagination.limit),
+      };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Failed to retrieve staff: ${errorMessage}`, errorStack);
+      throw new BadRequestException(`Failed to retrieve staff: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Retrieves a staff member by ID
+   */
+  async findStaffById(id: string, tenantId: string): Promise<StaffResponseDto> {
+    this.logger.log(`Finding staff member by ID: ${id} for tenant: ${tenantId}`);
+
+    const staff = await this.findStaffEntityById(id, tenantId);
+    return this.mapToResponseDto(staff);
+  }
+
+  /**
+   * Retrieves a staff member by email
+   */
+  async findStaffByEmail(email: string, tenantId: string): Promise<StaffResponseDto | null> {
+    this.logger.log(`Finding staff member by email: ${email} for tenant: ${tenantId}`);
+
+    const staff = await this.staffModel.findOne({
+      where: { email: email.toLowerCase().trim(), tenantId }
+    });
+
+    return staff ? this.mapToResponseDto(staff) : null;
+  }
+
+  /**
+   * Retrieves available staff members
+   */
+  async findAvailableStaff(tenantId: string): Promise<StaffResponseDto[]> {
+    this.logger.log(`Finding available staff for tenant: ${tenantId}`);
+
+    try {
+      const staff = await this.staffModel.findAll({
+        where: { 
+          tenantId,
+          status: StaffStatus.ACTIVE,
+          isBookable: true
+        },
+        order: [['firstName', 'ASC'], ['lastName', 'ASC']],
+      });
+
+      return staff.map(s => this.mapToResponseDto(s));
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Failed to retrieve available staff: ${errorMessage}`, errorStack);
+      throw new BadRequestException(`Failed to retrieve available staff: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Retrieves staff members by service ID
+   */
+  async findStaffByServiceId(serviceId: string, tenantId: string): Promise<StaffResponseDto[]> {
+    this.logger.log(`Finding staff by service ID: ${serviceId} for tenant: ${tenantId}`);
+
+    if (!serviceId?.trim()) {
+      throw new BadRequestException('Service ID is required');
+    }
+
+    try {
+      const staff = await this.staffModel.findAll({
+        where: {
+          tenantId,
+          serviceIds: { [Op.contains]: [serviceId] },
+          status: StaffStatus.ACTIVE
+        },
+        order: [['firstName', 'ASC'], ['lastName', 'ASC']],
+      });
+
+      return staff.map(s => this.mapToResponseDto(s));
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Failed to retrieve staff by service: ${errorMessage}`, errorStack);
+      throw new BadRequestException(`Failed to retrieve staff by service: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Updates a staff member
+   */
+  async updateStaff(id: string, updateStaffDto: UpdateStaffDto, tenantId: string): Promise<StaffResponseDto> {
+    this.logger.log(`Updating staff member ID: ${id} for tenant: ${tenantId}`);
+
+    const existingStaff = await this.findStaffEntityById(id, tenantId);
+
+    if (updateStaffDto.email && updateStaffDto.email !== existingStaff.email) {
+      await this.validateEmailUniqueness(updateStaffDto.email, tenantId, id);
+    }
+
+    this.validateBusinessRules(updateStaffDto);
+
+    try {
+      const updateData = this.prepareUpdateData(updateStaffDto);
+      await existingStaff.update(updateData);
+      this.logger.log(`Staff member updated successfully: ${id}`);
+      return this.mapToResponseDto(existingStaff);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Failed to update staff member: ${errorMessage}`, errorStack);
+      throw new BadRequestException(`Failed to update staff member: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Deletes a staff member
+   */
+  async deleteStaff(id: string, tenantId: string): Promise<void> {
+    this.logger.log(`Deleting staff member ID: ${id} for tenant: ${tenantId}`);
+
+    const existingStaff = await this.findStaffEntityById(id, tenantId);
+
+    try {
+      await existingStaff.destroy();
+      this.logger.log(`Staff member deleted successfully: ${id}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Failed to delete staff member: ${errorMessage}`, errorStack);
+      throw new BadRequestException(`Failed to delete staff member: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Activates a staff member
+   */
+  async activateStaff(id: string, tenantId: string): Promise<StaffResponseDto> {
+    this.logger.log(`Activating staff member ID: ${id} for tenant: ${tenantId}`);
+    return this.updateStaff(id, { status: StaffStatus.ACTIVE }, tenantId);
+  }
+
+  /**
+   * Deactivates a staff member
+   */
+  async deactivateStaff(id: string, tenantId: string): Promise<StaffResponseDto> {
+    this.logger.log(`Deactivating staff member ID: ${id} for tenant: ${tenantId}`);
+    return this.updateStaff(id, { status: StaffStatus.INACTIVE }, tenantId);
+  }
+
+  /**
+   * Adds a service to a staff member
+   */
+  async addServiceToStaff(staffId: string, serviceId: string, tenantId: string): Promise<StaffResponseDto> {
+    this.logger.log(`Adding service ${serviceId} to staff ${staffId} for tenant: ${tenantId}`);
+
+    const staff = await this.findStaffEntityById(staffId, tenantId);
+    const currentServices = staff.serviceIds || [];
+
+    if (currentServices.includes(serviceId)) {
+      throw new ConflictException('Service is already assigned to this staff member');
+    }
+
+    const updatedServices = [...currentServices, serviceId];
+    await staff.update({ serviceIds: updatedServices });
+
+    this.logger.log(`Service added successfully to staff member: ${staffId}`);
+    return this.mapToResponseDto(staff);
+  }
+
+  /**
+   * Removes a service from a staff member
+   */
+  async removeServiceFromStaff(staffId: string, serviceId: string, tenantId: string): Promise<StaffResponseDto> {
+    this.logger.log(`Removing service ${serviceId} from staff ${staffId} for tenant: ${tenantId}`);
+
+    const staff = await this.findStaffEntityById(staffId, tenantId);
+    const currentServices = staff.serviceIds || [];
+
+    if (!currentServices.includes(serviceId)) {
+      throw new NotFoundException('Service is not assigned to this staff member');
+    }
+
+    const updatedServices = currentServices.filter(id => id !== serviceId);
+    await staff.update({ serviceIds: updatedServices });
+
+    this.logger.log(`Service removed successfully from staff member: ${staffId}`);
+    return this.mapToResponseDto(staff);
+  }
+
+  /**
+   * Retrieves staff statistics
+   */
+  async getStaffStatistics(tenantId: string): Promise<StaffStatisticsResponseDto> {
+    this.logger.log(`Getting staff statistics for tenant: ${tenantId}`);
+
+    try {
+      const staff = await this.staffModel.findAll({ where: { tenantId } });
+
+      const totalStaff = staff.length;
+      const activeStaff = staff.filter(s => s.status === StaffStatus.ACTIVE as any).length;
+      const inactiveStaff = totalStaff - activeStaff;
+
+      const totalCommission = staff.reduce((sum, s) => sum + (s.commissionPercentage || 0), 0);
+      const avgCommissionRate = totalStaff > 0 ? totalCommission / totalStaff : 0;
+
+      const staffByRole = Object.values(StaffRole).reduce((acc, role) => {
+        acc[role] = staff.filter(s => s.role === role).length;
+        return acc;
+      }, {} as Record<StaffRole, number>);
+
+      return {
+        totalStaff,
+        activeStaff,
+        inactiveStaff,
+        avgCommissionRate,
+        staffByRole,
+      };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Failed to get staff statistics: ${errorMessage}`, errorStack);
+      throw new BadRequestException(`Failed to get staff statistics: ${errorMessage}`);
+    }
+  }
+
+  // Private helper methods
+  private async findStaffEntityById(id: string, tenantId: string): Promise<StaffEntity> {
+    const staff = await this.staffModel.findOne({
+      where: { id, tenantId }
+    });
+    
+    if (!staff) {
+      throw new NotFoundException(`Staff member with ID ${id} not found`);
+    }
+    
+    return staff;
+  }
+
+  private async validateEmailUniqueness(email: string, tenantId: string, excludeId?: string): Promise<void> {
+    const whereClause: WhereOptions<StaffEntity> = { 
+      email: email.toLowerCase().trim(), 
+      tenantId 
+    };
+
+    if (excludeId) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      (whereClause as any).id = { [Op.ne]: excludeId };
+    }
+
+    const existingStaff = await this.staffModel.findOne({ where: whereClause });
+    
+    if (existingStaff) {
+      throw new ConflictException(`Staff with email ${email} already exists`);
+    }
+  }
+
+  private validateBusinessRules(data: CreateStaffDto | UpdateStaffDto): void {
+    if (data.commissionPercentage !== undefined) {
+      if (data.commissionPercentage < 0 || data.commissionPercentage > 100) {
+        throw new BadRequestException('Commission percentage must be between 0 and 100');
+      }
+    }
+
+    if (data.hourlyRate !== undefined && data.hourlyRate < 0) {
+      throw new BadRequestException('Hourly rate must be a positive number');
+    }
+
+    if (data.startDate && 'endDate' in data && data.endDate) {
+      const startDate = new Date(data.startDate);
+      const endDate = new Date(data.endDate);
+      if (endDate <= startDate) {
+        throw new BadRequestException('End date must be after start date');
+      }
+    }
+  }
+
+  private validatePagination(pagination: PaginationParams): PaginationParams {
+    const page = Math.max(1, Math.floor(pagination.page) || this.DEFAULT_PAGE);
+    const limit = Math.min(this.MAX_LIMIT, Math.max(1, Math.floor(pagination.limit) || this.DEFAULT_LIMIT));
+    
+    return { page, limit };
+  }
+
+  private buildWhereClause(filters: StaffFilters): WhereOptions<StaffEntity> {
+    const where: WhereOptions<StaffEntity> = {};
+
+    if (filters.search?.trim()) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      (where as any)[Op.or] = [
+        { firstName: { [Op.iLike]: `%${filters.search.trim()}%` } },
+        { lastName: { [Op.iLike]: `%${filters.search.trim()}%` } },
+        { email: { [Op.iLike]: `%${filters.search.trim()}%` } }
+      ];
+    }
+
+    if (filters.role) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      (where as any).role = filters.role;
+    }
+
+    if (filters.status) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      (where as any).status = filters.status;
+    }
+
+    if (filters.isActive !== undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      (where as any).status = filters.isActive ? StaffStatus.ACTIVE : { [Op.ne]: StaffStatus.ACTIVE };
+    }
+
+    return where;
+  }
+
+  private prepareStaffData(createStaffDto: CreateStaffDto): Partial<StaffEntity> {
+    return {
+      ...createStaffDto,
+      email: createStaffDto.email.toLowerCase().trim(),
+      firstName: createStaffDto.firstName.trim(),
+      lastName: createStaffDto.lastName.trim(),
+      phone: createStaffDto.phone?.trim(),
+      role: createStaffDto.role || StaffRole.TECHNICIAN,
+      status: createStaffDto.status || StaffStatus.ACTIVE,
+      isBookable: createStaffDto.isBookable ?? true,
+      startDate: createStaffDto.startDate ? new Date(createStaffDto.startDate) : new Date(),
+      specialties: createStaffDto.specialties?.filter(Boolean) || [],
+      serviceIds: createStaffDto.serviceIds || [],
+    };
+  }
+
+  private prepareUpdateData(updateStaffDto: UpdateStaffDto): Partial<StaffEntity> {
+    const updateData: any = { ...updateStaffDto };
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    if (updateData.email) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+      updateData.email = updateData.email.toLowerCase().trim();
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    if (updateData.firstName) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+      updateData.firstName = updateData.firstName.trim();
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    if (updateData.lastName) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+      updateData.lastName = updateData.lastName.trim();
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    if (updateData.phone) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+      updateData.phone = updateData.phone.trim();
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    if (updateData.startDate) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+      updateData.startDate = new Date(updateData.startDate);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    if (updateData.endDate) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+      updateData.endDate = new Date(updateData.endDate);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    if (updateData.specialties) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+      updateData.specialties = updateData.specialties.filter(Boolean);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    return updateData;
+  }
+
+  private mapToResponseDto(staff: StaffEntity): StaffResponseDto {
+    return {
+      id: staff.id,
+      tenantId: staff.tenantId,
+      firstName: staff.firstName,
+      lastName: staff.lastName,
+      fullName: staff.fullName,
+      email: staff.email,
+      phone: staff.phone,
+      role: staff.role,
+      status: staff.status,
+      isActive: staff.isActive,
+      isAvailable: staff.isAvailable,
+      serviceIds: staff.serviceIds,
+      specialties: staff.specialties,
+      commissionPercentage: staff.commissionPercentage,
+      hourlyRate: staff.hourlyRate,
+      startDate: staff.startDate,
+      endDate: staff.endDate,
+      bio: staff.bio,
+      profilePictureUrl: staff.profilePictureUrl,
+      notes: staff.notes,
+      isBookable: staff.isBookable,
+      createdAt: staff.createdAt,
+      updatedAt: staff.updatedAt,
+      deletedAt: staff.deletedAt,
+    };
+  }
+}
