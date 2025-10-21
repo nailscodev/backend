@@ -1,6 +1,8 @@
 import { Table, Column, Model, DataType, Index } from 'sequelize-typescript';
 import { ApiProperty } from '@nestjs/swagger';
 
+import { ServiceEntity } from '../../../../services/infrastructure/persistence/entities/service.entity';
+
 export enum StaffRole {
   OWNER = 'OWNER',
   MANAGER = 'MANAGER',
@@ -120,17 +122,7 @@ export class StaffEntity extends Model<StaffEntity> {
   })
   status: StaffStatus;
 
-  @ApiProperty({
-    description: 'Services this staff member can perform',
-    example: ['123e4567-e89b-12d3-a456-426614174001'],
-    required: false,
-  })
-  @Column({
-    type: DataType.ARRAY(DataType.UUID),
-    allowNull: true,
-    defaultValue: [],
-  })
-  serviceIds?: string[];
+
 
   @ApiProperty({
     description: 'Staff member specialties',
@@ -285,6 +277,9 @@ export class StaffEntity extends Model<StaffEntity> {
   get isAvailable(): boolean {
     return this.isActive && this.isBookable;
   }
+
+  // Associations (defined in associations.ts)
+  services: ServiceEntity[];
 }
 
 export default StaffEntity;

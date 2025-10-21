@@ -36,7 +36,7 @@ export class ReservationsController {
   constructor(
     @InjectModel(BookingEntity)
     private bookingModel: typeof BookingEntity,
-  ) {}
+  ) { }
 
   @Get()
   @ApiOperation({
@@ -115,6 +115,107 @@ export class ReservationsController {
         hasNextPage: page < Math.ceil(total / actualLimit),
         hasPrevPage: page > 1,
       },
+    };
+  }
+
+  @Get('available-slots')
+  @ApiOperation({
+    summary: 'Get available time slots',
+    description: 'Retrieve available time slots for a specific date, excluding already booked times.',
+  })
+  @ApiQuery({ name: 'date', required: true, type: 'string', description: 'Date in YYYY-MM-DD format' })
+  @ApiQuery({ name: 'staffId', required: false, type: 'string', description: 'Filter by staff ID (UUID)' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Available time slots retrieved successfully',
+  })
+  async getAvailableTimeSlots(
+    @Query('date') date: string,
+    @Query('staffId') staffId?: string,
+  ) {
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new BadRequestException('Date must be in YYYY-MM-DD format');
+    }
+
+    // Build where clause for existing bookings
+    const where: Record<string, any> = {
+      appointmentDate: date,
+      status: {
+        [Op.not]: BookingStatus.CANCELLED
+      }
+    };
+
+    if (staffId) {
+      where.staffId = staffId;
+    }
+
+    // Get existing bookings for the date
+    const existingBookings = await this.bookingModel.findAll({
+      where,
+      attributes: ['startTime', 'endTime', 'staffId'],
+      order: [['startTime', 'ASC']]
+    });
+
+    // Generate all possible time slots (business hours: 07:30 - 21:30)
+    const allTimeSlots = this.generateTimeSlots();
+
+    // Group bookings by staff if staffId filter is not provided
+    const bookedSlotsByStaff = new Map<string, Set<string>>();
+
+    existingBookings.forEach(booking => {
+      const staff = booking.staffId;
+      if (!bookedSlotsByStaff.has(staff)) {
+        bookedSlotsByStaff.set(staff, new Set());
+      }
+
+      // Extract time from timestamp - startTime and endTime are Date objects from Sequelize
+      const startTime = new Date(booking.startTime).toTimeString().substring(0, 5); // Gets "08:30"
+      const endTime = new Date(booking.endTime).toTimeString().substring(0, 5); // Gets "10:00"
+
+      allTimeSlots.forEach(slot => {
+        if (slot.time >= startTime && slot.time < endTime) {
+          bookedSlotsByStaff.get(staff)!.add(slot.time);
+        }
+      });
+    });
+
+    // Filter available slots
+    const availableSlots = allTimeSlots.map(slot => {
+      let isAvailable = true;
+
+      if (staffId) {
+        // If specific staff requested, check only their bookings
+        const staffBookedSlots = bookedSlotsByStaff.get(staffId) || new Set();
+        isAvailable = !staffBookedSlots.has(slot.time);
+      } else {
+        // If no staff filter, slot is available if at least one staff member is free
+        // For simplicity, we'll assume slot is unavailable only if ALL staff are busy
+        // This logic can be enhanced based on business requirements
+        const totalStaffBusy = Array.from(bookedSlotsByStaff.values())
+          .filter(staffSlots => staffSlots.has(slot.time)).length;
+
+        // For now, mark as unavailable if any staff is busy (can be adjusted)
+        isAvailable = totalStaffBusy === 0;
+      }
+
+      return {
+        ...slot,
+        available: isAvailable
+      };
+    });
+
+    // Group by time periods
+    const groupedSlots = {
+      morning: availableSlots.filter(slot => slot.time >= '07:30' && slot.time < '12:00'),
+      afternoon: availableSlots.filter(slot => slot.time >= '12:00' && slot.time < '18:00'),
+      evening: availableSlots.filter(slot => slot.time >= '18:00' && slot.time <= '21:30')
+    };
+
+    return {
+      success: true,
+      data: groupedSlots,
+      date,
+      staffId: staffId || 'all'
     };
   }
 
@@ -246,5 +347,32 @@ export class ReservationsController {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException('Error confirming booking: ' + errorMessage);
     }
+  }
+
+  private generateTimeSlots(): Array<{ time: string; available: boolean }> {
+    const slots: Array<{ time: string; available: boolean }> = [];
+    const startHour = 7;
+    const startMinute = 30;
+    const endHour = 21;
+    const endMinute = 30;
+    const intervalMinutes = 60; // 1 hour intervals
+
+    const currentTime = new Date();
+    currentTime.setHours(startHour, startMinute, 0, 0);
+
+    const endTime = new Date();
+    endTime.setHours(endHour, endMinute, 0, 0);
+
+    while (currentTime <= endTime) {
+      const timeString = currentTime.toTimeString().substring(0, 5);
+      slots.push({
+        time: timeString,
+        available: true // Default to available, will be filtered later
+      });
+
+      currentTime.setMinutes(currentTime.getMinutes() + intervalMinutes);
+    }
+
+    return slots;
   }
 }

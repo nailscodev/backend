@@ -1,9 +1,12 @@
 import { Table, Column, Model, DataType } from 'sequelize-typescript';
 import { ApiProperty } from '@nestjs/swagger';
+import { AddOnEntity } from '../../../../addons/infrastructure/persistence/entities/addon.entity';
+
+import { StaffEntity } from '../../../../staff/infrastructure/persistence/entities/staff.entity';
 
 export enum ServiceCategory {
   NAILS = 'NAILS',
-  FACIAL = 'FACIAL', 
+  FACIAL = 'FACIAL',
   BODY = 'BODY',
   HAIR = 'HAIR',
   ADDON = 'ADDON'
@@ -179,6 +182,10 @@ export class ServiceEntity extends Model<ServiceEntity> {
     example: null,
   })
   declare deletedAt: Date;
+
+  // Associations (defined in associations.ts)
+  addOns?: AddOnEntity[];
+  staff?: StaffEntity[];
 }
 
 export default ServiceEntity;

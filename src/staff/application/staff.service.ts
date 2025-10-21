@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
-import { Op, WhereOptions } from 'sequelize';
+import { Op, WhereOptions, literal } from 'sequelize';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import { StaffResponseDto } from './dto/staff-response.dto';
@@ -8,6 +8,7 @@ import { StaffStatisticsResponseDto } from './dto/staff-statistics-response.dto'
 import { PaginatedStaffResponseDto } from './dto/paginated-staff-response.dto';
 import { StaffEntity } from '../infrastructure/persistence/entities/staff.entity';
 import { StaffRole, StaffStatus } from '../infrastructure/persistence/entities/staff.entity';
+import { ServiceEntity } from '../../services/infrastructure/persistence/entities/service.entity';
 
 interface PaginationParams {
   page: number;
@@ -31,7 +32,7 @@ export class StaffService {
   constructor(
     @InjectModel(StaffEntity)
     private readonly staffModel: typeof StaffEntity,
-  ) {}
+  ) { }
 
   /**
    * Creates a new staff member
@@ -65,10 +66,10 @@ export class StaffService {
         notes: createStaffDto.notes,
         isBookable: createStaffDto.isBookable ?? true
       };
-      
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const createdStaff = await this.staffModel.create(staffData as any);
-      
+
       this.logger.log(`Staff member created successfully with ID: ${createdStaff.id}`);
       return this.mapToResponseDto(createdStaff);
     } catch (error: unknown) {
@@ -167,10 +168,13 @@ export class StaffService {
 
     try {
       const staff = await this.staffModel.findAll({
+        include: [{
+          model: ServiceEntity,
+          where: { id: serviceId },
+          attributes: [],
+          through: { attributes: [] }
+        }],
         where: {
-          serviceIds: {
-            [Op.contains]: [serviceId]
-          },
           status: StaffStatus.ACTIVE
         },
         order: [['lastName', 'ASC'], ['firstName', 'ASC']]
@@ -180,6 +184,49 @@ export class StaffService {
     } catch (error: unknown) {
       this.logger.error(`Failed to find staff by service ID: ${serviceId}`, error);
       throw new BadRequestException('Failed to find staff by service');
+    }
+  }
+
+  /**
+   * Finds staff members who can perform ALL of the specified services
+   */
+  async findStaffByServiceIds(serviceIds: string[]): Promise<StaffResponseDto[]> {
+    this.logger.log(`Finding staff by service IDs: ${serviceIds.join(', ')}`);
+
+    if (!serviceIds || serviceIds.length === 0) {
+      return await this.findAvailableStaff();
+    }
+
+    try {
+      // Find staff that can perform ALL selected services using subquery approach
+      const staff = await this.staffModel.findAll({
+        where: {
+          status: StaffStatus.ACTIVE,
+          isBookable: true,
+          id: {
+            [Op.in]: literal(`(
+              SELECT DISTINCT staff_id 
+              FROM staff_services ss
+              WHERE ss.service_id IN (${serviceIds.map(id => `'${id}'`).join(', ')})
+              GROUP BY staff_id
+              HAVING COUNT(DISTINCT ss.service_id) = ${serviceIds.length}
+            )`)
+          }
+        },
+        order: [['lastName', 'ASC'], ['firstName', 'ASC']]
+      });
+
+      this.logger.log(`Found ${staff.length} staff members who can perform all required services: ${serviceIds.join(', ')}`);
+
+      // Debug: Log staff IDs found
+      staff.forEach(staffMember => {
+        this.logger.log(`Staff found: ${staffMember.dataValues.firstName} ${staffMember.dataValues.lastName} (ID: ${staffMember.dataValues.id})`);
+      });
+
+      return staff.map(s => this.mapToResponseDto(s));
+    } catch (error: unknown) {
+      this.logger.error(`Failed to find staff by service IDs: ${serviceIds.join(', ')}`, error);
+      throw new BadRequestException('Failed to find staff by services');
     }
   }
 
@@ -200,7 +247,7 @@ export class StaffService {
     try {
       const updateData = this.prepareUpdateData(updateStaffDto);
       await existingStaff.update(updateData);
-      
+
       this.logger.log(`Staff member updated successfully: ${id}`);
       return this.mapToResponseDto(existingStaff);
     } catch (error: unknown) {
@@ -240,56 +287,6 @@ export class StaffService {
   async deactivateStaff(id: string): Promise<StaffResponseDto> {
     this.logger.log(`Deactivating staff member ID: ${id}`);
     return await this.updateStaffStatus(id, StaffStatus.INACTIVE);
-  }
-
-  /**
-   * Adds a service to a staff member
-   */
-  async addServiceToStaff(staffId: string, serviceId: string): Promise<StaffResponseDto> {
-    this.logger.log(`Adding service ${serviceId} to staff ${staffId}`);
-
-    const staff = await this.findStaffEntityById(staffId);
-    const currentServiceIds = staff.serviceIds || [];
-
-    if (currentServiceIds.includes(serviceId)) {
-      throw new ConflictException('Service already assigned to this staff member');
-    }
-
-    const updatedServiceIds = [...currentServiceIds, serviceId];
-
-    try {
-      await staff.update({ serviceIds: updatedServiceIds });
-      this.logger.log(`Service added successfully to staff member: ${staffId}`);
-      return this.mapToResponseDto(staff);
-    } catch (error: unknown) {
-      this.logger.error(`Failed to add service to staff member: ${staffId}`, error);
-      throw new BadRequestException('Failed to add service to staff member');
-    }
-  }
-
-  /**
-   * Removes a service from a staff member
-   */
-  async removeServiceFromStaff(staffId: string, serviceId: string): Promise<StaffResponseDto> {
-    this.logger.log(`Removing service ${serviceId} from staff ${staffId}`);
-
-    const staff = await this.findStaffEntityById(staffId);
-    const currentServiceIds = staff.dataValues.serviceIds || [];
-
-    if (!currentServiceIds.includes(serviceId)) {
-      throw new NotFoundException('Service not assigned to this staff member');
-    }
-
-    const updatedServiceIds = currentServiceIds.filter(id => id !== serviceId);
-
-    try {
-      await staff.update({ serviceIds: updatedServiceIds });
-      this.logger.log(`Service removed successfully from staff member: ${staffId}`);
-      return this.mapToResponseDto(staff);
-    } catch (error: unknown) {
-      this.logger.error(`Failed to remove service from staff member: ${staffId}`, error);
-      throw new BadRequestException('Failed to remove service from staff member');
-    }
   }
 
   /**
@@ -439,7 +436,7 @@ export class StaffService {
       isBookable: createStaffDto.isBookable ?? true,
       startDate: createStaffDto.startDate ? new Date(createStaffDto.startDate) : new Date(),
       specialties: createStaffDto.specialties?.filter(Boolean) || [],
-      serviceIds: createStaffDto.serviceIds || [],
+
     };
   }
 
@@ -476,9 +473,7 @@ export class StaffService {
     if (updateStaffDto.specialties !== undefined) {
       updateData.specialties = updateStaffDto.specialties?.filter(Boolean) || [];
     }
-    if (updateStaffDto.serviceIds !== undefined) {
-      updateData.serviceIds = updateStaffDto.serviceIds || [];
-    }
+
     if (updateStaffDto.commissionPercentage !== undefined) {
       updateData.commissionPercentage = updateStaffDto.commissionPercentage;
     }
@@ -508,7 +503,7 @@ export class StaffService {
       phone: staff.dataValues.phone,
       role: staff.dataValues.role,
       status: staff.dataValues.status,
-      serviceIds: staff.dataValues.serviceIds || [],
+
       specialties: staff.dataValues.specialties || [],
       commissionPercentage: staff.dataValues.commissionPercentage,
       hourlyRate: staff.dataValues.hourlyRate,

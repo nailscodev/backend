@@ -1,9 +1,10 @@
 import { Table, Column, Model, DataType } from 'sequelize-typescript';
 import { ApiProperty } from '@nestjs/swagger';
+import { ServiceEntity } from '../../../../services/infrastructure/persistence/entities/service.entity';
 
 export enum AddOnCategory {
   NAIL_ART = 'NAIL_ART',
-  NAIL_CARE = 'NAIL_CARE', 
+  NAIL_CARE = 'NAIL_CARE',
   NAIL_ENHANCEMENT = 'NAIL_ENHANCEMENT',
   REMOVAL = 'REMOVAL',
   MASSAGE = 'MASSAGE',
@@ -145,6 +146,9 @@ export class AddOnEntity extends Model<AddOnEntity> {
     example: null,
   })
   declare deletedAt: Date;
+
+  // Associations (defined in associations.ts)
+  services?: ServiceEntity[];
 }
 
 export default AddOnEntity;

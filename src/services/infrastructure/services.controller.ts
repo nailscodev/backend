@@ -108,6 +108,34 @@ export class ServicesController {
     return this.servicesService.getCategories();
   }
 
+  @Get('addons/by-services')
+  @SkipResponseWrapper(true)
+  @ApiOperation({
+    summary: 'Get add-ons by service IDs',
+    description: 'Retrieves add-ons that are associated with the specified service IDs'
+  })
+  @ApiQuery({
+    name: 'serviceIds',
+    required: true,
+    type: String,
+    description: 'Comma-separated list of service UUIDs',
+    example: 'uuid1,uuid2,uuid3'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Add-ons retrieved successfully'
+  })
+  async getAddonsByServices(
+    @Query('serviceIds') serviceIds: string,
+  ) {
+    if (!serviceIds) {
+      return [];
+    }
+
+    const serviceIdArray = serviceIds.split(',').map(id => id.trim());
+    return await this.servicesService.getAddonsByServiceIds(serviceIdArray);
+  }
+
   @Get(':id')
   @ApiOperation({
     summary: 'Get service by ID',

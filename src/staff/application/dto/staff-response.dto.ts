@@ -65,13 +65,7 @@ export class StaffResponseDto {
   })
   isAvailable: boolean;
 
-  @ApiProperty({
-    description: 'Services this staff member can perform',
-    example: ['123e4567-e89b-12d3-a456-426614174001'],
-    required: false,
-    type: [String],
-  })
-  serviceIds?: string[];
+
 
   @ApiProperty({
     description: 'Staff member specialties',

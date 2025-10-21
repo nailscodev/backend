@@ -73,17 +73,7 @@ export class CreateStaffDto {
   @IsEnum(StaffStatus, { message: 'Invalid staff status' })
   status?: StaffStatus = StaffStatus.ACTIVE;
 
-  @ApiProperty({
-    description: 'Services this staff member can perform',
-    example: ['123e4567-e89b-12d3-a456-426614174001'],
-    required: false,
-    type: [String],
-  })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  @Transform(({ value }: { value: any }): any => Array.isArray(value) ? value.map((item: unknown) => typeof item === 'string' ? item.trim() : item).filter(Boolean) : value)
-  serviceIds?: string[];
+
 
   @ApiProperty({
     description: 'Staff member specialties',
