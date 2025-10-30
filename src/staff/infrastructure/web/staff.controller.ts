@@ -32,7 +32,7 @@ import { PaginatedStaffResponseDto } from '../../application/dto/paginated-staff
 import { StaffStatisticsResponseDto } from '../../application/dto/staff-statistics-response.dto';
 import { StaffRole, StaffStatus } from '../../domain/staff.types';
 
-// TODO: Replace with actual JWT guard when authentication is implemented
+// Mock guard - replace with actual JWT guard when authentication is implemented
 class MockJwtGuard {
   canActivate(): boolean {
     return true;
@@ -287,6 +287,7 @@ export class StaffController {
     return await this.staffService.deactivateStaff(id);
   }
 
-  // TODO: Implement staff-service relationship endpoints using StaffServiceRelationService
+  // Staff-service relationship endpoints
+  // Implementation pending
   // These methods were temporarily removed during database refactoring
 }

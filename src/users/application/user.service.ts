@@ -39,7 +39,7 @@ export class UserService {
   constructor(
     @InjectModel(UserEntity)
     private readonly userModel: typeof UserEntity,
-  ) {}
+  ) { }
 
   /**
    * Creates a new user
@@ -81,7 +81,7 @@ export class UserService {
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const createdUser = await this.userModel.create(userData as any);
-      
+
       this.logger.log(`User created successfully with ID: ${createdUser.id}`);
       return this.mapToResponseDto(createdUser);
     } catch (error: unknown) {
@@ -112,7 +112,7 @@ export class UserService {
       });
 
       const users = rows.map(user => this.mapToResponseDto(user));
-      
+
       const totalPages = Math.ceil(count / validatedPagination.limit);
 
       return {
@@ -177,7 +177,7 @@ export class UserService {
     this.logger.log(`Updating user with ID: ${id}`);
 
     const user = await this.findUserEntityById(id);
-    
+
     this.validateBusinessRules(updateUserDto);
 
     // Prepare update data
@@ -185,9 +185,9 @@ export class UserService {
 
     if (updateUserDto.username !== undefined) {
       const existingUser = await this.userModel.findOne({
-        where: { 
+        where: {
           username: updateUserDto.username.toLowerCase().trim(),
-          id: { [Op.ne]: id } 
+          id: { [Op.ne]: id }
         }
       });
       if (existingUser) {
@@ -198,7 +198,7 @@ export class UserService {
 
     if (updateUserDto.email !== undefined) {
       const existingUser = await this.userModel.findOne({
-        where: { 
+        where: {
           email: updateUserDto.email.toLowerCase().trim(),
           id: { [Op.ne]: id }
         }
@@ -331,7 +331,7 @@ export class UserService {
    * Authenticates user login
    */
   async login(loginDto: LoginDto): Promise<LoginResponseDto> {
-    this.logger.log(`🎯 LOGIN ATTEMPT for: ${loginDto.usernameOrEmail}`);
+    this.logger.log(`Login attempt for: ${loginDto.usernameOrEmail}`);
 
     // Find user by email or username
     const user = await this.userModel.findOne({
@@ -356,26 +356,17 @@ export class UserService {
     }
 
     console.log('🔐 USER ACTIVE STATUS:', user.isActive, 'TYPE:', typeof user.isActive);
-    
+
     if (!user.isActive) {
-      console.log('❌ USER IS DEACTIVATED!');
       throw new UnauthorizedException('User account is deactivated');
     }
 
     // Verify password
-    console.log('🔐 COMPARING PASSWORDS...');
-    console.log('🔐 Input password:', loginDto.password);
-    console.log('🔐 Stored hash:', user.password);
-    
     const isPasswordValid = await this.comparePassword(loginDto.password, user.password);
-    console.log('🔐 PASSWORD VALID:', isPasswordValid);
-    
+
     if (!isPasswordValid) {
-      console.log('❌ PASSWORD COMPARISON FAILED!');
       throw new UnauthorizedException('Invalid credentials');
     }
-    
-    console.log('✅ PASSWORD COMPARISON SUCCESS!');
 
     // Update last login
     await user.update({ lastLogin: new Date() });
@@ -591,7 +582,7 @@ export class UserService {
     }) as any[];
 
     const roleCounts = {} as { [K in UserRole]: number };
-    
+
     // Initialize all roles with 0
     Object.values(UserRole).forEach(role => {
       roleCounts[role] = 0;

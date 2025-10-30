@@ -218,11 +218,6 @@ export class StaffService {
 
       this.logger.log(`Found ${staff.length} staff members who can perform all required services: ${serviceIds.join(', ')}`);
 
-      // Debug: Log staff IDs found
-      staff.forEach(staffMember => {
-        this.logger.log(`Staff found: ${staffMember.dataValues.firstName} ${staffMember.dataValues.lastName} (ID: ${staffMember.dataValues.id})`);
-      });
-
       return staff.map(s => this.mapToResponseDto(s));
     } catch (error: unknown) {
       this.logger.error(`Failed to find staff by service IDs: ${serviceIds.join(', ')}`, error);

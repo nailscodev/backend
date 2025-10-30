@@ -67,10 +67,10 @@ export class BookingEntity extends Model<BookingEntity> {
 
   @ApiProperty({
     description: 'The start time of the booking',
-    example: '14:00:00',
+    example: '2025-09-21T14:00:00Z',
   })
   @Column({
-    type: DataType.TIME,
+    type: DataType.DATE,
     allowNull: false,
     field: 'startTime',
   })
@@ -78,10 +78,10 @@ export class BookingEntity extends Model<BookingEntity> {
 
   @ApiProperty({
     description: 'The end time of the booking',
-    example: '15:00:00',
+    example: '2025-09-21T15:00:00Z',
   })
   @Column({
-    type: DataType.TIME,
+    type: DataType.DATE,
     allowNull: false,
     field: 'endTime',
   })
@@ -93,8 +93,21 @@ export class BookingEntity extends Model<BookingEntity> {
   })
   @Column({
     type: DataType.ARRAY(DataType.UUID),
-    defaultValue: [],
+    allowNull: true,
+    defaultValue: null,
     field: 'addOnIds',
+    get() {
+      const value = this.getDataValue('addOnIds') as string[] | null;
+      return value || [];
+    },
+    set(value: string[] | null | undefined) {
+      // Store the array as-is if it has items, otherwise store null
+      if (value && Array.isArray(value) && value.length > 0) {
+        this.setDataValue('addOnIds', value);
+      } else {
+        this.setDataValue('addOnIds', null);
+      }
+    }
   })
   declare addOnIds: string[];
 

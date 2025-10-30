@@ -48,7 +48,9 @@ async function bootstrap() {
       'Accept',
       'X-Requested-With',
       'Cache-Control',
-      'x-tenant-id'
+      'x-tenant-id',
+      'X-CSRF-Token',
+      'x-csrf-token'
     ],
     exposedHeaders: ['X-Total-Count', 'X-Total-Pages'],
     optionsSuccessStatus: 200, // For legacy browser support
@@ -80,11 +82,11 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
 
   const port = process.env.PORT || 3000;
-  await app.listen(port, '0.0.0.0'); // Permitir conexiones externas
+  await app.listen(port, '0.0.0.0');
 
-  console.log(`🚀 Application is running on: http://localhost:${port}`);
-  console.log(`📚 API Documentation: http://localhost:${port}/api/docs`);
-  console.log(`🌐 CORS enabled for origins: ${allowedOrigins.join(', ')}`);
+  console.log(`Application is running on: http://localhost:${port}`);
+  console.log(`API Documentation: http://localhost:${port}/api/docs`);
+  console.log(`CORS enabled for origins: ${allowedOrigins.join(', ')}`);
 }
 
 bootstrap().catch((error) => {

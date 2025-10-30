@@ -59,6 +59,4 @@ export function defineAssociations() {
     foreignKey: 'service_id',
     as: 'service'
   });
-
-  console.log('Database associations loaded for Sequelize entities');
 }

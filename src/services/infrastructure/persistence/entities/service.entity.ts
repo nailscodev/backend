@@ -37,7 +37,7 @@ export class ServiceEntity extends Model<ServiceEntity> {
     type: DataType.STRING(255),
     allowNull: false,
   })
-  name: string;
+  declare name: string;
 
   @ApiProperty({
     description: 'Service description',
@@ -47,7 +47,7 @@ export class ServiceEntity extends Model<ServiceEntity> {
     type: DataType.TEXT,
     allowNull: true,
   })
-  description?: string;
+  declare description?: string;
 
   @ApiProperty({
     description: 'Service category',
@@ -58,7 +58,7 @@ export class ServiceEntity extends Model<ServiceEntity> {
     type: DataType.ENUM(...Object.values(ServiceCategory)),
     allowNull: false,
   })
-  category: ServiceCategory;
+  declare category: ServiceCategory;
 
   @ApiProperty({
     description: 'Service price in cents',
@@ -71,7 +71,7 @@ export class ServiceEntity extends Model<ServiceEntity> {
       min: 0,
     },
   })
-  price: number;
+  declare price: number;
 
   @ApiProperty({
     description: 'Service duration in minutes',
@@ -84,7 +84,7 @@ export class ServiceEntity extends Model<ServiceEntity> {
       min: 1,
     },
   })
-  duration: number;
+  declare duration: number;
 
   @ApiProperty({
     description: 'Buffer time after service in minutes',
@@ -98,7 +98,7 @@ export class ServiceEntity extends Model<ServiceEntity> {
       min: 0,
     },
   })
-  bufferTime: number;
+  declare bufferTime: number;
 
   @ApiProperty({
     description: 'Whether the service is currently active',
@@ -109,7 +109,7 @@ export class ServiceEntity extends Model<ServiceEntity> {
     allowNull: false,
     defaultValue: true,
   })
-  isActive: boolean;
+  declare isActive: boolean;
 
   @ApiProperty({
     description: 'Whether the service is marked as popular',
@@ -120,7 +120,7 @@ export class ServiceEntity extends Model<ServiceEntity> {
     allowNull: false,
     defaultValue: false,
   })
-  isPopular: boolean;
+  declare isPopular: boolean;
 
   @ApiProperty({
     description: 'Service requirements or preparations',
@@ -131,7 +131,7 @@ export class ServiceEntity extends Model<ServiceEntity> {
     allowNull: true,
     defaultValue: [],
   })
-  requirements?: string[];
+  declare requirements?: string[];
 
   @ApiProperty({
     description: 'Compatible add-on service IDs',
@@ -142,7 +142,7 @@ export class ServiceEntity extends Model<ServiceEntity> {
     allowNull: true,
     defaultValue: [],
   })
-  compatibleAddOns?: string[];
+  declare compatibleAddOns?: string[];
 
   @ApiProperty({
     description: 'Service image URL',
@@ -152,7 +152,7 @@ export class ServiceEntity extends Model<ServiceEntity> {
     type: DataType.STRING(500),
     allowNull: true,
   })
-  imageUrl?: string;
+  declare imageUrl?: string;
 
   @ApiProperty({
     description: 'Display order for service listings',
@@ -163,7 +163,7 @@ export class ServiceEntity extends Model<ServiceEntity> {
     allowNull: false,
     defaultValue: 0,
   })
-  displayOrder: number;
+  declare displayOrder: number;
 
   @ApiProperty({
     description: 'When the service was created',

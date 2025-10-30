@@ -37,7 +37,7 @@ export class AddOnEntity extends Model<AddOnEntity> {
     type: DataType.STRING(255),
     allowNull: false,
   })
-  name: string;
+  declare name: string;
 
   @ApiProperty({
     description: 'Add-on description',
@@ -47,7 +47,7 @@ export class AddOnEntity extends Model<AddOnEntity> {
     type: DataType.TEXT,
     allowNull: true,
   })
-  description?: string;
+  declare description?: string;
 
   @ApiProperty({
     description: 'Add-on category',
@@ -58,7 +58,7 @@ export class AddOnEntity extends Model<AddOnEntity> {
     type: DataType.ENUM(...Object.values(AddOnCategory)),
     allowNull: false,
   })
-  category: AddOnCategory;
+  declare category: AddOnCategory;
 
   @ApiProperty({
     description: 'Add-on price in cents',
@@ -71,7 +71,7 @@ export class AddOnEntity extends Model<AddOnEntity> {
       min: 0,
     },
   })
-  price: number;
+  declare price: number;
 
   @ApiProperty({
     description: 'Additional time in minutes for this add-on',
@@ -85,7 +85,7 @@ export class AddOnEntity extends Model<AddOnEntity> {
       min: 0,
     },
   })
-  additionalTime: number;
+  declare additionalTime: number;
 
   @ApiProperty({
     description: 'Whether the add-on is currently active',
@@ -96,7 +96,7 @@ export class AddOnEntity extends Model<AddOnEntity> {
     allowNull: false,
     defaultValue: true,
   })
-  isActive: boolean;
+  declare isActive: boolean;
 
   @ApiProperty({
     description: 'Display order for sorting',
@@ -107,7 +107,7 @@ export class AddOnEntity extends Model<AddOnEntity> {
     allowNull: false,
     defaultValue: 0,
   })
-  displayOrder: number;
+  declare displayOrder: number;
 
   @ApiProperty({
     description: 'Array of service IDs this add-on is compatible with',
@@ -117,7 +117,7 @@ export class AddOnEntity extends Model<AddOnEntity> {
     type: DataType.ARRAY(DataType.UUID),
     allowNull: true,
   })
-  compatibleServiceIds?: string[];
+  declare compatibleServiceIds?: string[];
 
   @ApiProperty({
     description: 'Image URL for the add-on',
@@ -127,7 +127,7 @@ export class AddOnEntity extends Model<AddOnEntity> {
     type: DataType.STRING(500),
     allowNull: true,
   })
-  imageUrl?: string;
+  declare imageUrl?: string;
 
   @ApiProperty({
     description: 'When the add-on was created',

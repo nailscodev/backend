@@ -24,7 +24,7 @@ import { defineAssociations } from './associations';
         password: configService.get('DB_PASSWORD') || undefined,
         database: configService.get('DB_NAME', 'nailsandco'),
         synchronize: false, // Use manual SQL scripts instead of auto-sync
-        logging: configService.get('NODE_ENV') === 'development' ? console.log : false,
+        logging: configService.get('NODE_ENV') === 'development',
         autoLoadModels: true,
         models: [UserEntity, ServiceEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, ServiceAddon],
       }),
