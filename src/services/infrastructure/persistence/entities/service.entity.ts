@@ -1,7 +1,7 @@
-import { Table, Column, Model, DataType } from 'sequelize-typescript';
+import { Table, Column, Model, DataType, ForeignKey, BelongsTo } from 'sequelize-typescript';
 import { ApiProperty } from '@nestjs/swagger';
 import { AddOnEntity } from '../../../../addons/infrastructure/persistence/entities/addon.entity';
-
+import { CategoryEntity } from '../../../../categories/infrastructure/persistence/entities/category.entity';
 import { StaffEntity } from '../../../../staff/infrastructure/persistence/entities/staff.entity';
 
 export enum ServiceCategory {
@@ -50,15 +50,16 @@ export class ServiceEntity extends Model<ServiceEntity> {
   declare description?: string;
 
   @ApiProperty({
-    description: 'Service category',
-    enum: ServiceCategory,
-    example: ServiceCategory.NAILS,
+    description: 'Category ID (foreign key)',
+    example: '123e4567-e89b-12d3-a456-426614174000',
   })
+  @ForeignKey(() => CategoryEntity)
   @Column({
-    type: DataType.ENUM(...Object.values(ServiceCategory)),
+    type: DataType.UUID,
     allowNull: false,
+    field: 'category_id',
   })
-  declare category: ServiceCategory;
+  declare categoryId: string;
 
   @ApiProperty({
     description: 'Service price in cents',
@@ -186,6 +187,14 @@ export class ServiceEntity extends Model<ServiceEntity> {
   // Associations (defined in associations.ts)
   addOns?: AddOnEntity[];
   staff?: StaffEntity[];
+
+  @BelongsTo(() => CategoryEntity, 'categoryId')
+  declare categoryRelation?: CategoryEntity;
+
+  // Virtual field for category name (for backward compatibility)
+  get category(): string | undefined {
+    return this.categoryRelation?.name;
+  }
 }
 
 export default ServiceEntity;

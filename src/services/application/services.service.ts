@@ -1,6 +1,9 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { ServiceEntity } from '../infrastructure/persistence/entities/service.entity';
+import { ServiceIncompatibilityEntity } from '../infrastructure/persistence/entities/service-incompatibility.entity';
+import { RemovalStepEntity } from '../infrastructure/persistence/entities/removal-step.entity';
+import { CategoryEntity } from '../../categories/infrastructure/persistence/entities/category.entity';
 import { CreateServiceDto, UpdateServiceDto } from './dto';
 import { Op, QueryTypes } from 'sequelize';
 import { AddOnEntity } from '../../addons/infrastructure/persistence/entities/addon.entity';
@@ -36,6 +39,10 @@ export class ServicesService {
     private readonly serviceModel: typeof ServiceEntity,
     @InjectModel(AddOnEntity)
     private readonly addOnModel: typeof AddOnEntity,
+    @InjectModel(ServiceIncompatibilityEntity)
+    private readonly serviceIncompatibilityModel: typeof ServiceIncompatibilityEntity,
+    @InjectModel(RemovalStepEntity)
+    private readonly removalStepModel: typeof RemovalStepEntity,
     private readonly sequelize: Sequelize,
   ) { }
 
@@ -45,7 +52,7 @@ export class ServicesService {
     const serviceData = {
       name: createServiceDto.name,
       description: createServiceDto.description,
-      category: createServiceDto.category,
+      categoryId: createServiceDto.categoryId,
       price: createServiceDto.price,
       duration: createServiceDto.duration,
       bufferTime: createServiceDto.bufferTime ?? 15,
@@ -80,7 +87,7 @@ export class ServicesService {
     }
 
     if (category) {
-      whereClause.category = category;
+      whereClause.categoryId = category;
     }
 
     if (typeof isActive === 'boolean') {
@@ -89,9 +96,17 @@ export class ServicesService {
 
     const { rows: data, count: total } = await this.serviceModel.findAndCountAll({
       where: whereClause,
+      include: [
+        {
+          model: CategoryEntity,
+          as: 'categoryRelation',
+          attributes: ['id', 'name', 'displayOrder']
+        }
+      ],
       order: [['displayOrder', 'ASC'], ['name', 'ASC']],
       limit,
       offset,
+      raw: false,
     });
 
     return {
@@ -103,43 +118,37 @@ export class ServicesService {
     };
   }
 
-  async getCategories(): Promise<string[]> {
+  async getCategories(): Promise<CategoryEntity[]> {
     try {
-      // Obtener todos los servicios con sus categorías
-      const allServices = await this.serviceModel.findAll({
-        attributes: ['category']
+      // Obtener todas las categorías activas desde la tabla categories
+      const categories = await CategoryEntity.findAll({
+        where: { isActive: true },
+        order: [['displayOrder', 'ASC']]
       });
 
-      this.logger.log(`Found ${allServices.length} services in database`);
+      this.logger.log(`Found ${categories.length} categories in database`);
 
-      // Si no hay servicios, devolver array vacío
-      if (allServices.length === 0) {
-        this.logger.warn('No services found in database');
-        return [];
-      }
-
-      // Filtrar categorías válidas y obtener únicas
-      const validCategories = allServices
-        .map(service => service.dataValues.category)
-        .filter(category => category && category.trim() !== '');
-
-      const uniqueCategories = [...new Set(validCategories)];
-
-      this.logger.log(`Found categories: ${uniqueCategories.join(', ')}`);
-
-      return uniqueCategories.sort();
+      return categories;
     } catch (error) {
       this.logger.error('Error fetching categories:', error);
       return [];
     }
   }
 
-  async findCategories(): Promise<string[]> {
+  async findCategories(): Promise<CategoryEntity[]> {
     return this.getCategories();
   }
 
   async findOne(id: string): Promise<ServiceEntity> {
-    const service = await this.serviceModel.findByPk(id);
+    const service = await this.serviceModel.findByPk(id, {
+      include: [
+        {
+          model: CategoryEntity,
+          as: 'categoryRelation',
+          attributes: ['id', 'name', 'displayOrder']
+        }
+      ]
+    });
     if (!service) {
       throw new NotFoundException(`Service with ID ${id} not found`);
     }
@@ -210,6 +219,62 @@ export class ServicesService {
       return addOns;
     } catch (error) {
       this.logger.error('Error fetching add-ons by service IDs:', error);
+      throw error;
+    }
+  }
+
+  async getIncompatibleCategories(categoryIds: string[]): Promise<string[]> {
+    this.logger.log(`Getting incompatible categories for: ${categoryIds.join(', ')}`);
+
+    if (!categoryIds || categoryIds.length === 0) {
+      return [];
+    }
+
+    try {
+      const incompatibilities = await this.serviceIncompatibilityModel.findAll({
+        where: {
+          categoryId: {
+            [Op.in]: categoryIds,
+          },
+        },
+        attributes: ['incompatibleCategoryId'],
+      });
+
+      const incompatibleCategoryIds = incompatibilities.map(
+        (inc) => inc.incompatibleCategoryId,
+      );
+
+      // Remove duplicates
+      const uniqueIncompatibleIds = [...new Set(incompatibleCategoryIds)];
+
+      this.logger.log(`Found ${uniqueIncompatibleIds.length} incompatible categories`);
+      return uniqueIncompatibleIds;
+    } catch (error) {
+      this.logger.error('Error fetching incompatible categories:', error);
+      throw error;
+    }
+  }
+
+  async requiresRemovalStep(categoryIds: string[]): Promise<boolean> {
+    if (!categoryIds || categoryIds.length === 0) {
+      return false;
+    }
+
+    try {
+      const removalCategories = await this.removalStepModel.findAll({
+        where: {
+          categoryId: {
+            [Op.in]: categoryIds,
+          },
+        },
+      });
+
+      const requiresRemoval = removalCategories.length > 0;
+      this.logger.log(`Removal step required: ${requiresRemoval} for categories: ${categoryIds.join(', ')}`);
+
+      return requiresRemoval;
+    } catch (error) {
+      this.logger.error('Error checking removal step requirement:', error);
       throw error;
     }
   }

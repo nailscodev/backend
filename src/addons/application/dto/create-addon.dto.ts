@@ -1,6 +1,5 @@
-import { IsString, IsOptional, IsEnum, IsNumber, IsBoolean, IsArray, IsUrl, Min } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsBoolean, IsArray, IsUrl, Min } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { AddOnCategory } from '../../infrastructure/persistence/entities/addon.entity';
 
 export class CreateAddOnDto {
   @ApiProperty({
@@ -18,14 +17,6 @@ export class CreateAddOnDto {
   @IsOptional()
   @IsString()
   description?: string;
-
-  @ApiProperty({
-    description: 'Add-on category',
-    enum: AddOnCategory,
-    example: AddOnCategory.NAIL_ART,
-  })
-  @IsEnum(AddOnCategory)
-  category: AddOnCategory;
 
   @ApiProperty({
     description: 'Add-on price in cents',

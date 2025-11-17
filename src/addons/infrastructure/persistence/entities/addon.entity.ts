@@ -2,16 +2,6 @@ import { Table, Column, Model, DataType } from 'sequelize-typescript';
 import { ApiProperty } from '@nestjs/swagger';
 import { ServiceEntity } from '../../../../services/infrastructure/persistence/entities/service.entity';
 
-export enum AddOnCategory {
-  NAIL_ART = 'NAIL_ART',
-  NAIL_CARE = 'NAIL_CARE',
-  NAIL_ENHANCEMENT = 'NAIL_ENHANCEMENT',
-  REMOVAL = 'REMOVAL',
-  MASSAGE = 'MASSAGE',
-  TREATMENT = 'TREATMENT',
-  OTHER = 'OTHER'
-}
-
 @Table({
   tableName: 'addons',
   paranoid: true,
@@ -48,17 +38,6 @@ export class AddOnEntity extends Model<AddOnEntity> {
     allowNull: true,
   })
   declare description?: string;
-
-  @ApiProperty({
-    description: 'Add-on category',
-    enum: AddOnCategory,
-    example: AddOnCategory.NAIL_ART,
-  })
-  @Column({
-    type: DataType.ENUM(...Object.values(AddOnCategory)),
-    allowNull: false,
-  })
-  declare category: AddOnCategory;
 
   @ApiProperty({
     description: 'Add-on price in cents',

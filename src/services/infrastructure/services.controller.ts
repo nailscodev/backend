@@ -97,15 +97,90 @@ export class ServicesController {
   @SkipResponseWrapper(true)
   @ApiOperation({
     summary: 'Get service categories',
-    description: 'Retrieves list of unique service categories'
+    description: 'Retrieves list of unique service categories from database'
   })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Categories retrieved successfully',
-    type: [String]
+    description: 'Categories retrieved successfully'
   })
-  async getCategories(): Promise<string[]> {
+  async getCategories() {
     return this.servicesService.getCategories();
+  }
+
+  @Get('categories/incompatibilities')
+  @SkipResponseWrapper(true)
+  @ApiOperation({
+    summary: 'Get incompatible categories',
+    description: 'Returns category IDs that are incompatible with the given category IDs'
+  })
+  @ApiQuery({
+    name: 'categoryIds',
+    required: true,
+    type: String,
+    description: 'Comma-separated list of category UUIDs',
+    example: 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d,c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Incompatible categories retrieved successfully',
+    schema: {
+      type: 'array',
+      items: { type: 'string', format: 'uuid' },
+      example: ['c5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b', 'c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c']
+    }
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid category IDs format'
+  })
+  async getIncompatibleCategories(
+    @Query('categoryIds') categoryIds: string,
+  ): Promise<string[]> {
+    if (!categoryIds) {
+      return [];
+    }
+
+    const categoryIdArray = categoryIds.split(',').map(id => id.trim());
+    this.logger.log(`Getting incompatible categories for: ${categoryIdArray.join(', ')}`);
+
+    return this.servicesService.getIncompatibleCategories(categoryIdArray);
+  }
+
+  @Get('categories/requires-removal')
+  @SkipResponseWrapper(true)
+  @ApiOperation({
+    summary: 'Check if categories require removal step',
+    description: 'Returns whether the given categories require showing the removal step in booking flow'
+  })
+  @ApiQuery({
+    name: 'categoryIds',
+    required: true,
+    type: String,
+    description: 'Comma-separated list of category UUIDs',
+    example: 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Removal step requirement checked successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        requiresRemoval: { type: 'boolean', example: true }
+      }
+    }
+  })
+  async checkRemovalStepRequired(
+    @Query('categoryIds') categoryIds: string,
+  ): Promise<{ requiresRemoval: boolean }> {
+    if (!categoryIds) {
+      return { requiresRemoval: false };
+    }
+
+    const categoryIdArray = categoryIds.split(',').map(id => id.trim());
+    this.logger.log(`Checking removal step requirement for: ${categoryIdArray.join(', ')}`);
+
+    const requiresRemoval = await this.servicesService.requiresRemovalStep(categoryIdArray);
+    return { requiresRemoval };
   }
 
   @Get('addons/by-services')

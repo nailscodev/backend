@@ -5,6 +5,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { DatabaseModule } from './database/database.module';
 // import { AuthModule } from './auth/auth.module'; // TODO: Implementar completamente
 import { CustomersModule } from './customers/customer.module';
+import { CategoriesModule } from './categories/categories.module';
 import { ServicesModule } from './services/services.module';
 import { StaffModule } from './staff/staff.module';
 import { UserModule } from './users/user.module';
@@ -52,6 +53,7 @@ import { CsrfGuard } from './common/guards/csrf.guard';
     DatabaseModule,
     // AuthModule, // TODO: Implementar completamente
     CustomersModule,
+    CategoriesModule,
     ServicesModule,
     StaffModule,
     UserModule,
@@ -72,4 +74,4 @@ import { CsrfGuard } from './common/guards/csrf.guard';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

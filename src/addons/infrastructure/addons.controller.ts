@@ -25,7 +25,7 @@ import {
 } from '@nestjs/swagger';
 import { Op } from 'sequelize';
 import { InjectModel } from '@nestjs/sequelize';
-import { AddOnEntity, AddOnCategory } from './persistence/entities/addon.entity';
+import { AddOnEntity } from './persistence/entities/addon.entity';
 import { CreateAddOnDto } from '../application/dto/create-addon.dto';
 import { UpdateAddOnDto } from '../application/dto/update-addon.dto';
 
@@ -35,16 +35,15 @@ export class AddOnsController {
   constructor(
     @InjectModel(AddOnEntity)
     private addOnModel: typeof AddOnEntity,
-  ) {}
+  ) { }
 
   @Get()
   @ApiOperation({
     summary: 'Get all add-ons',
-    description: 'Retrieve a paginated list of add-ons with optional filtering by category, active status, or compatible service.',
+    description: 'Retrieve a paginated list of add-ons with optional filtering by active status or compatible service.',
   })
   @ApiQuery({ name: 'page', required: false, type: 'number', description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'limit', required: false, type: 'number', description: 'Items per page (default: 10, max: 100)' })
-  @ApiQuery({ name: 'category', required: false, enum: AddOnCategory, description: 'Filter by add-on category' })
   @ApiQuery({ name: 'isActive', required: false, type: 'boolean', description: 'Filter by active status' })
   @ApiQuery({ name: 'serviceId', required: false, type: 'string', description: 'Filter by compatible service ID' })
   @ApiQuery({ name: 'search', required: false, type: 'string', description: 'Search in name and description' })
@@ -56,17 +55,11 @@ export class AddOnsController {
   async findAll(
     @Query('page', new ParseIntPipe({ optional: true })) page = 1,
     @Query('limit', new ParseIntPipe({ optional: true })) limit = 10,
-    @Query('category') category?: AddOnCategory,
     @Query('isActive') isActive?: string,
     @Query('serviceId') serviceId?: string,
     @Query('search') search?: string,
   ) {
     const where: Record<string, any> = {};
-
-    // Build where conditions
-    if (category) {
-      where.category = category;
-    }
 
     if (isActive !== undefined) {
       where.isActive = isActive === 'true';
@@ -108,22 +101,6 @@ export class AddOnsController {
         hasNextPage: page < Math.ceil(total / actualLimit),
         hasPrevPage: page > 1,
       },
-    };
-  }
-
-  @Get('categories')
-  @ApiOperation({
-    summary: 'Get all add-on categories',
-    description: 'Retrieve list of available add-on categories.',
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Categories retrieved successfully',
-  })
-  getCategories() {
-    return {
-      success: true,
-      data: Object.values(AddOnCategory),
     };
   }
 
@@ -216,7 +193,7 @@ export class AddOnsController {
     try {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const addOn = await this.addOnModel.create(createAddOnDto as any);
-      
+
       return {
         success: true,
         data: addOn,
@@ -264,7 +241,7 @@ export class AddOnsController {
     try {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       await addOn.update(updateAddOnDto as any);
-      
+
       return {
         success: true,
         data: addOn,
@@ -303,7 +280,7 @@ export class AddOnsController {
 
     try {
       await addOn.destroy(); // Soft delete due to paranoid: true
-      
+
       return {
         success: true,
         message: 'Add-on deleted successfully',
@@ -336,7 +313,7 @@ export class AddOnsController {
     }
 
     await addOn.update({ isActive: true });
-    
+
     return {
       success: true,
       data: addOn,
@@ -366,7 +343,7 @@ export class AddOnsController {
     }
 
     await addOn.update({ isActive: false });
-    
+
     return {
       success: true,
       data: addOn,

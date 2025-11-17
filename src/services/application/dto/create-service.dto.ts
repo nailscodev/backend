@@ -1,6 +1,5 @@
-import { IsString, IsNotEmpty, IsNumber, IsOptional, IsEnum, IsBoolean, IsArray, Min, MaxLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsOptional, IsBoolean, IsArray, Min, MaxLength, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ServiceCategory } from '../../infrastructure/persistence/entities/service.entity';
 
 export class CreateServiceDto {
   @ApiProperty({
@@ -22,12 +21,12 @@ export class CreateServiceDto {
   description?: string;
 
   @ApiProperty({
-    description: 'Service category',
-    enum: ServiceCategory,
-    example: ServiceCategory.NAILS,
+    description: 'Category ID (UUID)',
+    example: 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
   })
-  @IsEnum(ServiceCategory)
-  category: ServiceCategory;
+  @IsUUID()
+  @IsNotEmpty()
+  categoryId: string;
 
   @ApiProperty({
     description: 'Service price in cents',
