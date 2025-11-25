@@ -4,23 +4,7 @@ import { Op } from 'sequelize';
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 import { UserEntity, UserRole } from '../common/entities/user.entity';
-
-export interface LoginDto {
-  username: string;
-  password: string;
-}
-
-export interface AuthResponse {
-  access_token: string;
-  user: {
-    id: string;
-    username: string;
-    email: string;
-    role: UserRole;
-    first_name: string;
-    last_name: string;
-  };
-}
+import { LoginDto, AuthResponse } from './dto/auth.dto';
 
 @Injectable()
 export class AuthService {
