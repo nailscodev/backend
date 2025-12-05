@@ -4,18 +4,15 @@ import { AddOnEntity } from '../../../../addons/infrastructure/persistence/entit
 import { CategoryEntity } from '../../../../categories/infrastructure/persistence/entities/category.entity';
 import { StaffEntity } from '../../../../staff/infrastructure/persistence/entities/staff.entity';
 
-export enum ServiceCategory {
-  NAILS = 'NAILS',
-  FACIAL = 'FACIAL',
-  BODY = 'BODY',
-  HAIR = 'HAIR',
-  ADDON = 'ADDON'
-}
-
 @Table({
   tableName: 'services',
   paranoid: true,
   timestamps: true,
+  defaultScope: {
+    attributes: {
+      exclude: ['category']
+    }
+  }
 })
 export class ServiceEntity extends Model<ServiceEntity> {
   @ApiProperty({
