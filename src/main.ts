@@ -31,6 +31,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
 
   // CORS mejorado
+  console.log('DEBUG: ALLOWED_ORIGINS env var:', process.env.ALLOWED_ORIGINS);
   const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [
     'http://localhost:3002',
     'http://localhost:3000',
@@ -39,6 +40,7 @@ async function bootstrap() {
     'https://nails-and-co.vercel.app',
     'https://nails-and-co-ilandanieles-projects.vercel.app'
   ];
+  console.log('DEBUG: Allowed origins configured:', allowedOrigins);
 
   app.enableCors({
     origin: allowedOrigins,
