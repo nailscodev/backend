@@ -190,11 +190,6 @@ export class ServiceEntity extends Model<ServiceEntity> {
 
   @BelongsTo(() => CategoryEntity, 'categoryId')
   declare categoryRelation?: CategoryEntity;
-
-  // Virtual field for category name (for backward compatibility)
-  get category(): string | undefined {
-    return this.categoryRelation?.name;
-  }
 }
 
 export default ServiceEntity;
