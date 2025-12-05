@@ -31,11 +31,13 @@ async function bootstrap() {
   app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
 
   // CORS mejorado
-  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [
     'http://localhost:3002',
     'http://localhost:3000',
     'http://192.168.1.32:3002',
-    'http://127.0.0.1:3002'
+    'http://127.0.0.1:3002',
+    'https://nails-and-co.vercel.app',
+    'https://nails-and-co-ilandanieles-projects.vercel.app'
   ];
 
   app.enableCors({
