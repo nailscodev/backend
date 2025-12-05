@@ -4,15 +4,18 @@ import { AddOnEntity } from '../../../../addons/infrastructure/persistence/entit
 import { CategoryEntity } from '../../../../categories/infrastructure/persistence/entities/category.entity';
 import { StaffEntity } from '../../../../staff/infrastructure/persistence/entities/staff.entity';
 
+export enum ServiceCategory {
+  NAILS = 'NAILS',
+  FACIAL = 'FACIAL',
+  BODY = 'BODY',
+  HAIR = 'HAIR',
+  ADDON = 'ADDON',
+}
+
 @Table({
   tableName: 'services',
   paranoid: true,
   timestamps: true,
-  defaultScope: {
-    attributes: {
-      exclude: ['category']
-    }
-  }
 })
 export class ServiceEntity extends Model<ServiceEntity> {
   @ApiProperty({
@@ -45,6 +48,18 @@ export class ServiceEntity extends Model<ServiceEntity> {
     allowNull: true,
   })
   declare description?: string;
+
+  @ApiProperty({
+    description: 'Service category type',
+    example: 'NAILS',
+    enum: ServiceCategory,
+  })
+  @Column({
+    type: DataType.ENUM(...Object.values(ServiceCategory)),
+    allowNull: false,
+    defaultValue: ServiceCategory.NAILS,
+  })
+  declare category: ServiceCategory;
 
   @ApiProperty({
     description: 'Category ID (foreign key)',
