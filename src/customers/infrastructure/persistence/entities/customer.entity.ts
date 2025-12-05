@@ -19,6 +19,18 @@ export class CustomerEntity extends Model<CustomerEntity> {
   declare id: string;
 
   @ApiProperty({
+    description: 'Tenant ID for multi-tenancy support',
+    example: 'nailsandco',
+  })
+  @Column({
+    type: DataType.STRING(255),
+    allowNull: false,
+    defaultValue: 'nailsandco',
+    field: 'tenant_id',
+  })
+  declare tenantId: string;
+
+  @ApiProperty({
     description: 'Customer first name',
     example: 'María',
   })

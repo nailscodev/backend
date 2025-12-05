@@ -47,7 +47,6 @@ export class ServicesService {
   ) { }
 
   async create(createServiceDto: CreateServiceDto): Promise<ServiceEntity> {
-    this.logger.log(`Creating new service: ${createServiceDto.name}`);
 
     const serviceData = {
       name: createServiceDto.name,
@@ -66,7 +65,6 @@ export class ServicesService {
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const createdService = await this.serviceModel.create(serviceData as any);
-    this.logger.log(`Service created successfully with ID: ${createdService.id}`);
 
     return createdService;
   }
@@ -126,8 +124,6 @@ export class ServicesService {
         order: [['displayOrder', 'ASC']]
       });
 
-      this.logger.log(`Found ${categories.length} categories in database`);
-
       return categories;
     } catch (error) {
       this.logger.error('Error fetching categories:', error);
@@ -156,21 +152,16 @@ export class ServicesService {
   }
 
   async update(id: string, updateServiceDto: UpdateServiceDto): Promise<ServiceEntity> {
-    this.logger.log(`Updating service with ID: ${id}`);
 
     const service = await this.findOne(id);
     await service.update(updateServiceDto);
-
-    this.logger.log(`Service updated successfully: ${id}`);
     return service;
   }
 
   async remove(id: string): Promise<{ message: string }> {
-    this.logger.log(`Deleting service with ID: ${id}`);
 
     // Verificar que el servicio existe primero
     const service = await this.findOne(id);
-    this.logger.log(`Found service to delete: ${service.name} (ID: ${service.id})`);
 
     // Usar el modelo directamente para eliminar paranoid:true no me dejaba
     const deletedCount = await this.serviceModel.destroy({
@@ -181,13 +172,10 @@ export class ServicesService {
       this.logger.error(`Failed to delete service with ID: ${id}`);
       throw new NotFoundException(`Service with ID ${id} could not be deleted`);
     }
-
-    this.logger.log(`Service deleted successfully: ${id} (${deletedCount} row(s) affected)`);
     return { message: `Service with ID ${id} has been deleted` };
   }
 
   async getAddonsByServiceIds(serviceIds: string[]): Promise<AddOnEntity[]> {
-    this.logger.log(`Getting add-ons for service IDs: ${serviceIds.join(', ')}`);
 
     if (!serviceIds || serviceIds.length === 0) {
       return [];
@@ -204,6 +192,7 @@ export class ServicesService {
         WHERE s.id IN (${placeholders})
           AND a."deletedAt" IS NULL
           AND a."isActive" = true
+          AND a.removal = false
           AND s."deletedAt" IS NULL
         ORDER BY a."displayOrder" ASC, a.name ASC
       `;
@@ -214,8 +203,6 @@ export class ServicesService {
         model: AddOnEntity,
         mapToModel: true
       });
-
-      this.logger.log(`Found ${addOns.length} unique add-ons for the specified services`);
       return addOns;
     } catch (error) {
       this.logger.error('Error fetching add-ons by service IDs:', error);
@@ -223,8 +210,42 @@ export class ServicesService {
     }
   }
 
+  async getRemovalAddonsByServiceIds(serviceIds: string[]): Promise<AddOnEntity[]> {
+
+    if (!serviceIds || serviceIds.length === 0) {
+      return [];
+    }
+
+    try {
+      // Use raw SQL query to get ONLY removal add-ons by service IDs
+      const placeholders = serviceIds.map(() => '?').join(',');
+      const query = `
+        SELECT DISTINCT a.*
+        FROM addons a
+        INNER JOIN service_addons sa ON a.id = sa.addon_id
+        INNER JOIN services s ON sa.service_id = s.id
+        WHERE s.id IN (${placeholders})
+          AND a."deletedAt" IS NULL
+          AND a."isActive" = true
+          AND a.removal = true
+          AND s."deletedAt" IS NULL
+        ORDER BY a."displayOrder" ASC, a.name ASC
+      `;
+
+      const addOns = await this.sequelize.query(query, {
+        replacements: serviceIds,
+        type: QueryTypes.SELECT,
+        model: AddOnEntity,
+        mapToModel: true
+      });
+      return addOns;
+    } catch (error) {
+      this.logger.error('Error fetching removal add-ons by service IDs:', error);
+      throw error;
+    }
+  }
+
   async getIncompatibleCategories(categoryIds: string[]): Promise<string[]> {
-    this.logger.log(`Getting incompatible categories for: ${categoryIds.join(', ')}`);
 
     if (!categoryIds || categoryIds.length === 0) {
       return [];
@@ -246,8 +267,6 @@ export class ServicesService {
 
       // Remove duplicates
       const uniqueIncompatibleIds = [...new Set(incompatibleCategoryIds)];
-
-      this.logger.log(`Found ${uniqueIncompatibleIds.length} incompatible categories`);
       return uniqueIncompatibleIds;
     } catch (error) {
       this.logger.error('Error fetching incompatible categories:', error);
@@ -270,7 +289,6 @@ export class ServicesService {
       });
 
       const requiresRemoval = removalCategories.length > 0;
-      this.logger.log(`Removal step required: ${requiresRemoval} for categories: ${categoryIds.join(', ')}`);
 
       return requiresRemoval;
     } catch (error) {

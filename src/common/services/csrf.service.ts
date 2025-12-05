@@ -297,7 +297,6 @@ export class CsrfService implements ICsrfService {
     try {
       // If no allowed origins configured, skip validation
       if (this.configuration.allowedOrigins.length === 0) {
-        this.logger.debug('Origin validation skipped - no allowed origins configured');
         return true;
       }
 
@@ -305,7 +304,6 @@ export class CsrfService implements ICsrfService {
       if (origin) {
         const isOriginAllowed = this.isOriginInAllowedList(origin);
         if (isOriginAllowed) {
-          this.logger.debug('Origin validation passed', { origin });
           return true;
         }
         
@@ -321,7 +319,6 @@ export class CsrfService implements ICsrfService {
         if (refererOrigin) {
           const isRefererAllowed = this.isOriginInAllowedList(refererOrigin);
           if (isRefererAllowed) {
-            this.logger.debug('Referer origin validation passed', { refererOrigin });
             return true;
           }
         }
@@ -689,7 +686,6 @@ export class CsrfService implements ICsrfService {
     
     if (this.configuration.debugMode) {
       const duration = Date.now() - startTime;
-      this.logger.debug('Token generation completed', { duration });
     }
   }
 
@@ -704,7 +700,6 @@ export class CsrfService implements ICsrfService {
     
     if (this.configuration.debugMode) {
       const duration = Date.now() - startTime;
-      this.logger.debug('Token validation completed', { duration, isValid });
     }
   }
 

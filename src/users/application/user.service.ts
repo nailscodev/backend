@@ -45,8 +45,6 @@ export class UserService {
    * Creates a new user
    */
   async createUser(createUserDto: CreateUserDto): Promise<UserResponseDto> {
-    this.logger.log(`Creating user with email: ${createUserDto.email}`);
-
     // Check if email already exists
     const existingUserByEmail = await this.userModel.findOne({
       where: { email: createUserDto.email.toLowerCase().trim() }
@@ -82,7 +80,6 @@ export class UserService {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const createdUser = await this.userModel.create(userData as any);
 
-      this.logger.log(`User created successfully with ID: ${createdUser.id}`);
       return this.mapToResponseDto(createdUser);
     } catch (error: unknown) {
       this.logger.error('Failed to create user', error);
@@ -97,8 +94,6 @@ export class UserService {
     pagination: PaginationParams = { page: this.DEFAULT_PAGE, limit: this.DEFAULT_LIMIT },
     filters: UserFilters = {}
   ): Promise<PaginatedUserResponseDto> {
-    this.logger.log(`Finding users with pagination: ${JSON.stringify(pagination)}`);
-
     const validatedPagination = this.validatePaginationParams(pagination);
     const whereConditions = this.buildWhereConditions(filters);
 
@@ -136,7 +131,6 @@ export class UserService {
    * Finds a user by ID
    */
   async getUserById(id: string): Promise<UserResponseDto> {
-    this.logger.log(`Finding user by ID: ${id}`);
 
     const user = await this.findUserEntityById(id);
     return this.mapToResponseDto(user);
@@ -146,7 +140,6 @@ export class UserService {
    * Finds a user by email
    */
   async getUserByEmail(email: string): Promise<UserResponseDto | null> {
-    this.logger.log(`Finding user by email: ${email}`);
 
     const user = await this.userModel.findOne({
       where: { email: email.toLowerCase().trim() },
@@ -160,7 +153,6 @@ export class UserService {
    * Finds a user by username
    */
   async getUserByUsername(username: string): Promise<UserResponseDto | null> {
-    this.logger.log(`Finding user by username: ${username}`);
 
     const user = await this.userModel.findOne({
       where: { username: username.toLowerCase().trim() },
@@ -174,7 +166,6 @@ export class UserService {
    * Updates a user by ID
    */
   async updateUser(id: string, updateUserDto: UpdateUserDto): Promise<UserResponseDto> {
-    this.logger.log(`Updating user with ID: ${id}`);
 
     const user = await this.findUserEntityById(id);
 
@@ -235,7 +226,6 @@ export class UserService {
 
     try {
       await user.update(updateData);
-      this.logger.log(`User updated successfully with ID: ${id}`);
       return this.mapToResponseDto(user);
     } catch (error: unknown) {
       this.logger.error(`Failed to update user with ID: ${id}`, error);
@@ -247,13 +237,11 @@ export class UserService {
    * Deletes a user by ID
    */
   async deleteUser(id: string): Promise<boolean> {
-    this.logger.log(`Deleting user with ID: ${id}`);
 
     const user = await this.findUserEntityById(id);
 
     try {
       await user.destroy();
-      this.logger.log(`User deleted successfully with ID: ${id}`);
       return true;
     } catch (error: unknown) {
       this.logger.error(`Failed to delete user with ID: ${id}`, error);
@@ -265,13 +253,11 @@ export class UserService {
    * Activates a user
    */
   async activateUser(id: string): Promise<UserResponseDto> {
-    this.logger.log(`Activating user with ID: ${id}`);
 
     const user = await this.findUserEntityById(id);
 
     try {
       await user.update({ isActive: true });
-      this.logger.log(`User activated successfully with ID: ${id}`);
       return this.mapToResponseDto(user);
     } catch (error: unknown) {
       this.logger.error(`Failed to activate user with ID: ${id}`, error);
@@ -283,13 +269,11 @@ export class UserService {
    * Deactivates a user
    */
   async deactivateUser(id: string): Promise<UserResponseDto> {
-    this.logger.log(`Deactivating user with ID: ${id}`);
 
     const user = await this.findUserEntityById(id);
 
     try {
       await user.update({ isActive: false });
-      this.logger.log(`User deactivated successfully with ID: ${id}`);
       return this.mapToResponseDto(user);
     } catch (error: unknown) {
       this.logger.error(`Failed to deactivate user with ID: ${id}`, error);
@@ -301,7 +285,6 @@ export class UserService {
    * Changes user password
    */
   async changePassword(id: string, changePasswordDto: ChangePasswordDto): Promise<boolean> {
-    this.logger.log(`Changing password for user with ID: ${id}`);
 
     const user = await this.userModel.findByPk(id);
     if (!user) {
@@ -319,7 +302,6 @@ export class UserService {
 
     try {
       await user.update({ password: hashedNewPassword });
-      this.logger.log(`Password changed successfully for user with ID: ${id}`);
       return true;
     } catch (error: unknown) {
       this.logger.error(`Failed to change password for user with ID: ${id}`, error);
@@ -331,7 +313,6 @@ export class UserService {
    * Authenticates user login
    */
   async login(loginDto: LoginDto): Promise<LoginResponseDto> {
-    this.logger.log(`Login attempt for: ${loginDto.usernameOrEmail}`);
 
     // Find user by email or username
     const user = await this.userModel.findOne({
@@ -371,8 +352,6 @@ export class UserService {
     // Update last login
     await user.update({ lastLogin: new Date() });
 
-    this.logger.log(`User logged in successfully: ${user.id}`);
-
     return {
       user: this.mapToResponseDto(user),
       message: 'Login successful',
@@ -384,7 +363,6 @@ export class UserService {
    * Gets user statistics
    */
   async getUserStatistics(): Promise<UserStatisticsResponseDto> {
-    this.logger.log('Calculating user statistics');
 
     try {
       const [
@@ -425,7 +403,6 @@ export class UserService {
    * Gets all active users
    */
   async getActiveUsers(): Promise<UserResponseDto[]> {
-    this.logger.log('Finding all active users');
 
     try {
       const users = await this.userModel.findAll({
@@ -445,7 +422,6 @@ export class UserService {
    * Gets users by role
    */
   async getUsersByRole(role: UserRole): Promise<UserResponseDto[]> {
-    this.logger.log(`Finding users by role: ${role}`);
 
     try {
       const users = await this.userModel.findAll({
@@ -465,13 +441,11 @@ export class UserService {
    * Updates last login timestamp
    */
   async updateLastLogin(id: string): Promise<void> {
-    this.logger.log(`Updating last login for user with ID: ${id}`);
 
     const user = await this.findUserEntityById(id);
 
     try {
       await user.update({ lastLogin: new Date() });
-      this.logger.log(`Last login updated successfully for user with ID: ${id}`);
     } catch (error: unknown) {
       this.logger.error(`Failed to update last login for user with ID: ${id}`, error);
       throw new BadRequestException('Failed to update last login');

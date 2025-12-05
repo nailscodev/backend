@@ -14,6 +14,7 @@ import {
   ParseUUIDPipe,
   ParseIntPipe,
   HttpCode,
+  ConflictException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -30,6 +31,8 @@ import { BookingEntity } from './persistence/entities/booking.entity';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { BookingStatus } from '../domain/value-objects/booking-status.vo';
+import { MultiServiceAvailabilityService } from '../application/services/multi-service-availability.service';
+import { SkipCsrf } from '../../common/decorators/csrf.decorator';
 
 // Interfaces for type safety
 interface StaffMember {
@@ -53,6 +56,7 @@ export class ReservationsController {
     @InjectModel(BookingEntity)
     private bookingModel: typeof BookingEntity,
     private sequelize: Sequelize,
+    private multiServiceAvailabilityService: MultiServiceAvailabilityService,
   ) { }
 
   @Get()
@@ -278,6 +282,87 @@ export class ReservationsController {
       date,
       staffId: staffId || 'all'
     };
+  }
+
+  @Post('multi-service-slots')
+  @SkipCsrf() // Read operation, skip CSRF for performance
+  @ApiOperation({
+    summary: 'Get available time slots for multiple consecutive services',
+    description: 'Retrieve available time slots where multiple services can be performed consecutively. Each service may be performed by a different technician, but all must be available in consecutive time slots.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        serviceIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of service IDs (UUIDs) to book consecutively',
+          example: ['service-id-1', 'service-id-2']
+        },
+        date: {
+          type: 'string',
+          description: 'Date in YYYY-MM-DD format',
+          example: '2025-11-24'
+        },
+        selectedTechnicianId: {
+          type: 'string',
+          description: 'Optional: UUID of preferred technician for first service',
+          example: 'tech-id-1'
+        }
+      },
+      required: ['serviceIds', 'date']
+    }
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Available multi-service time slots retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data',
+  })
+  @HttpCode(HttpStatus.OK)
+  async getMultiServiceSlots(
+    @Body() body: { serviceIds: string[]; date: string; selectedTechnicianId?: string },
+  ) {
+    try {
+      const { serviceIds, date, selectedTechnicianId } = body;
+
+      // Validation
+      if (!serviceIds || !Array.isArray(serviceIds) || serviceIds.length === 0) {
+        throw new BadRequestException('serviceIds must be a non-empty array');
+      }
+
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        throw new BadRequestException('Date must be in YYYY-MM-DD format');
+      }
+
+      // Call the multi-service availability service
+      const availableSlots = await this.multiServiceAvailabilityService.findMultiServiceSlots(
+        serviceIds,
+        date,
+        selectedTechnicianId
+      );
+
+      console.log(`\n🎯 CONTROLLER RESPONSE:`);
+      console.log(`   Found ${availableSlots.length} slots`);
+      if (availableSlots.length > 0) {
+        console.log(`   Sample slot structure:`, JSON.stringify(availableSlots[0], null, 2));
+      }
+
+      return {
+        success: true,
+        data: availableSlots,
+        date,
+        serviceIds,
+        count: availableSlots.length
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('Error in getMultiServiceSlots:', errorMessage, error);
+      throw error;
+    }
   }
 
   @Get(':id')
@@ -619,5 +704,223 @@ export class ReservationsController {
     }
 
     return slots;
+  }
+
+  // ============================================================================
+  // MULTI-SERVICE BOOKING ENDPOINTS
+  // ============================================================================
+
+  /**
+   * Verifica disponibilidad de múltiples slots con sus técnicos asignados
+   * POST /bookings/verify-multi-availability
+   */
+  @Post('verify-multi-availability')
+  @SkipCsrf()
+  @ApiOperation({
+    summary: 'Verify availability for multiple service slots',
+    description: 'Check if all slots with their assigned technicians are still available before creating bookings'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        date: { type: 'string', format: 'date', example: '2025-12-02' },
+        slots: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              serviceId: { type: 'string', format: 'uuid' },
+              staffId: { type: 'string', format: 'uuid' },
+              startTime: { type: 'string', format: 'date-time' },
+              endTime: { type: 'string', format: 'date-time' }
+            }
+          }
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Availability check result',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        available: { type: 'boolean' },
+        conflicts: { type: 'array', items: { type: 'object' } }
+      }
+    }
+  })
+  async verifyMultiAvailability(
+    @Body() body: {
+      date: string;
+      slots: Array<{
+        serviceId: string;
+        staffId: string;
+        startTime: string;
+        endTime: string;
+      }>;
+    }
+  ) {
+    const conflicts: Array<{
+      serviceId: string;
+      staffId: string;
+      requestedStart: string;
+      requestedEnd: string;
+      conflictingBookingId: string;
+      conflictingStart: string;
+      conflictingEnd: string;
+    }> = [];
+
+    for (const slot of body.slots) {
+      // Verificar si el técnico tiene alguna reserva que se superponga con este slot
+      const existingBookings = await this.bookingModel.findAll({
+        where: {
+          staffId: slot.staffId,
+          appointmentDate: body.date,
+          status: {
+            [Op.in]: ['pending', 'confirmed']
+          }
+        }
+      });
+
+      // Revisar si hay solapamiento de horarios
+      for (const booking of existingBookings) {
+        const slotStart = new Date(slot.startTime);
+        const slotEnd = new Date(slot.endTime);
+        const bookingStart = new Date(booking.startTime);
+        const bookingEnd = new Date(booking.endTime);
+
+        // Hay conflicto si los rangos se superponen
+        if (slotStart < bookingEnd && slotEnd > bookingStart) {
+          conflicts.push({
+            serviceId: slot.serviceId,
+            staffId: slot.staffId,
+            requestedStart: slot.startTime,
+            requestedEnd: slot.endTime,
+            conflictingBookingId: booking.id,
+            conflictingStart: booking.startTime,
+            conflictingEnd: booking.endTime
+          });
+        }
+      }
+    }
+
+    return {
+      success: true,
+      available: conflicts.length === 0,
+      conflicts
+    };
+  }
+
+  /**
+   * Crea múltiples bookings en una transacción atómica
+   * POST /bookings/create-multiple
+   */
+  @Post('create-multiple')
+  @SkipCsrf()
+  @ApiOperation({
+    summary: 'Create multiple bookings atomically',
+    description: 'Create multiple bookings in a single transaction. If any fails, all are rolled back.'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        customerId: { type: 'string', format: 'uuid' },
+        bookings: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              serviceId: { type: 'string', format: 'uuid' },
+              staffId: { type: 'string', format: 'uuid' },
+              appointmentDate: { type: 'string', format: 'date' },
+              startTime: { type: 'string', format: 'date-time' },
+              endTime: { type: 'string', format: 'date-time' },
+              totalAmount: { type: 'number' },
+              notes: { type: 'string' }
+            }
+          }
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Bookings created successfully',
+  })
+  async createMultiple(
+    @Body() body: {
+      customerId: string;
+      bookings: Array<{
+        serviceId: string;
+        staffId: string;
+        appointmentDate: string;
+        startTime: string;
+        endTime: string;
+        totalAmount: number;
+        notes?: string;
+      }>;
+    }
+  ) {
+    // Usar transacción para asegurar atomicidad
+    const transaction = await this.sequelize.transaction();
+
+    try {
+      // Verificar disponibilidad antes de crear
+      const verificationResult = await this.verifyMultiAvailability({
+        date: body.bookings[0].appointmentDate,
+        slots: body.bookings.map(b => ({
+          serviceId: b.serviceId,
+          staffId: b.staffId,
+          startTime: b.startTime,
+          endTime: b.endTime
+        }))
+      });
+
+      if (!verificationResult.available) {
+        throw new ConflictException({
+          message: 'One or more time slots are no longer available',
+          conflicts: verificationResult.conflicts
+        });
+      }
+
+      // Crear todos los bookings
+      const createdBookings: BookingEntity[] = [];
+
+      for (const bookingData of body.bookings) {
+        const booking = await this.bookingModel.create(
+          {
+            customerId: body.customerId,
+            serviceId: bookingData.serviceId,
+            staffId: bookingData.staffId,
+            appointmentDate: bookingData.appointmentDate,
+            startTime: new Date(bookingData.startTime),
+            endTime: new Date(bookingData.endTime),
+            totalAmount: bookingData.totalAmount,
+            status: BookingStatus.PENDING,
+            notes: bookingData.notes || ''
+          } as any,
+          { transaction }
+        );
+
+        createdBookings.push(booking);
+      }
+
+      // Commit de la transacción
+      await transaction.commit();
+
+      return {
+        success: true,
+        bookings: createdBookings
+      };
+
+    } catch (error) {
+      // Rollback en caso de error
+      await transaction.rollback();
+      throw error;
+    }
   }
 }

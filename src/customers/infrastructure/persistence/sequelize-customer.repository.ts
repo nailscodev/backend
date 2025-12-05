@@ -18,11 +18,9 @@ export class SequelizeCustomerRepository implements ICustomerRepository {
       const existingCustomer = await this.customerModel.findByPk(customerData.id);
       if (existingCustomer) {
         await existingCustomer.update(customerData);
-        this.logger.log(`Updated customer with id: ${customerData.id}`);
       } else {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         await this.customerModel.create(customerData as any);
-        this.logger.log(`Created new customer with id: ${customerData.id}`);
       }
     } catch (error) {
       this.logger.error(`Failed to save customer with id: ${customerData.id}`, error);
@@ -85,7 +83,6 @@ export class SequelizeCustomerRepository implements ICustomerRepository {
   async delete(id: string): Promise<void> {
     try {
       await this.customerModel.destroy({ where: { id } });
-      this.logger.log(`Deleted customer with id: ${id}`);
     } catch (error) {
       this.logger.error(`Failed to delete customer with id: ${id}`, error);
       throw error;

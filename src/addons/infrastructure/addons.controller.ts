@@ -23,7 +23,7 @@ import {
   ApiParam,
   ApiBody,
 } from '@nestjs/swagger';
-import { Op } from 'sequelize';
+import { Op, QueryTypes } from 'sequelize';
 import { InjectModel } from '@nestjs/sequelize';
 import { AddOnEntity } from './persistence/entities/addon.entity';
 import { CreateAddOnDto } from '../application/dto/create-addon.dto';
@@ -64,6 +64,9 @@ export class AddOnsController {
     if (isActive !== undefined) {
       where.isActive = isActive === 'true';
     }
+
+    // By default, exclude removal add-ons (unless explicitly requested)
+    where.removal = false;
 
     if (serviceId) {
       where.compatibleServiceIds = {
@@ -123,6 +126,7 @@ export class AddOnsController {
     const addOns = await this.addOnModel.findAll({
       where: {
         isActive: true,
+        removal: false, // Only show non-removal add-ons
         compatibleServiceIds: {
           [Op.contains]: [serviceId],
         },
@@ -133,6 +137,59 @@ export class AddOnsController {
     return {
       success: true,
       data: addOns,
+    };
+  }
+
+  @Get('incompatibilities/:addonIds')
+  @ApiOperation({
+    summary: 'Get incompatible add-ons for given add-on IDs',
+    description: 'Retrieves the list of add-on IDs that are incompatible with the provided add-on IDs',
+  })
+  @ApiParam({
+    name: 'addonIds',
+    type: 'string',
+    description: 'Comma-separated list of add-on UUIDs',
+    example: 'uuid1,uuid2,uuid3'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Incompatible add-on IDs retrieved successfully',
+  })
+  async getIncompatibleAddons(
+    @Param('addonIds') addonIds: string,
+  ) {
+    if (!addonIds) {
+      return {
+        success: true,
+        data: [],
+      };
+    }
+
+    const addonIdArray = addonIds.split(',').map(id => id.trim());
+
+    // Query addon_incompatibilities table
+    const sequelize = this.addOnModel.sequelize;
+    if (!sequelize) {
+      throw new Error('Sequelize instance not available');
+    }
+
+    const incompatibilities = await sequelize.query(
+      `
+      SELECT DISTINCT incompatible_addon_id
+      FROM addon_incompatibilities
+      WHERE addon_id IN (:addonIds)
+      `,
+      {
+        replacements: { addonIds: addonIdArray },
+        type: QueryTypes.SELECT,
+      }
+    );
+
+    const incompatibleIds = (incompatibilities as any[]).map(row => row.incompatible_addon_id);
+
+    return {
+      success: true,
+      data: incompatibleIds,
     };
   }
 

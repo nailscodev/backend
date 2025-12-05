@@ -141,7 +141,6 @@ export class ServicesController {
     }
 
     const categoryIdArray = categoryIds.split(',').map(id => id.trim());
-    this.logger.log(`Getting incompatible categories for: ${categoryIdArray.join(', ')}`);
 
     return this.servicesService.getIncompatibleCategories(categoryIdArray);
   }
@@ -177,7 +176,6 @@ export class ServicesController {
     }
 
     const categoryIdArray = categoryIds.split(',').map(id => id.trim());
-    this.logger.log(`Checking removal step requirement for: ${categoryIdArray.join(', ')}`);
 
     const requiresRemoval = await this.servicesService.requiresRemovalStep(categoryIdArray);
     return { requiresRemoval };
@@ -209,6 +207,34 @@ export class ServicesController {
 
     const serviceIdArray = serviceIds.split(',').map(id => id.trim());
     return await this.servicesService.getAddonsByServiceIds(serviceIdArray);
+  }
+
+  @Get('removal-addons/by-services')
+  @SkipResponseWrapper(true)
+  @ApiOperation({
+    summary: 'Get removal add-ons by service IDs',
+    description: 'Retrieves removal add-ons (removal=true) that are associated with the specified service IDs'
+  })
+  @ApiQuery({
+    name: 'serviceIds',
+    required: true,
+    type: String,
+    description: 'Comma-separated list of service UUIDs',
+    example: 'uuid1,uuid2,uuid3'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Removal add-ons retrieved successfully'
+  })
+  async getRemovalAddonsByServices(
+    @Query('serviceIds') serviceIds: string,
+  ) {
+    if (!serviceIds) {
+      return [];
+    }
+
+    const serviceIdArray = serviceIds.split(',').map(id => id.trim());
+    return await this.servicesService.getRemovalAddonsByServiceIds(serviceIdArray);
   }
 
   @Get(':id')
@@ -245,7 +271,6 @@ export class ServicesController {
     description: 'Invalid input data'
   })
   async create(@Body(ValidationPipe) createServiceDto: CreateServiceDto): Promise<ServiceEntity> {
-    this.logger.log(`Creating new service: ${createServiceDto.name}`);
     return this.servicesService.create(createServiceDto);
   }
 

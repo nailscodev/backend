@@ -27,8 +27,6 @@ export class CustomThrottlerGuard implements CanActivate {
     const envIPs = whitelistEnv ? whitelistEnv.split(',').map(ip => ip.trim()) : [];
     
     this.whitelistedIPs = new Set([...defaultIPs, ...envIPs]);
-    
-    this.logger.log(`Security guard whitelist initialized with IPs: ${Array.from(this.whitelistedIPs).join(', ')}`);
   }
 
   /**
@@ -42,7 +40,6 @@ export class CustomThrottlerGuard implements CanActivate {
     
     // Always allow whitelisted IPs
     if (this.whitelistedIPs.has(clientIP)) {
-      this.logger.debug(`Allowing whitelisted IP: ${clientIP}`);
       return true;
     }
     
@@ -69,8 +66,6 @@ export class CustomThrottlerGuard implements CanActivate {
   private logRequest(request: Request, clientIP: string): void {
     const userAgent = request.headers['user-agent'] || 'Unknown';
     const endpoint = `${request.method} ${request.url}`;
-    
-    this.logger.debug(`Request: ${endpoint} from IP: ${clientIP}, User-Agent: ${userAgent}`);
   }
 
   /**
@@ -103,7 +98,6 @@ export class CustomThrottlerGuard implements CanActivate {
    */
   public addToWhitelist(ip: string): void {
     this.whitelistedIPs.add(ip);
-    this.logger.log(`IP added to whitelist: ${ip}`);
   }
 
   /**
@@ -112,7 +106,6 @@ export class CustomThrottlerGuard implements CanActivate {
    */
   public removeFromWhitelist(ip: string): void {
     this.whitelistedIPs.delete(ip);
-    this.logger.log(`IP removed from whitelist: ${ip}`);
   }
 
   /**

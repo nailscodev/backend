@@ -89,6 +89,17 @@ export class AddOnEntity extends Model<AddOnEntity> {
   declare displayOrder: number;
 
   @ApiProperty({
+    description: 'Whether this add-on is a removal service',
+    example: false,
+  })
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  })
+  declare removal: boolean;
+
+  @ApiProperty({
     description: 'Array of service IDs this add-on is compatible with',
     example: ['123e4567-e89b-12d3-a456-426614174001', '123e4567-e89b-12d3-a456-426614174002'],
   })

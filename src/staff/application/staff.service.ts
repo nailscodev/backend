@@ -38,7 +38,6 @@ export class StaffService {
    * Creates a new staff member
    */
   async createStaff(createStaffDto: CreateStaffDto): Promise<StaffResponseDto> {
-    this.logger.log(`Creating staff member with email: ${createStaffDto.email}`);
 
     // Check if email already exists
     const existingStaff = await this.staffModel.findOne({
@@ -69,8 +68,6 @@ export class StaffService {
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const createdStaff = await this.staffModel.create(staffData as any);
-
-      this.logger.log(`Staff member created successfully with ID: ${createdStaff.id}`);
       return this.mapToResponseDto(createdStaff);
     } catch (error: unknown) {
       this.logger.error('Failed to create staff member', error);
@@ -85,7 +82,6 @@ export class StaffService {
     pagination: PaginationParams = { page: this.DEFAULT_PAGE, limit: this.DEFAULT_LIMIT },
     filters: StaffFilters = {}
   ): Promise<PaginatedStaffResponseDto> {
-    this.logger.log(`Finding staff with pagination: ${JSON.stringify(pagination)}`);
 
     const validatedPagination = this.validatePagination(pagination);
     const whereClause = this.buildWhereClause(filters);
@@ -119,7 +115,6 @@ export class StaffService {
    * Finds a staff member by ID
    */
   async findStaffById(id: string): Promise<StaffResponseDto> {
-    this.logger.log(`Finding staff member by ID: ${id}`);
 
     const staff = await this.findStaffEntityById(id);
     return this.mapToResponseDto(staff);
@@ -129,7 +124,6 @@ export class StaffService {
    * Finds a staff member by email
    */
   async findStaffByEmail(email: string): Promise<StaffResponseDto | null> {
-    this.logger.log(`Finding staff member by email: ${email}`);
 
     const staff = await this.staffModel.findOne({
       where: { email: email.toLowerCase().trim() }
@@ -142,7 +136,6 @@ export class StaffService {
    * Finds all available staff members
    */
   async findAvailableStaff(): Promise<StaffResponseDto[]> {
-    this.logger.log('Finding available staff');
 
     try {
       const staff = await this.staffModel.findAll({
@@ -164,7 +157,6 @@ export class StaffService {
    * Finds staff members who can perform a specific service
    */
   async findStaffByServiceId(serviceId: string): Promise<StaffResponseDto[]> {
-    this.logger.log(`Finding staff by service ID: ${serviceId}`);
 
     try {
       const staff = await this.staffModel.findAll({
@@ -188,17 +180,16 @@ export class StaffService {
   }
 
   /**
-   * Finds staff members who can perform ALL of the specified services
+   * Finds staff members who can perform AT LEAST ONE of the specified services
    */
   async findStaffByServiceIds(serviceIds: string[]): Promise<StaffResponseDto[]> {
-    this.logger.log(`Finding staff by service IDs: ${serviceIds.join(', ')}`);
 
     if (!serviceIds || serviceIds.length === 0) {
       return await this.findAvailableStaff();
     }
 
     try {
-      // Find staff that can perform ALL selected services using subquery approach
+      // Find staff that can perform AT LEAST ONE of the selected services (union approach)
       const staff = await this.staffModel.findAll({
         where: {
           status: StaffStatus.ACTIVE,
@@ -208,15 +199,11 @@ export class StaffService {
               SELECT DISTINCT staff_id 
               FROM staff_services ss
               WHERE ss.service_id IN (${serviceIds.map(id => `'${id}'`).join(', ')})
-              GROUP BY staff_id
-              HAVING COUNT(DISTINCT ss.service_id) = ${serviceIds.length}
             )`)
           }
         },
         order: [['lastName', 'ASC'], ['firstName', 'ASC']]
       });
-
-      this.logger.log(`Found ${staff.length} staff members who can perform all required services: ${serviceIds.join(', ')}`);
 
       return staff.map(s => this.mapToResponseDto(s));
     } catch (error: unknown) {
@@ -229,7 +216,6 @@ export class StaffService {
    * Updates an existing staff member
    */
   async updateStaff(id: string, updateStaffDto: UpdateStaffDto): Promise<StaffResponseDto> {
-    this.logger.log(`Updating staff member ID: ${id}`);
 
     const existingStaff = await this.findStaffEntityById(id);
 
@@ -242,8 +228,6 @@ export class StaffService {
     try {
       const updateData = this.prepareUpdateData(updateStaffDto);
       await existingStaff.update(updateData);
-
-      this.logger.log(`Staff member updated successfully: ${id}`);
       return this.mapToResponseDto(existingStaff);
     } catch (error: unknown) {
       this.logger.error(`Failed to update staff member: ${id}`, error);
@@ -255,13 +239,11 @@ export class StaffService {
    * Deletes a staff member (soft delete)
    */
   async deleteStaff(id: string): Promise<void> {
-    this.logger.log(`Deleting staff member ID: ${id}`);
 
     const staff = await this.findStaffEntityById(id);
 
     try {
       await staff.destroy();
-      this.logger.log(`Staff member deleted successfully: ${id}`);
     } catch (error: unknown) {
       this.logger.error(`Failed to delete staff member: ${id}`, error);
       throw new BadRequestException('Failed to delete staff member');
@@ -272,7 +254,6 @@ export class StaffService {
    * Activates a staff member
    */
   async activateStaff(id: string): Promise<StaffResponseDto> {
-    this.logger.log(`Activating staff member ID: ${id}`);
     return await this.updateStaffStatus(id, StaffStatus.ACTIVE);
   }
 
@@ -280,7 +261,6 @@ export class StaffService {
    * Deactivates a staff member
    */
   async deactivateStaff(id: string): Promise<StaffResponseDto> {
-    this.logger.log(`Deactivating staff member ID: ${id}`);
     return await this.updateStaffStatus(id, StaffStatus.INACTIVE);
   }
 
@@ -288,7 +268,6 @@ export class StaffService {
    * Gets staff statistics
    */
   async getStaffStatistics(): Promise<StaffStatisticsResponseDto> {
-    this.logger.log('Getting staff statistics');
 
     try {
       const [totalStaff, activeStaff, inactiveStaff, onVacationStaff, sickLeaveStaff] = await Promise.all([
@@ -336,7 +315,6 @@ export class StaffService {
 
     try {
       await staff.update({ status });
-      this.logger.log(`Staff status updated successfully: ${id} -> ${status}`);
       return this.mapToResponseDto(staff);
     } catch (error: unknown) {
       this.logger.error(`Failed to update staff status: ${id}`, error);

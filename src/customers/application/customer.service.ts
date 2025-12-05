@@ -36,8 +36,6 @@ export class CustomerService {
 
       await this.customerRepository.save(customerData);
       
-      this.logger.log(`Created customer with ID: ${customerId.value}`);
-      
       const createdCustomer = await this.customerRepository.findById(customerId.value);
       if (!createdCustomer) {
         throw new Error('Failed to retrieve created customer');
@@ -122,8 +120,6 @@ export class CustomerService {
 
       await this.customerRepository.save(updatedData);
       
-      this.logger.log(`Updated customer with ID: ${id}`);
-      
       const updatedCustomer = await this.customerRepository.findById(id);
       if (!updatedCustomer) {
         throw new Error('Failed to retrieve updated customer');
@@ -143,7 +139,6 @@ export class CustomerService {
       }
 
       await this.customerRepository.delete(id);
-      this.logger.log(`Deleted customer with ID: ${id}`);
     } catch (error) {
       this.logger.error(`Failed to delete customer with ID: ${id}`, error);
       throw error;

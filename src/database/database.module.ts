@@ -9,6 +9,7 @@ import { StaffServiceEntity } from '../staff/infrastructure/persistence/entities
 import { BookingEntity } from '../booking/infrastructure/persistence/entities/booking.entity';
 import { NotificationEntity } from '../notifications/infrastructure/persistence/entities/notification.entity';
 import { AddOnEntity } from '../addons/infrastructure/persistence/entities/addon.entity';
+import { AddonIncompatibilityEntity } from '../addons/infrastructure/persistence/entities/addon-incompatibility.entity';
 import { ServiceAddon } from '../shared/domain/service-addon.model';
 import { defineAssociations } from './associations';
 
@@ -27,7 +28,7 @@ import { defineAssociations } from './associations';
         synchronize: false, // Use manual SQL scripts instead of auto-sync
         logging: configService.get('NODE_ENV') === 'development',
         autoLoadModels: true,
-        models: [UserEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, ServiceAddon],
+        models: [UserEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon],
       }),
     }),
   ],

@@ -22,7 +22,6 @@ export class StaffServiceRelationService {
      * Creates a new staff-service relationship
      */
     async createStaffService(createDto: CreateStaffServiceDto): Promise<StaffServiceEntity> {
-        this.logger.log(`Creating staff-service relationship: ${createDto.staffId} -> ${createDto.serviceId}`);
 
         // Verify staff and service exist
         await this.verifyStaffExists(createDto.staffId);
@@ -48,8 +47,6 @@ export class StaffServiceRelationService {
                 proficiencyLevel: createDto.proficiencyLevel,
                 notes: createDto.notes,
             } as any);
-
-            this.logger.log(`Staff-service relationship created: ${relationship.id}`);
             return relationship;
         } catch (error: unknown) {
             this.logger.error('Failed to create staff-service relationship', error);
@@ -61,7 +58,6 @@ export class StaffServiceRelationService {
      * Updates an existing staff-service relationship
      */
     async updateStaffService(staffId: string, serviceId: string, updateDto: UpdateStaffServiceDto): Promise<StaffServiceEntity> {
-        this.logger.log(`Updating staff-service relationship: ${staffId} -> ${serviceId}`);
 
         const relationship = await this.findStaffServiceRelation(staffId, serviceId);
 
@@ -71,8 +67,6 @@ export class StaffServiceRelationService {
                 ...(updateDto.proficiencyLevel && { proficiencyLevel: updateDto.proficiencyLevel }),
                 ...(updateDto.notes !== undefined && { notes: updateDto.notes }),
             });
-
-            this.logger.log(`Staff-service relationship updated: ${relationship.id}`);
             return relationship;
         } catch (error: unknown) {
             this.logger.error(`Failed to update staff-service relationship: ${relationship.id}`, error);
@@ -84,13 +78,11 @@ export class StaffServiceRelationService {
      * Deletes a staff-service relationship
      */
     async deleteStaffService(staffId: string, serviceId: string): Promise<void> {
-        this.logger.log(`Deleting staff-service relationship: ${staffId} -> ${serviceId}`);
 
         const relationship = await this.findStaffServiceRelation(staffId, serviceId);
 
         try {
             await relationship.destroy();
-            this.logger.log(`Staff-service relationship deleted: ${relationship.id}`);
         } catch (error: unknown) {
             this.logger.error(`Failed to delete staff-service relationship: ${relationship.id}`, error);
             throw new BadRequestException('Failed to delete staff-service relationship');
@@ -101,7 +93,6 @@ export class StaffServiceRelationService {
      * Gets all services for a staff member
      */
     async getStaffServices(staffId: string): Promise<ServiceEntity[]> {
-        this.logger.log(`Getting services for staff: ${staffId}`);
 
         await this.verifyStaffExists(staffId);
 
@@ -124,7 +115,6 @@ export class StaffServiceRelationService {
      * Gets all staff members for a service
      */
     async getServiceStaff(serviceId: string): Promise<StaffEntity[]> {
-        this.logger.log(`Getting staff for service: ${serviceId}`);
 
         await this.verifyServiceExists(serviceId);
 
@@ -154,7 +144,6 @@ export class StaffServiceRelationService {
      * Gets all staff-service relationships
      */
     async getAllStaffServiceRelations(): Promise<StaffServiceEntity[]> {
-        this.logger.log('Getting all staff-service relationships');
 
         try {
             const relationships = await this.staffServiceModel.findAll({
