@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   Query,
+  Headers,
   NotFoundException,
   BadRequestException,
   HttpStatus,
@@ -14,6 +15,7 @@ import {
   ParseUUIDPipe,
   ParseIntPipe,
   HttpCode,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -26,16 +28,79 @@ import {
 import { Op, QueryTypes } from 'sequelize';
 import { InjectModel } from '@nestjs/sequelize';
 import { AddOnEntity } from './persistence/entities/addon.entity';
+import { AddOnLangEntity } from './persistence/entities/addon-lang.entity';
+import { LanguageEntity } from '../../shared/domain/entities/language.entity';
 import { CreateAddOnDto } from '../application/dto/create-addon.dto';
 import { UpdateAddOnDto } from '../application/dto/update-addon.dto';
 
 @ApiTags('addons')
 @Controller('addons')
 export class AddOnsController {
+  private readonly logger = new Logger(AddOnsController.name);
+
   constructor(
     @InjectModel(AddOnEntity)
     private addOnModel: typeof AddOnEntity,
+    @InjectModel(AddOnLangEntity)
+    private addOnLangModel: typeof AddOnLangEntity,
+    @InjectModel(LanguageEntity)
+    private languageModel: typeof LanguageEntity,
   ) { }
+
+  /**
+   * Apply translations to an addon entity based on language code
+   */
+  private async applyAddonTranslations(
+    addon: AddOnEntity,
+    languageCode?: string,
+  ): Promise<AddOnEntity> {
+    if (!languageCode || languageCode.toUpperCase() === 'EN') {
+      return addon;
+    }
+
+    try {
+      const language = await this.languageModel.findOne({
+        where: { code: languageCode.toUpperCase(), isActive: true },
+      });
+
+      if (!language) {
+        this.logger.warn(`Language ${languageCode} not found, returning original`);
+        return addon;
+      }
+
+      const translation = await this.addOnLangModel.findOne({
+        where: {
+          addonId: addon.id,
+          languageId: language.id,
+        },
+      });
+
+      if (translation) {
+        addon.name = translation.title;
+        addon.description = translation.description;
+      }
+    } catch (error) {
+      this.logger.error(`Error applying translations: ${error.message}`);
+    }
+
+    return addon;
+  }
+
+  /**
+   * Apply translations to multiple addons
+   */
+  private async applyAddonsTranslations(
+    addons: AddOnEntity[],
+    languageCode?: string,
+  ): Promise<AddOnEntity[]> {
+    if (!languageCode || languageCode.toUpperCase() === 'EN') {
+      return addons;
+    }
+
+    return Promise.all(
+      addons.map((addon) => this.applyAddonTranslations(addon, languageCode)),
+    );
+  }
 
   @Get()
   @ApiOperation({
@@ -47,6 +112,7 @@ export class AddOnsController {
   @ApiQuery({ name: 'isActive', required: false, type: 'boolean', description: 'Filter by active status' })
   @ApiQuery({ name: 'serviceId', required: false, type: 'string', description: 'Filter by compatible service ID' })
   @ApiQuery({ name: 'search', required: false, type: 'string', description: 'Search in name and description' })
+  @ApiQuery({ name: 'lang', required: false, type: 'string', description: 'Language code (EN or ES)' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Add-ons retrieved successfully',
@@ -58,6 +124,8 @@ export class AddOnsController {
     @Query('isActive') isActive?: string,
     @Query('serviceId') serviceId?: string,
     @Query('search') search?: string,
+    @Query('lang') lang?: string,
+    @Headers('accept-language') acceptLanguage?: string,
   ) {
     const where: Record<string, any> = {};
 
@@ -93,9 +161,15 @@ export class AddOnsController {
       order: [['displayOrder', 'ASC'], ['name', 'ASC']],
     });
 
+    // Use lang query param, or fall back to accept-language header
+    const languageCode = lang || acceptLanguage?.split(',')[0]?.split('-')[0];
+
+    // Apply translations if language code is provided
+    const translatedAddOns = await this.applyAddonsTranslations(addOns, languageCode);
+
     return {
       success: true,
-      data: addOns,
+      data: translatedAddOns,
       pagination: {
         page,
         limit: actualLimit,
@@ -117,12 +191,17 @@ export class AddOnsController {
     type: 'string',
     description: 'Service unique identifier (UUID)',
   })
+  @ApiQuery({ name: 'lang', required: false, type: 'string', description: 'Language code (EN or ES)' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Compatible add-ons retrieved successfully',
     type: [AddOnEntity],
   })
-  async getCompatibleWithService(@Param('serviceId', new ParseUUIDPipe()) serviceId: string) {
+  async getCompatibleWithService(
+    @Param('serviceId', new ParseUUIDPipe()) serviceId: string,
+    @Query('lang') lang?: string,
+    @Headers('accept-language') acceptLanguage?: string,
+  ) {
     const addOns = await this.addOnModel.findAll({
       where: {
         isActive: true,
@@ -134,9 +213,15 @@ export class AddOnsController {
       order: [['displayOrder', 'ASC'], ['name', 'ASC']],
     });
 
+    // Use lang query param, or fall back to accept-language header
+    const languageCode = lang || acceptLanguage?.split(',')[0]?.split('-')[0];
+
+    // Apply translations if language code is provided
+    const translatedAddOns = await this.applyAddonsTranslations(addOns, languageCode);
+
     return {
       success: true,
-      data: addOns,
+      data: translatedAddOns,
     };
   }
 
@@ -203,6 +288,7 @@ export class AddOnsController {
     type: 'string',
     description: 'Add-on unique identifier (UUID)',
   })
+  @ApiQuery({ name: 'lang', required: false, type: 'string', description: 'Language code (EN or ES)' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Add-on retrieved successfully',
@@ -212,16 +298,26 @@ export class AddOnsController {
     status: HttpStatus.NOT_FOUND,
     description: 'Add-on not found',
   })
-  async findOne(@Param('id', new ParseUUIDPipe()) id: string) {
+  async findOne(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Query('lang') lang?: string,
+    @Headers('accept-language') acceptLanguage?: string,
+  ) {
     const addOn = await this.addOnModel.findByPk(id);
 
     if (!addOn) {
       throw new NotFoundException(`Add-on with ID ${id} not found`);
     }
 
+    // Use lang query param, or fall back to accept-language header
+    const languageCode = lang || acceptLanguage?.split(',')[0]?.split('-')[0];
+
+    // Apply translation if language code is provided
+    const translatedAddOn = await this.applyAddonTranslations(addOn, languageCode);
+
     return {
       success: true,
-      data: addOn,
+      data: translatedAddOn,
     };
   }
 

@@ -3,6 +3,12 @@ import { Sequelize } from 'sequelize-typescript';
 import { QueryTypes } from 'sequelize';
 
 // Interfaces
+interface Addon {
+  id: string;
+  additionalTime: number;
+  price?: number;
+}
+
 interface Service {
   id: string;
   name: string;
@@ -10,6 +16,8 @@ interface Service {
   bufferTime: number;
   categoryId: string;
   parentCategoryId?: string | null; // For removal services: the category they prepare for
+  price: number; // Price in cents
+  addOns?: Addon[]; // Optional addons for this service
 }
 
 interface Staff {
@@ -54,11 +62,13 @@ export class MultiServiceAvailabilityService {
   /**
    * Encuentra slots disponibles para múltiples servicios consecutivos
    * Cada servicio puede ser realizado por un técnico diferente
+   * Ahora soporta addons por servicio para cálculo correcto de duración
    */
   async findMultiServiceSlots(
     serviceIds: string[],
     date: string,
-    selectedTechnicianId?: string
+    selectedTechnicianId?: string,
+    servicesWithAddons?: any[]
   ): Promise<MultiServiceSlot[]> {
 
     try {
@@ -69,9 +79,27 @@ export class MultiServiceAvailabilityService {
 
       // 1. Obtener información de servicios
       const services = await this.getServices(serviceIds);
+      
+      // 1.1. Agregar información de addons a los servicios
+      if (servicesWithAddons && servicesWithAddons.length > 0) {
+        services.forEach(service => {
+          const serviceWithAddon = servicesWithAddons.find(s => s.id === service.id);
+          if (serviceWithAddon && serviceWithAddon.addOns) {
+            // Map addon IDs to get price information from database
+            service.addOns = serviceWithAddon.addOns.map((addon: any) => ({
+              id: addon.id,
+              additionalTime: addon.additionalTime,
+              price: addon.price || 0
+            }));
+          }
+        });
+      }
+      
       this.logger.log(`\n📦 Services Found: ${services.length}`);
       services.forEach(s => {
-        this.logger.log(`   - ${s.name} (${s.duration}min + ${s.bufferTime}min buffer)`);
+        const addonTime = (s.addOns || []).reduce((sum, addon) => sum + addon.additionalTime, 0);
+        const baseTime = s.duration + s.bufferTime;
+        this.logger.log(`   - ${s.name} (${s.duration}min + ${s.bufferTime}min buffer + ${addonTime}min addons = ${baseTime + addonTime}min total)`);
       });
 
       if (services.length === 0) {
@@ -79,9 +107,12 @@ export class MultiServiceAvailabilityService {
         return [];
       }
 
-      // 2. Calcular duración total necesaria
-      const totalMinutes = services.reduce((sum, s) => sum + s.duration + s.bufferTime, 0);
-      this.logger.log(`\n⏱️ Total Duration Needed: ${totalMinutes} minutes`);
+      // 2. Calcular duración total necesaria (incluyendo addons)
+      const totalMinutes = services.reduce((sum, s) => {
+        const addonTime = (s.addOns || []).reduce((addonSum, addon) => addonSum + addon.additionalTime, 0);
+        return sum + s.duration + s.bufferTime + addonTime;
+      }, 0);
+      this.logger.log(`\n⏱️ Total Duration Needed: ${totalMinutes} minutes (including addons)`);
 
       // 3. Obtener staff disponible para cada servicio
       const staffByService = await this.getStaffForServices(serviceIds);
@@ -146,8 +177,9 @@ export class MultiServiceAvailabilityService {
       bufferTime: number;
       category_id: string;
       parent_category_id: string | null;
+      price: number;
     }>(
-      `SELECT s.id, s.name, s.duration, s."bufferTime", s.category_id, s.parent_category_id
+      `SELECT s.id, s.name, s.duration, s."bufferTime", s.category_id, s.parent_category_id, s.price
        FROM services s
        WHERE s.id = ANY($1::uuid[]) AND s."isActive" = true`,
       {
@@ -161,8 +193,9 @@ export class MultiServiceAvailabilityService {
       id: string;
       name: string;
       additionalTime: number;
+      price: number;
     }>(
-      `SELECT a.id, a.name, a."additionalTime"
+      `SELECT a.id, a.name, a."additionalTime", a.price
        FROM addons a
        WHERE a.id = ANY($1::uuid[]) AND a."isActive" = true`,
       {
@@ -179,6 +212,7 @@ export class MultiServiceAvailabilityService {
       bufferTime: s.bufferTime || 0,
       categoryId: s.category_id,
       parentCategoryId: s.parent_category_id,
+      price: s.price || 0,
     }));
 
     // Mapear addons como servicios (sin buffer, duration = additionalTime)
@@ -190,6 +224,7 @@ export class MultiServiceAvailabilityService {
       bufferTime: 0, // Los addons no tienen buffer, solo additionalTime
       categoryId: '', // Los addons se asignan por sufijo en el nombre (- Mani, - Pedi)
       parentCategoryId: null, // Los addons no usan parent_category_id
+      price: a.price || 0,
     }));
 
     // Combinar ambos y ordenar: removals primero, luego por duración
@@ -423,11 +458,18 @@ export class MultiServiceAvailabilityService {
           return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
         };
 
+        // Calculate total price: sum of all service prices + their addon prices
+        const totalPrice = services.reduce((sum, service) => {
+          const servicePrice = service.price || 0;
+          const addonsPrice = (service.addOns || []).reduce((addonSum, addon) => addonSum + (addon.price || 0), 0);
+          return sum + servicePrice + addonsPrice;
+        }, 0);
+
         slots.push({
           startTime: formatLocalTime(slotStart),
           endTime: formatLocalTime(slotEnd),
           totalDuration: totalMinutes,
-          totalPrice: 0,
+          totalPrice: totalPrice,
           available: true, // Slot is available since it has valid staff assignments
           services: assignments,
           assignments,
@@ -630,12 +672,15 @@ export class MultiServiceAvailabilityService {
             }
           }
 
+          const alreadyAssignedIds = assignments.map(a => a.staffId);
           assigned = this.findAvailableStaffWithMinWorkload(
             staffToConsider,
             bookings,
             currentStart,
             currentEnd,
-            debugSlot
+            debugSlot,
+            alreadyAssignedIds,
+            selectedTechnicianId
           );
 
           if (!assigned) {
@@ -650,12 +695,15 @@ export class MultiServiceAvailabilityService {
           technicianByCategory.set(mainServiceKey, assigned);
         } else {
           // No hay servicio principal, asignar normalmente
+          const alreadyAssignedIds = assignments.map(a => a.staffId);
           assigned = this.findAvailableStaffWithMinWorkload(
             candidateStaff,
             bookings,
             currentStart,
             currentEnd,
-            debugSlot
+            debugSlot,
+            alreadyAssignedIds,
+            selectedTechnicianId
           );
         }
       }
@@ -704,31 +752,66 @@ export class MultiServiceAvailabilityService {
       }
       // Servicio normal (no es removal y no tiene removal previo)
       else {
-        let staffToConsider = candidateStaff;
+        // Get already assigned staff IDs to prefer different technicians
+        const alreadyAssignedIds = assignments.map(a => a.staffId);
 
-        // CAMBIO IMPORTANTE: Para cualquier servicio, intentar usar técnico seleccionado si puede hacerlo
-        // Esto permite multi-servicio con diferentes técnicos por servicio
-        if (selectedTechnicianId) {
+        let staffToConsider = candidateStaff;
+        const isSingleService = services.length === 1;
+
+        if (isSingleService && selectedTechnicianId) {
+          // Single service: Force use of selected technician if they can do it
           const selectedStaff = candidateStaff.find(s => s.id === selectedTechnicianId);
           if (selectedStaff) {
-            // El técnico seleccionado PUEDE hacer este servicio, úsalo
             staffToConsider = [selectedStaff];
-            this.logger.debug(`   Service ${i + 1}: Using selected technician ${selectedStaff.name}`);
+            if (debugSlot) this.logger.log(`   Single service: Using selected technician ${selectedStaff.name}`);
+          }
+        } else if (!isSingleService && selectedTechnicianId) {
+          // Multi-service: Try to use selected technician for services they CAN do
+          const selectedStaff = candidateStaff.find(s => s.id === selectedTechnicianId);
+
+          if (selectedStaff) {
+            // Selected technician CAN do this service
+            // First check if they are available at this time
+            const isSelectedAvailable = !bookings.some(booking => {
+              if (booking.staffId !== selectedStaff.id) return false;
+              const getMinutesOfDay = (date: Date): number => date.getHours() * 60 + date.getMinutes();
+              const slotStartMin = getMinutesOfDay(currentStart);
+              const slotEndMin = getMinutesOfDay(currentEnd);
+              const bookingStartMin = getMinutesOfDay(booking.startTime);
+              const bookingEndMin = getMinutesOfDay(booking.endTime);
+              return slotStartMin < bookingEndMin && slotEndMin > bookingStartMin;
+            });
+
+            if (isSelectedAvailable) {
+              // Selected technician IS available → Use them directly
+              assigned = selectedStaff;
+              if (debugSlot) this.logger.log(`   Multi-service: ✅ Using selected technician ${selectedStaff.name} (available)`);
+            } else {
+              // Selected technician is BUSY → Use workload-based selection
+              if (debugSlot) this.logger.log(`   Multi-service: ⚠️ Selected technician ${selectedStaff.name} is busy, using alternative`);
+              staffToConsider = candidateStaff.filter(s => s.id !== selectedStaff.id);
+            }
           } else {
-            // El técnico seleccionado NO puede hacer este servicio
-            // Para multi-servicio, permitir cualquier técnico disponible
-            this.logger.debug(`   Service ${i + 1}: Selected technician cannot do this service, finding alternative`);
-            // staffToConsider ya es candidateStaff (todos los que pueden hacer el servicio)
+            // Selected technician CANNOT do this service → Use workload-based selection
+            if (debugSlot) {
+              this.logger.log(`   Multi-service: Selected technician cannot do this service, using best available`);
+            }
           }
         }
+        // For multi-service without selectedTechnicianId, staffToConsider = candidateStaff (all available)
 
-        assigned = this.findAvailableStaffWithMinWorkload(
-          staffToConsider,
-          bookings,
-          currentStart,
-          currentEnd,
-          debugSlot
-        );
+        // Only call findAvailableStaffWithMinWorkload if not already assigned
+        if (!assigned) {
+          assigned = this.findAvailableStaffWithMinWorkload(
+            staffToConsider,
+            bookings,
+            currentStart,
+            currentEnd,
+            debugSlot,
+            alreadyAssignedIds,
+            selectedTechnicianId
+          );
+        }
 
         if (!assigned) {
           if (debugSlot) this.logger.log(`  ❌ No se encontró técnico disponible`);
@@ -775,13 +858,17 @@ export class MultiServiceAvailabilityService {
 
   /**
    * NUEVO: Encuentra técnico disponible con menor carga de trabajo
+   * Prefiere técnicos que NO estén ya asignados en este slot multi-servicio
+   * EXCEPCIÓN: Si el técnico es el seleccionado por el cliente, NO se penaliza
    */
   private findAvailableStaffWithMinWorkload(
     candidates: Staff[],
     bookings: Booking[],
     start: Date,
     end: Date,
-    debugSlot?: string
+    debugSlot?: string,
+    alreadyAssignedIds: string[] = [],
+    selectedTechnicianId?: string
   ): Staff | null {
 
     if (candidates.length === 0) {
@@ -830,12 +917,31 @@ export class MultiServiceAvailabilityService {
       }
 
       // Calcular carga de trabajo total del día
-      const workload = bookings
+      let workload = bookings
         .filter(b => b.staffId === staff.id)
         .reduce((total, b) => {
           const minutes = (b.endTime.getTime() - b.startTime.getTime()) / 60000;
           return total + minutes;
         }, 0);
+
+      // IMPORTANTE: Penalizar técnicos ya asignados en este slot multi-servicio
+      // EXCEPCIÓN: NO penalizar al técnico seleccionado por el cliente
+      // Esto permite que el técnico principal haga múltiples servicios si puede
+      const isAlreadyAssigned = alreadyAssignedIds.includes(staff.id);
+      const isSelectedTechnician = selectedTechnicianId && staff.id === selectedTechnicianId;
+
+      if (isAlreadyAssigned && !isSelectedTechnician) {
+        // Ya asignado Y NO es el técnico elegido → Penalizar para distribuir
+        workload += 10000;
+        if (debugSlot) {
+          this.logger.log(`    ${staff.name}: ⚠️ Ya asignado en este slot (penalizado)`);
+        }
+      } else if (isAlreadyAssigned && isSelectedTechnician) {
+        // Ya asignado PERO es el técnico elegido → NO penalizar
+        if (debugSlot) {
+          this.logger.log(`    ${staff.name}: ✅ Ya asignado pero es técnico seleccionado (sin penalización)`);
+        }
+      }
 
       // Seleccionar técnico con menor carga
       if (workload < minWorkload) {

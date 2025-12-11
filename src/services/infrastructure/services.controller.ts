@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   Query,
+  Headers,
   ValidationPipe,
   ParseUUIDPipe,
   ParseIntPipe,
@@ -54,6 +55,7 @@ export class ServicesController {
   @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by service name' })
   @ApiQuery({ name: 'category', required: false, type: String, description: 'Filter by category' })
   @ApiQuery({ name: 'is_active', required: false, type: Boolean, description: 'Filter by active status' })
+  @ApiQuery({ name: 'lang', required: false, type: String, description: 'Language code (EN or ES)' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Services retrieved successfully'
@@ -64,10 +66,16 @@ export class ServicesController {
     @Query('search') search?: string,
     @Query('category') category?: string,
     @Query('is_active', new ParseBoolPipe({ optional: true })) isActive?: boolean,
+    @Query('lang') lang?: string,
+    @Headers('accept-language') acceptLanguage?: string,
   ): Promise<PaginatedResponse<ServiceEntity>> {
+    // Use lang query param, or fall back to accept-language header
+    const languageCode = lang || acceptLanguage?.split(',')[0]?.split('-')[0];
+
     return this.servicesService.findAll(
       { search, category, isActive },
-      { page: page || 1, limit: Math.min(limit || 10, 100) }
+      { page: page || 1, limit: Math.min(limit || 10, 100) },
+      languageCode
     );
   }
 
@@ -78,6 +86,7 @@ export class ServicesController {
     description: 'Retrieves all active services as a simple array for frontend consumption'
   })
   @ApiQuery({ name: 'category', required: false, type: String, description: 'Filter by category' })
+  @ApiQuery({ name: 'lang', required: false, type: String, description: 'Language code (EN or ES)' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Services retrieved successfully',
@@ -85,10 +94,16 @@ export class ServicesController {
   })
   async getServicesList(
     @Query('category') category?: string,
+    @Query('lang') lang?: string,
+    @Headers('accept-language') acceptLanguage?: string,
   ): Promise<ServiceEntity[]> {
+    // Use lang query param, or fall back to accept-language header
+    const languageCode = lang || acceptLanguage?.split(',')[0]?.split('-')[0];
+
     const result = await this.servicesService.findAll(
       { category, isActive: true },
-      { page: 1, limit: 1000 } // Get all services
+      { page: 1, limit: 1000 }, // Get all services
+      languageCode
     );
     return result.data;
   }

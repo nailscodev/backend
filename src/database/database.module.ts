@@ -10,7 +10,10 @@ import { BookingEntity } from '../booking/infrastructure/persistence/entities/bo
 import { NotificationEntity } from '../notifications/infrastructure/persistence/entities/notification.entity';
 import { AddOnEntity } from '../addons/infrastructure/persistence/entities/addon.entity';
 import { AddonIncompatibilityEntity } from '../addons/infrastructure/persistence/entities/addon-incompatibility.entity';
+import { AddOnLangEntity } from '../addons/infrastructure/persistence/entities/addon-lang.entity';
 import { ServiceAddon } from '../shared/domain/service-addon.model';
+import { ServiceLangEntity } from '../services/infrastructure/persistence/entities/service-lang.entity';
+import { LanguageEntity } from '../shared/domain/entities/language.entity';
 import { defineAssociations } from './associations';
 
 @Module({
@@ -28,7 +31,7 @@ import { defineAssociations } from './associations';
         synchronize: false, // Use manual SQL scripts instead of auto-sync
         logging: configService.get('NODE_ENV') === 'development',
         autoLoadModels: true,
-        models: [UserEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon],
+        models: [UserEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity],
       }),
     }),
   ],

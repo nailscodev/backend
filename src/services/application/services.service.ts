@@ -4,6 +4,8 @@ import { ServiceEntity } from '../infrastructure/persistence/entities/service.en
 import { ServiceIncompatibilityEntity } from '../infrastructure/persistence/entities/service-incompatibility.entity';
 import { RemovalStepEntity } from '../infrastructure/persistence/entities/removal-step.entity';
 import { CategoryEntity } from '../../categories/infrastructure/persistence/entities/category.entity';
+import { ServiceLangEntity } from '../infrastructure/persistence/entities/service-lang.entity';
+import { LanguageEntity } from '../../shared/domain/entities/language.entity';
 import { CreateServiceDto, UpdateServiceDto } from './dto';
 import { Op, QueryTypes } from 'sequelize';
 import { AddOnEntity } from '../../addons/infrastructure/persistence/entities/addon.entity';
@@ -43,8 +45,71 @@ export class ServicesService {
     private readonly serviceIncompatibilityModel: typeof ServiceIncompatibilityEntity,
     @InjectModel(RemovalStepEntity)
     private readonly removalStepModel: typeof RemovalStepEntity,
+    @InjectModel(ServiceLangEntity)
+    private readonly serviceLangModel: typeof ServiceLangEntity,
+    @InjectModel(LanguageEntity)
+    private readonly languageModel: typeof LanguageEntity,
     private readonly sequelize: Sequelize,
   ) { }
+
+  /**
+   * Apply translations to a service entity based on language code
+   */
+  private async applyServiceTranslations(
+    service: ServiceEntity,
+    languageCode?: string,
+  ): Promise<ServiceEntity> {
+    if (!languageCode || languageCode.toUpperCase() === 'EN') {
+      // No translation needed for English or if no language specified
+      return service;
+    }
+
+    try {
+      // Find the language by code
+      const language = await this.languageModel.findOne({
+        where: { code: languageCode.toUpperCase(), isActive: true },
+      });
+
+      if (!language) {
+        this.logger.warn(`Language ${languageCode} not found, returning original`);
+        return service;
+      }
+
+      // Find translation for this service
+      const translation = await this.serviceLangModel.findOne({
+        where: {
+          serviceId: service.id,
+          languageId: language.id,
+        },
+      });
+
+      if (translation) {
+        // Apply translation to service
+        service.name = translation.title;
+        service.description = translation.description;
+      }
+    } catch (error) {
+      this.logger.error(`Error applying translations: ${error.message}`);
+    }
+
+    return service;
+  }
+
+  /**
+   * Apply translations to multiple services
+   */
+  private async applyServicesTranslations(
+    services: ServiceEntity[],
+    languageCode?: string,
+  ): Promise<ServiceEntity[]> {
+    if (!languageCode || languageCode.toUpperCase() === 'EN') {
+      return services;
+    }
+
+    return Promise.all(
+      services.map((service) => this.applyServiceTranslations(service, languageCode)),
+    );
+  }
 
   async create(createServiceDto: CreateServiceDto): Promise<ServiceEntity> {
 
@@ -71,7 +136,8 @@ export class ServicesService {
 
   async findAll(
     filters: Omit<ServiceFilters, 'page' | 'limit'>,
-    pagination: PaginationOptions = {}
+    pagination: PaginationOptions = {},
+    languageCode?: string,
   ): Promise<PaginatedResponse<ServiceEntity>> {
     const { search, category, isActive } = filters;
     const page = pagination.page || 1;
@@ -107,8 +173,11 @@ export class ServicesService {
       raw: false,
     });
 
+    // Apply translations if language code is provided
+    const translatedData = await this.applyServicesTranslations(data, languageCode);
+
     return {
-      data,
+      data: translatedData,
       total,
       page,
       limit,

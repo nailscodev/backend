@@ -288,17 +288,34 @@ export class ReservationsController {
   @SkipCsrf() // Read operation, skip CSRF for performance
   @ApiOperation({
     summary: 'Get available time slots for multiple consecutive services',
-    description: 'Retrieve available time slots where multiple services can be performed consecutively. Each service may be performed by a different technician, but all must be available in consecutive time slots.',
+    description: 'Retrieve available time slots where multiple services can be performed consecutively. Each service may be performed by a different technician, but all must be available in consecutive time slots. Supports addons per service.',
   })
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
-        serviceIds: {
+        servicesWithAddons: {
           type: 'array',
-          items: { type: 'string' },
-          description: 'Array of service IDs (UUIDs) to book consecutively',
-          example: ['service-id-1', 'service-id-2']
+          description: 'Array of services with their addons',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: 'Service ID' },
+              duration: { type: 'number', description: 'Service duration in minutes' },
+              addOns: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    additionalTime: { type: 'number', description: 'Additional time in minutes' },
+                    price: { type: 'number', description: 'Price in cents' }
+                  }
+                }
+              }
+            }
+          },
+          example: [{ id: 'service-id-1', duration: 45, addOns: [{ id: 'addon-1', additionalTime: 10 }] }]
         },
         date: {
           type: 'string',
@@ -311,7 +328,7 @@ export class ReservationsController {
           example: 'tech-id-1'
         }
       },
-      required: ['serviceIds', 'date']
+      required: ['servicesWithAddons', 'date']
     }
   })
   @ApiResponse({
@@ -324,25 +341,29 @@ export class ReservationsController {
   })
   @HttpCode(HttpStatus.OK)
   async getMultiServiceSlots(
-    @Body() body: { serviceIds: string[]; date: string; selectedTechnicianId?: string },
+    @Body() body: { servicesWithAddons: any[]; date: string; selectedTechnicianId?: string },
   ) {
     try {
-      const { serviceIds, date, selectedTechnicianId } = body;
+      const { servicesWithAddons, date, selectedTechnicianId } = body;
 
       // Validation
-      if (!serviceIds || !Array.isArray(serviceIds) || serviceIds.length === 0) {
-        throw new BadRequestException('serviceIds must be a non-empty array');
+      if (!servicesWithAddons || !Array.isArray(servicesWithAddons) || servicesWithAddons.length === 0) {
+        throw new BadRequestException('servicesWithAddons must be a non-empty array');
       }
 
       if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         throw new BadRequestException('Date must be in YYYY-MM-DD format');
       }
 
+      // Extract service IDs for backwards compatibility
+      const serviceIds = servicesWithAddons.map(s => s.id);
+
       // Call the multi-service availability service
       const availableSlots = await this.multiServiceAvailabilityService.findMultiServiceSlots(
         serviceIds,
         date,
-        selectedTechnicianId
+        selectedTechnicianId,
+        servicesWithAddons
       );
 
       console.log(`\n🎯 CONTROLLER RESPONSE:`);
@@ -356,6 +377,7 @@ export class ReservationsController {
         data: availableSlots,
         date,
         serviceIds,
+        servicesWithAddons,
         count: availableSlots.length
       };
     } catch (error) {
