@@ -1,4 +1,4 @@
-import { Table, Column, Model, DataType, Index, ForeignKey } from 'sequelize-typescript';
+import { Table, Column, Model, DataType, Index, ForeignKey, BelongsTo } from 'sequelize-typescript';
 import { ApiProperty } from '@nestjs/swagger';
 import { UserEntity } from './user.entity';
 
@@ -67,4 +67,7 @@ export class UserTokenEntity extends Model<UserTokenEntity> {
   @ApiProperty({ description: 'Updated at' })
   @Column({ type: DataType.DATE, allowNull: false, field: 'updated_at' })
   declare updatedAt: Date;
+
+  @BelongsTo(() => UserEntity, 'userId')
+  declare user?: UserEntity;
 }

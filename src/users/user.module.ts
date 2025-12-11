@@ -11,6 +11,9 @@ import { UserController } from './infrastructure/web/user.controller';
   ],
   controllers: [UserController],
   providers: [UserService],
-  exports: [UserService],
+  exports: [
+    UserService,
+    SequelizeModule, // Export to allow other modules to inject User entities
+  ],
 })
 export class UserModule {}
