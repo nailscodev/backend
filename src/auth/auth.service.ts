@@ -4,24 +4,26 @@ import { Op } from 'sequelize';
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 import { UserEntity, UserRole } from '../common/entities/user.entity';
+import { LoginDto, AuthResponse } from './dto/auth.dto';
 
-export interface LoginDto {
-  username: string;
-  password: string;
-}
-
-export interface AuthResponse {
-  access_token: string;
-  user: {
-    id: string;
-    username: string;
-    email: string;
-    role: UserRole;
-    first_name: string;
-    last_name: string;
-  };
-}
-
+/**
+ * @deprecated This service is LEGACY and should not be used for new implementations.
+ * 
+ * Use `UserService.login()` from `users/application/user.service.ts` instead.
+ * 
+ * Reasons:
+ * - Does NOT store JWT tokens in the database (no token tracking/revocation)
+ * - Uses bcryptjs instead of the standard bcrypt used elsewhere
+ * - Uses incorrect column names (is_active, last_login) that don't match Sequelize models
+ * - Does NOT revoke previous tokens on login
+ * - Missing advanced logging and error handling
+ * 
+ * The new implementation in UserService provides:
+ * ✅ JWT token persistence with SHA-256 hashing in user_tokens table
+ * ✅ Automatic revocation of previous tokens on login
+ * ✅ Proper Sequelize model mapping (camelCase -> snake_case)
+ * ✅ Enhanced security and token lifecycle management
+ */
 @Injectable()
 export class AuthService {
   constructor(

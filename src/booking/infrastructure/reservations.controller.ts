@@ -33,6 +33,7 @@ import { UpdateBookingDto } from './dto/update-booking.dto';
 import { BookingStatus } from '../domain/value-objects/booking-status.vo';
 import { MultiServiceAvailabilityService } from '../application/services/multi-service-availability.service';
 import { SkipCsrf } from '../../common/decorators/csrf.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 
 // Interfaces for type safety
 interface StaffMember {
@@ -417,6 +418,7 @@ export class ReservationsController {
     return booking;
   }
 
+  @Public()
   @Post()
   @ApiOperation({
     summary: 'Create a new booking',
@@ -551,10 +553,10 @@ export class ReservationsController {
       return booking;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new BadRequestException('Error confirming booking: ' + errorMessage);
     }
   }
 
+  @Public()
   @Post('assign-optimal-staff')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
