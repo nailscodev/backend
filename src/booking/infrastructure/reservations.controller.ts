@@ -387,6 +387,94 @@ export class ReservationsController {
     }
   }
 
+  @Post('vip-combo-slots')
+  @SkipCsrf()
+  @ApiOperation({
+    summary: 'Get available time slots for VIP Combo (simultaneous services)',
+    description: 'Retrieve available time slots where two services can be performed SIMULTANEOUSLY by two different technicians. This is for VIP Combo bookings where Mani + Pedi are done at the same time.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        servicesWithAddons: {
+          type: 'array',
+          description: 'Array of exactly 2 services with their addons (must be combo-eligible)',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: 'Service ID' },
+              duration: { type: 'number', description: 'Service duration in minutes' },
+              addOns: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    additionalTime: { type: 'number' },
+                    price: { type: 'number' }
+                  }
+                }
+              }
+            }
+          }
+        },
+        date: {
+          type: 'string',
+          description: 'Date in YYYY-MM-DD format',
+          example: '2025-12-20'
+        }
+      },
+      required: ['servicesWithAddons', 'date']
+    }
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Available VIP combo time slots retrieved successfully',
+  })
+  @HttpCode(HttpStatus.OK)
+  async getVIPComboSlots(
+    @Body() body: { servicesWithAddons: any[]; date: string },
+  ) {
+    try {
+      const { servicesWithAddons, date } = body;
+
+      // Validation
+      if (!servicesWithAddons || !Array.isArray(servicesWithAddons) || servicesWithAddons.length !== 2) {
+        throw new BadRequestException('VIP Combo requires exactly 2 services');
+      }
+
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        throw new BadRequestException('Date must be in YYYY-MM-DD format');
+      }
+
+      const serviceIds = servicesWithAddons.map(s => s.id);
+
+      // Call the VIP combo availability service
+      const availableSlots = await this.multiServiceAvailabilityService.findVIPComboSlots(
+        serviceIds,
+        date,
+        servicesWithAddons
+      );
+
+      console.log(`\n🌟 VIP COMBO CONTROLLER RESPONSE:`);
+      console.log(`   Found ${availableSlots.length} simultaneous slots`);
+
+      return {
+        success: true,
+        data: availableSlots,
+        date,
+        serviceIds,
+        isVIPCombo: true,
+        count: availableSlots.length
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('Error in getVIPComboSlots:', errorMessage, error);
+      throw error;
+    }
+  }
+
   @Get(':id')
   @ApiOperation({
     summary: 'Get booking by ID',
@@ -731,6 +819,131 @@ export class ReservationsController {
   // ============================================================================
   // MULTI-SERVICE BOOKING ENDPOINTS
   // ============================================================================
+
+  /**
+   * 🔒 VERIFICACIÓN GLOBAL DE DISPONIBILIDAD CON PERMUTACIONES
+   * Este endpoint usa el algoritmo central de disponibilidad que prueba todas
+   * las permutaciones posibles del orden de servicios.
+   * 
+   * Úsalo para:
+   * - Verificar antes de confirmar un booking
+   * - Re-verificar disponibilidad si pasó tiempo desde la selección del slot
+   * - Obtener las asignaciones óptimas de staff para un slot específico
+   * 
+   * POST /bookings/verify-slot-with-permutations
+   */
+  @Post('verify-slot-with-permutations')
+  @SkipCsrf()
+  @ApiOperation({
+    summary: 'Verify slot availability using all permutations',
+    description: 'Central availability check that tries all service order permutations to find valid staff assignments'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['serviceIds', 'date', 'startTime'],
+      properties: {
+        serviceIds: {
+          type: 'array',
+          items: { type: 'string', format: 'uuid' },
+          description: 'Array of service IDs to book'
+        },
+        date: {
+          type: 'string',
+          format: 'date',
+          example: '2025-12-16',
+          description: 'Booking date in YYYY-MM-DD format'
+        },
+        startTime: {
+          type: 'string',
+          example: '11:30',
+          description: 'Start time in HH:mm format'
+        },
+        selectedTechnicianId: {
+          type: 'string',
+          format: 'uuid',
+          description: 'Optional: ID of the technician selected by the customer'
+        },
+        servicesWithAddons: {
+          type: 'array',
+          description: 'Optional: Services with their addon details for duration calculation',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', format: 'uuid' },
+              addOns: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string', format: 'uuid' },
+                    additionalTime: { type: 'number' },
+                    price: { type: 'number' }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Slot verification result with optimal staff assignments',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        available: { type: 'boolean' },
+        totalDuration: { type: 'number', description: 'Total duration in minutes' },
+        totalPrice: { type: 'number', description: 'Total price in cents' },
+        permutationUsed: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Order of services in the successful permutation'
+        },
+        assignments: {
+          type: 'array',
+          description: 'Staff assignments for each service in the optimal order',
+          items: {
+            type: 'object',
+            properties: {
+              serviceId: { type: 'string' },
+              serviceName: { type: 'string' },
+              staffId: { type: 'string' },
+              staffName: { type: 'string' },
+              startTime: { type: 'string' },
+              endTime: { type: 'string' },
+              duration: { type: 'number' }
+            }
+          }
+        }
+      }
+    }
+  })
+  async verifySlotWithPermutations(
+    @Body() body: {
+      serviceIds: string[];
+      date: string;
+      startTime: string;
+      selectedTechnicianId?: string;
+      servicesWithAddons?: any[];
+    }
+  ) {
+    const result = await this.multiServiceAvailabilityService.verifySlotAvailability(
+      body.serviceIds,
+      body.date,
+      body.startTime,
+      body.selectedTechnicianId,
+      body.servicesWithAddons
+    );
+
+    return {
+      success: true,
+      ...result
+    };
+  }
 
   /**
    * Verifica disponibilidad de múltiples slots con sus técnicos asignados

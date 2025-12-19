@@ -179,6 +179,17 @@ export class ServiceEntity extends Model<ServiceEntity> {
   declare displayOrder: number;
 
   @ApiProperty({
+    description: 'Whether the service is eligible for VIP combo (Mani + Pedi)',
+    example: true,
+  })
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  })
+  declare combo: boolean;
+
+  @ApiProperty({
     description: 'When the service was created',
     example: '2025-09-21T13:00:00Z',
   })

@@ -161,6 +161,119 @@ export class MultiServiceAvailabilityService {
   }
 
   // ============================================================================
+  // MÉTODO PÚBLICO - VERIFICACIÓN DE DISPONIBILIDAD (REUTILIZABLE)
+  // ============================================================================
+
+  /**
+   * 🔒 FUNCIÓN GLOBAL DE VERIFICACIÓN DE DISPONIBILIDAD
+   * Usada por: slots generation, confirmación, y cualquier verificación de disponibilidad
+   * 
+   * Verifica si un slot específico está disponible para los servicios dados,
+   * probando todas las permutaciones posibles del orden de servicios.
+   * 
+   * @returns Las asignaciones de staff si hay disponibilidad, null si no
+   */
+  async verifySlotAvailability(
+    serviceIds: string[],
+    date: string,
+    startTime: string, // Format: "HH:mm" or "HH:mm:ss"
+    selectedTechnicianId?: string,
+    servicesWithAddons?: any[]
+  ): Promise<{
+    available: boolean;
+    assignments: StaffAssignment[] | null;
+    totalDuration: number;
+    totalPrice: number;
+    permutationUsed?: string[];
+  }> {
+    try {
+      this.logger.log(`\n🔍 === VERIFY SLOT AVAILABILITY ===`);
+      this.logger.log(`📅 Date: ${date}, Time: ${startTime}`);
+      this.logger.log(`🎯 Services: ${serviceIds.length}`);
+      this.logger.log(`👤 Selected Technician: ${selectedTechnicianId || 'Any'}`);
+
+      // 1. Obtener información de servicios
+      const services = await this.getServices(serviceIds);
+
+      // 1.1. Agregar información de addons
+      if (servicesWithAddons && servicesWithAddons.length > 0) {
+        services.forEach(service => {
+          const serviceWithAddon = servicesWithAddons.find(s => s.id === service.id);
+          if (serviceWithAddon && serviceWithAddon.addOns) {
+            service.addOns = serviceWithAddon.addOns.map((addon: any) => ({
+              id: addon.id,
+              additionalTime: addon.additionalTime,
+              price: addon.price || 0
+            }));
+          }
+        });
+      }
+
+      if (services.length === 0) {
+        return { available: false, assignments: null, totalDuration: 0, totalPrice: 0 };
+      }
+
+      // 2. Calcular duración total
+      const totalDuration = services.reduce((sum, s) => sum + this.getServiceTotalDuration(s), 0);
+
+      // 3. Calcular precio total
+      const totalPrice = services.reduce((sum, service) => {
+        const servicePrice = service.price || 0;
+        const addonsPrice = (service.addOns || []).reduce((addonSum, addon) => addonSum + (addon.price || 0), 0);
+        return sum + servicePrice + addonsPrice;
+      }, 0);
+
+      // 4. Obtener staff por servicio
+      const staffByService = await this.getStaffForServices(serviceIds);
+
+      // Verificar que hay staff para todos los servicios
+      for (const serviceId of serviceIds) {
+        if (!staffByService.has(serviceId) || staffByService.get(serviceId)!.length === 0) {
+          this.logger.warn(`❌ No staff for service ${serviceId}`);
+          return { available: false, assignments: null, totalDuration, totalPrice };
+        }
+      }
+
+      // 5. Obtener bookings existentes
+      const existingBookings = await this.getBookingsForDate(date);
+
+      // 6. Construir la hora de inicio
+      const [hour, minute] = startTime.split(':').map(Number);
+      const slotStart = new Date(`${date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`);
+
+      // 7. Intentar asignar staff con permutaciones
+      const assignments = this.tryAssignStaffForSlot(
+        services,
+        staffByService,
+        existingBookings,
+        slotStart,
+        selectedTechnicianId
+      );
+
+      if (assignments) {
+        // Extraer el orden de servicios usado
+        const permutationUsed = assignments.map(a => a.serviceName);
+        
+        this.logger.log(`✅ Slot available with permutation: ${permutationUsed.join(' → ')}`);
+        return {
+          available: true,
+          assignments,
+          totalDuration,
+          totalPrice,
+          permutationUsed
+        };
+      }
+
+      this.logger.log(`❌ Slot NOT available for any permutation`);
+      return { available: false, assignments: null, totalDuration, totalPrice };
+
+    } catch (error) {
+      this.logger.error(`Error verifying slot: ${error instanceof Error ? error.message : 'Unknown'}`);
+      return { available: false, assignments: null, totalDuration: 0, totalPrice: 0 };
+    }
+  }
+
+  // ============================================================================
   // MÉTODOS PRIVADOS - QUERIES A BASE DE DATOS
   // ============================================================================
 
@@ -347,20 +460,87 @@ export class MultiServiceAvailabilityService {
       }
     );
 
-    const bookings = result.map(b => ({
-      staffId: b.staffId,
-      startTime: new Date(b.startTime),
-      endTime: new Date(b.endTime),
-    }));
+    this.logger.log(`\n📋 Raw bookings from DB for ${date}: ${result.length}`);
+    result.forEach(r => {
+      this.logger.log(`   RAW: "${r.startTime}" - "${r.endTime}" (Staff: ${r.staffId.substring(0, 8)}...)`);
+    });
 
-    // Log para debug
-    if (bookings.length > 0 && bookings.length < 15) {
-      this.logger.log(`\n📋 Bookings parseados para ${date}:`);
+    // Parse times - extract hours and minutes from various formats
+    // Database can return Date objects OR strings depending on configuration
+    const bookings = result.map(b => {
+      const parseTime = (timeValue: string | Date): { hours: number; minutes: number } => {
+        // If it's already a Date object, just extract the time
+        if (timeValue instanceof Date) {
+          return { hours: timeValue.getHours(), minutes: timeValue.getMinutes() };
+        }
+        
+        // Convert to string if needed
+        const timeStr = String(timeValue);
+        
+        // Log the raw value for debugging
+        this.logger.debug(`     Parsing time string: "${timeStr}"`);
+        
+        // Format 1: "2025-12-18 12:30:00-03" (PostgreSQL with timezone)
+        // Format 2: "2025-12-18T12:30:00.000Z" (ISO with Z)
+        // Format 3: "2025-12-18T12:30:00" (ISO without timezone)
+        
+        // Extract the time portion - handle both space and T separators
+        let timePart: string;
+        
+        if (timeStr.includes('T')) {
+          // ISO format: "2025-12-18T12:30:00.000Z"
+          timePart = timeStr.split('T')[1]; // "12:30:00.000Z"
+        } else if (timeStr.includes(' ')) {
+          // PostgreSQL format: "2025-12-18 12:30:00-03"
+          const parts = timeStr.split(' ');
+          // Handle "Thu Dec 18 2025 12:30:00 GMT-0300" format
+          if (parts.length >= 4 && parts[3].includes(':')) {
+            timePart = parts[3]; // "12:30:00"
+          } else if (parts.length >= 2 && parts[1].includes(':')) {
+            timePart = parts[1]; // "12:30:00-03"
+          } else {
+            // Fallback: use Date parser
+            const d = new Date(timeStr);
+            return { hours: d.getHours(), minutes: d.getMinutes() };
+          }
+        } else {
+          // Fallback: use Date parser
+          const d = new Date(timeStr);
+          return { hours: d.getHours(), minutes: d.getMinutes() };
+        }
+        
+        // Extract hours and minutes from timePart (e.g., "12:30:00-03" or "12:30:00.000Z")
+        const [hours, minutes] = timePart.split(':').map(Number);
+        
+        this.logger.debug(`     Extracted: ${hours}:${minutes}`);
+        
+        return { hours, minutes };
+      };
+      
+      const startParsed = parseTime(b.startTime as unknown as string | Date);
+      const endParsed = parseTime(b.endTime as unknown as string | Date);
+      
+      // Create Date objects with extracted time (using date from query)
+      const startDate = new Date(`${date}T${String(startParsed.hours).padStart(2, '0')}:${String(startParsed.minutes).padStart(2, '0')}:00`);
+      const endDate = new Date(`${date}T${String(endParsed.hours).padStart(2, '0')}:${String(endParsed.minutes).padStart(2, '0')}:00`);
+      
+      return {
+        staffId: b.staffId,
+        startTime: startDate,
+        endTime: endDate,
+      };
+    });
+
+    // Log parsed bookings
+    if (bookings.length > 0) {
+      this.logger.log(`\n📋 Parsed bookings for ${date}:`);
       bookings.forEach(b => {
         const startStr = `${String(b.startTime.getHours()).padStart(2, '0')}:${String(b.startTime.getMinutes()).padStart(2, '0')}`;
         const endStr = `${String(b.endTime.getHours()).padStart(2, '0')}:${String(b.endTime.getMinutes()).padStart(2, '0')}`;
-        this.logger.log(`   ${startStr}-${endStr} (Staff: ${b.staffId.substring(0, 8)}...)`);
+        this.logger.log(`   ⏰ Staff ${b.staffId.substring(0, 8)}...: ${startStr}-${endStr}`);
       });
+    } else {
+      this.logger.log(`\n📋 No existing bookings for ${date}`);
     }
 
     return bookings;
@@ -434,7 +614,7 @@ export class MultiServiceAvailabilityService {
       }
 
       // Intentar asignar staff para este slot
-      const assignments = this.tryAssignStaffForSlot(
+      let assignments = this.tryAssignStaffForSlot(
         services,
         staffByService,
         bookings,
@@ -444,6 +624,18 @@ export class MultiServiceAvailabilityService {
 
       if (!assignments) {
         slotsNoStaff++;
+      }
+
+      // 🔒 IMPORTANT: If a specific technician was selected, they MUST be assigned to at least one service
+      // If the selected technician is not in any assignment, reject this slot
+      if (assignments && selectedTechnicianId) {
+        const selectedTechnicianAssigned = assignments.some(a => a.staffId === selectedTechnicianId);
+        if (!selectedTechnicianAssigned) {
+          const slotTimeStr = `${String(slotStart.getHours()).padStart(2, '0')}:${String(slotStart.getMinutes()).padStart(2, '0')}`;
+          this.logger.log(`   ❌ [${slotTimeStr}] Rejected: Selected technician not available for any service they can do`);
+          slotsNoStaff++;
+          assignments = null; // Mark as invalid
+        }
       }
 
       if (assignments) {
@@ -488,8 +680,8 @@ export class MultiServiceAvailabilityService {
 
   /**
    * Intenta asignar técnicos para un slot específico
-   * Maneja removals: el técnico que hace el servicio principal también hace su removal
-   * IMPORTANTE: Para multi-servicio, prueba diferentes órdenes de ejecución
+   * ALGORITMO DE PERMUTACIONES: Prueba todas las combinaciones de orden de servicios
+   * para encontrar una configuración válida donde el técnico seleccionado participe
    */
   private tryAssignStaffForSlot(
     services: Service[],
@@ -503,13 +695,74 @@ export class MultiServiceAvailabilityService {
     const isDebugSlot = ['10:30', '11:30', '12:30', '13:30', '14:30', '15:30'].includes(slotTimeStr);
 
     if (isDebugSlot) {
-      this.logger.log(`\n🔍 [DEBUG ${slotTimeStr}] Evaluando slot...`);
+      this.logger.log(`\n🔍 [DEBUG ${slotTimeStr}] Evaluando slot con permutaciones...`);
     }
 
-    // Para multi-servicio con diferentes técnicos, probar todas las permutaciones de orden
-    // Esto permite que Sofia haga pedicure primero O al final
-    const servicePermutations = this.generateServicePermutations(services);
+    // Generar TODAS las permutaciones válidas de servicios (respetando grupos removal+servicio)
+    const servicePermutations = this.generateAllValidPermutations(services);
 
+    if (isDebugSlot) {
+      this.logger.log(`   📋 Permutaciones a probar: ${servicePermutations.length}`);
+      servicePermutations.forEach((perm, idx) => {
+        this.logger.log(`      ${idx + 1}. ${perm.map(s => s.name.substring(0, 20)).join(' → ')}`);
+      });
+    }
+
+    // Si hay un técnico seleccionado, primero probar permutaciones donde pueda participar
+    if (selectedTechnicianId) {
+      // Identificar servicios que el técnico seleccionado puede hacer
+      const servicesSelectedCanDo = services.filter(s => {
+        const staff = staffByService.get(s.id) || [];
+        return staff.some(st => st.id === selectedTechnicianId);
+      });
+
+      if (isDebugSlot && servicesSelectedCanDo.length > 0) {
+        this.logger.log(`   👤 Técnico seleccionado puede hacer: ${servicesSelectedCanDo.map(s => s.name).join(', ')}`);
+      }
+
+      // Ordenar permutaciones: priorizar las que ponen servicios del técnico seleccionado
+      // en momentos donde podría estar disponible
+      const prioritizedPermutations = this.prioritizePermutationsForTechnician(
+        servicePermutations,
+        servicesSelectedCanDo,
+        bookings,
+        startTime,
+        selectedTechnicianId,
+        isDebugSlot ? slotTimeStr : undefined
+      );
+
+      for (const orderedServices of prioritizedPermutations) {
+        const result = this.tryAssignStaffInOrder(
+          orderedServices,
+          staffByService,
+          bookings,
+          startTime,
+          selectedTechnicianId,
+          isDebugSlot ? slotTimeStr : undefined
+        );
+
+        if (result) {
+          // Verificar que el técnico seleccionado esté asignado a al menos un servicio
+          const selectedIsAssigned = result.some(a => a.staffId === selectedTechnicianId);
+          if (selectedIsAssigned) {
+            if (isDebugSlot) {
+              this.logger.log(`   ✅ Permutación exitosa CON técnico seleccionado`);
+            }
+            return result;
+          } else if (isDebugSlot) {
+            this.logger.log(`   ⚠️ Permutación válida pero SIN técnico seleccionado, intentando otra...`);
+          }
+        }
+      }
+
+      // Si ninguna permutación incluye al técnico seleccionado, retornar null
+      if (isDebugSlot) {
+        this.logger.log(`   ❌ Ninguna permutación permite al técnico seleccionado participar`);
+      }
+      return null;
+    }
+
+    // Sin técnico seleccionado: probar todas las permutaciones y retornar la primera válida
     for (const orderedServices of servicePermutations) {
       const result = this.tryAssignStaffInOrder(
         orderedServices,
@@ -529,67 +782,176 @@ export class MultiServiceAvailabilityService {
   }
 
   /**
-   * Genera permutaciones de servicios manteniendo removals con sus servicios principales
+   * Genera TODAS las permutaciones válidas de servicios
+   * Regla: Los removals deben ir ANTES del servicio principal de su categoría
    */
-  private generateServicePermutations(services: Service[]): Service[][] {
-    // Si hay removal + servicio principal de una categoría + servicio de otra categoría,
-    // podemos intercambiar el orden entre las categorías
-
-    const removals: Service[] = [];
-    const maniServices: Service[] = [];
-    const pediServices: Service[] = [];
-
-    for (const service of services) {
-      const name = service.name.toLowerCase();
-      if (name.includes('removal')) {
-        removals.push(service);
-      } else if (name.includes('mani')) {
-        maniServices.push(service);
-      } else if (name.includes('pedi')) {
-        pediServices.push(service);
-      }
+  private generateAllValidPermutations(services: Service[]): Service[][] {
+    // Agrupar servicios por categoría (mani/pedi) incluyendo sus removals
+    interface ServiceBlock {
+      category: 'mani' | 'pedi' | 'other';
+      removal?: Service;
+      mainService: Service;
     }
 
-    // Agrupar removal de mani con manicure
-    const maniBlock: Service[] = [];
-    removals.forEach(r => {
-      if (r.name.toLowerCase().includes('mani')) {
-        maniBlock.push(r);
+    const blocks: ServiceBlock[] = [];
+    const processedIds = new Set<string>();
+
+    // Identificar removals y sus servicios principales
+    const removals = services.filter(s => s.name.toLowerCase().includes('removal'));
+    const mainServices = services.filter(s => !s.name.toLowerCase().includes('removal'));
+
+    for (const mainService of mainServices) {
+      const name = mainService.name.toLowerCase();
+      let category: 'mani' | 'pedi' | 'other' = 'other';
+      
+      if (name.includes('mani')) category = 'mani';
+      else if (name.includes('pedi')) category = 'pedi';
+
+      // Buscar removal correspondiente
+      const correspondingRemoval = removals.find(r => {
+        const rName = r.name.toLowerCase();
+        if (category === 'mani' && rName.includes('mani')) return true;
+        if (category === 'pedi' && rName.includes('pedi')) return true;
+        return false;
+      });
+
+      if (correspondingRemoval && !processedIds.has(correspondingRemoval.id)) {
+        processedIds.add(correspondingRemoval.id);
       }
-    });
-    maniBlock.push(...maniServices);
 
-    // Agrupar removal de pedi con pedicure
-    const pediBlock: Service[] = [];
-    removals.forEach(r => {
-      if (r.name.toLowerCase().includes('pedi')) {
-        pediBlock.push(r);
-      }
-    });
-    pediBlock.push(...pediServices);
-
-    // Generar permutaciones: mani antes de pedi, o pedi antes de mani
-    const permutations: Service[][] = [];
-
-    if (maniBlock.length > 0 && pediBlock.length > 0) {
-      // Opción 1: Mani primero, luego Pedi
-      permutations.push([...maniBlock, ...pediBlock]);
-      // Opción 2: Pedi primero, luego Mani
-      permutations.push([...pediBlock, ...maniBlock]);
-    } else if (maniBlock.length > 0) {
-      permutations.push(maniBlock);
-    } else if (pediBlock.length > 0) {
-      permutations.push(pediBlock);
-    } else {
-      // Servicios sin categoría clara, usar orden original
-      permutations.push(services);
+      blocks.push({
+        category,
+        removal: correspondingRemoval,
+        mainService,
+      });
     }
 
-    return permutations;
+    // Generar permutaciones de los bloques
+    const blockPermutations = this.generatePermutations(blocks);
+
+    // Convertir bloques a secuencias de servicios
+    const result: Service[][] = [];
+    for (const blockOrder of blockPermutations) {
+      const sequence: Service[] = [];
+      for (const block of blockOrder) {
+        if (block.removal) {
+          sequence.push(block.removal);
+        }
+        sequence.push(block.mainService);
+      }
+      result.push(sequence);
+    }
+
+    return result.length > 0 ? result : [services];
+  }
+
+  /**
+   * Genera todas las permutaciones de un array
+   */
+  private generatePermutations<T>(arr: T[]): T[][] {
+    if (arr.length <= 1) return [arr];
+    
+    const result: T[][] = [];
+    
+    for (let i = 0; i < arr.length; i++) {
+      const current = arr[i];
+      const remaining = [...arr.slice(0, i), ...arr.slice(i + 1)];
+      const remainingPerms = this.generatePermutations(remaining);
+      
+      for (const perm of remainingPerms) {
+        result.push([current, ...perm]);
+      }
+    }
+    
+    return result;
+  }
+
+  /**
+   * Prioriza permutaciones basándose en la disponibilidad del técnico seleccionado
+   * Pone primero las permutaciones donde los servicios del técnico están en momentos donde está libre
+   */
+  private prioritizePermutationsForTechnician(
+    permutations: Service[][],
+    servicesSelectedCanDo: Service[],
+    bookings: Booking[],
+    startTime: Date,
+    selectedTechnicianId: string,
+    debugSlot?: string
+  ): Service[][] {
+    if (servicesSelectedCanDo.length === 0) {
+      return permutations;
+    }
+
+    // Obtener horarios ocupados del técnico seleccionado
+    const selectedTechBookings = bookings.filter(b => b.staffId === selectedTechnicianId);
+
+    // Calcular para cada permutación: ¿el técnico seleccionado estará libre cuando toque su servicio?
+    const scored = permutations.map(perm => {
+      let currentStart = new Date(startTime);
+      let score = 0;
+
+      for (const service of perm) {
+        const duration = this.getServiceTotalDuration(service);
+        const currentEnd = new Date(currentStart.getTime() + duration * 60000);
+
+        // Si este servicio es uno que el técnico puede hacer, verificar disponibilidad
+        if (servicesSelectedCanDo.some(s => s.id === service.id)) {
+          const isFree = !this.hasConflict(selectedTechBookings, currentStart, currentEnd);
+          if (isFree) {
+            score += 100; // Alta prioridad si puede hacerlo
+          }
+        }
+
+        currentStart = currentEnd;
+      }
+
+      return { perm, score };
+    });
+
+    // Ordenar por score descendente
+    scored.sort((a, b) => b.score - a.score);
+
+    if (debugSlot) {
+      this.logger.log(`   🎯 Permutaciones priorizadas:`);
+      scored.slice(0, 3).forEach((s, idx) => {
+        this.logger.log(`      ${idx + 1}. Score ${s.score}: ${s.perm.map(sv => sv.name.substring(0, 15)).join(' → ')}`);
+      });
+    }
+
+    return scored.map(s => s.perm);
+  }
+
+  /**
+   * Calcula la duración total de un servicio incluyendo addons
+   */
+  private getServiceTotalDuration(service: Service): number {
+    const addonTime = (service.addOns || []).reduce((sum, addon) => {
+      const time = addon.additionalTime || 0;
+      return sum + time;
+    }, 0);
+    const total = service.duration + (service.bufferTime || 0) + addonTime;
+    this.logger.debug(`   📊 ${service.name}: base=${service.duration} + buffer=${service.bufferTime || 0} + addons=${addonTime} = ${total}min`);
+    return total;
+  }
+
+  /**
+   * Verifica si hay conflicto con bookings existentes
+   */
+  private hasConflict(bookings: Booking[], start: Date, end: Date): boolean {
+    const getMinutesOfDay = (date: Date): number => date.getHours() * 60 + date.getMinutes();
+    const startMin = getMinutesOfDay(start);
+    const endMin = getMinutesOfDay(end);
+
+    return bookings.some(booking => {
+      const bookingStartMin = getMinutesOfDay(booking.startTime);
+      const bookingEndMin = getMinutesOfDay(booking.endTime);
+      return startMin < bookingEndMin && endMin > bookingStartMin;
+    });
   }
 
   /**
    * Intenta asignar staff para los servicios en un orden específico
+   * INCLUYE addons en la duración de cada servicio
    */
   private tryAssignStaffInOrder(
     services: Service[],
@@ -608,13 +970,15 @@ export class MultiServiceAvailabilityService {
 
     for (let i = 0; i < services.length; i++) {
       const service = services[i];
-      const duration = service.duration + service.bufferTime;
+      // IMPORTANTE: Incluir tiempo de addons en la duración
+      const duration = this.getServiceTotalDuration(service);
       const currentEnd = new Date(currentStart.getTime() + duration * 60000);
 
       if (debugSlot) {
         const startStr = `${String(currentStart.getHours()).padStart(2, '0')}:${String(currentStart.getMinutes()).padStart(2, '0')}`;
         const endStr = `${String(currentEnd.getHours()).padStart(2, '0')}:${String(currentEnd.getMinutes()).padStart(2, '0')}`;
-        this.logger.log(`  Servicio ${i + 1}: ${service.name} (${startStr}-${endStr}, ${duration}min)`);
+        const addonTime = (service.addOns || []).reduce((sum, a) => sum + a.additionalTime, 0);
+        this.logger.log(`  Servicio ${i + 1}: ${service.name} (${startStr}-${endStr}, ${duration}min = ${service.duration}+${service.bufferTime}buf+${addonTime}addons)`);
       }
 
       // Obtener lista de técnicos que pueden hacer este servicio
@@ -951,6 +1315,335 @@ export class MultiServiceAvailabilityService {
     }
 
     return bestStaff;
+  }
+
+  // ============================================================================
+  // VIP COMBO: SERVICIOS SIMULTÁNEOS (2 técnicos al mismo tiempo)
+  // ============================================================================
+
+  /**
+   * 🌟 VIP COMBO: Encuentra slots donde 2 técnicos diferentes puedan realizar
+   * ambos servicios SIMULTÁNEAMENTE (al mismo tiempo, no consecutivamente)
+   * 
+   * Requisitos:
+   * - Exactamente 2 servicios con combo=true (Manicure + Pedicure)
+   * - 2 técnicos DIFERENTES disponibles al mismo tiempo
+   * - La duración del slot = MAX(servicio1, servicio2) + buffer
+   */
+  async findVIPComboSlots(
+    serviceIds: string[],
+    date: string,
+    servicesWithAddons?: any[]
+  ): Promise<MultiServiceSlot[]> {
+    try {
+      this.logger.log(`\n🌟 === FINDING VIP COMBO SLOTS (SIMULTANEOUS) ===`);
+      this.logger.log(`📅 Date: ${date}`);
+      this.logger.log(`🎯 Service IDs: ${JSON.stringify(serviceIds)}`);
+
+      if (serviceIds.length !== 2) {
+        this.logger.warn('❌ VIP Combo requires exactly 2 services');
+        return [];
+      }
+
+      // 1. Obtener información de servicios
+      const services = await this.getServices(serviceIds);
+      
+      if (services.length !== 2) {
+        this.logger.warn('❌ Could not find both services');
+        return [];
+      }
+
+      // 1.1. Agregar información de addons a los servicios
+      if (servicesWithAddons && servicesWithAddons.length > 0) {
+        this.logger.log(`\n📦 Processing servicesWithAddons from frontend:`);
+        servicesWithAddons.forEach((swa, idx) => {
+          this.logger.log(`   Service ${idx + 1} (${swa.id}): ${swa.addOns?.length || 0} addons`);
+          if (swa.addOns && swa.addOns.length > 0) {
+            swa.addOns.forEach((addon: any) => {
+              this.logger.log(`      - Addon: ${addon.id}, additionalTime: ${addon.additionalTime}`);
+            });
+          }
+        });
+
+        services.forEach(service => {
+          const serviceWithAddon = servicesWithAddons.find(s => s.id === service.id);
+          if (serviceWithAddon && serviceWithAddon.addOns) {
+            service.addOns = serviceWithAddon.addOns.map((addon: any) => ({
+              id: addon.id,
+              additionalTime: addon.additionalTime || 0,
+              price: addon.price || 0
+            }));
+            this.logger.log(`   ✅ Assigned ${service.addOns?.length || 0} addons to ${service.name}`);
+          }
+        });
+      }
+
+      // 2. Calcular duración total = MAX de ambos servicios (se hacen al mismo tiempo)
+      const service1Duration = this.getServiceTotalDuration(services[0]);
+      const service2Duration = this.getServiceTotalDuration(services[1]);
+      const simultaneousDuration = Math.max(service1Duration, service2Duration);
+      
+      this.logger.log(`\n📦 Services for VIP Combo:`);
+      this.logger.log(`   - ${services[0].name}: ${service1Duration}min`);
+      this.logger.log(`   - ${services[1].name}: ${service2Duration}min`);
+      this.logger.log(`   ⏱️ Simultaneous Duration: ${simultaneousDuration}min (max of both)`);
+
+      // 3. Obtener staff disponible para cada servicio
+      const staffByService = await this.getStaffForServices(serviceIds);
+
+      this.logger.log(`\n👥 Staff Available by Service:`);
+      staffByService.forEach((staff, serviceId) => {
+        const serviceName = services.find(s => s.id === serviceId)?.name || serviceId;
+        this.logger.log(`   - ${serviceName}: ${staff.length} staff members`);
+      });
+
+      // Verificar que haya al menos un técnico por servicio
+      for (const serviceId of serviceIds) {
+        if (!staffByService.has(serviceId) || staffByService.get(serviceId)!.length === 0) {
+          this.logger.warn(`❌ No staff available for service ${serviceId}`);
+          return [];
+        }
+      }
+
+      // 4. Obtener bookings existentes del día
+      const existingBookings = await this.getBookingsForDate(date);
+
+      // 5. Generar slots donde 2 técnicos puedan trabajar simultáneamente
+      const availableSlots = this.findVIPComboAvailableSlots(
+        services,
+        staffByService,
+        existingBookings,
+        date,
+        simultaneousDuration
+      );
+
+      this.logger.log(`\n✅ VIP COMBO RESULT: Found ${availableSlots.length} simultaneous slots`);
+      
+      return availableSlots;
+
+    } catch (error) {
+      this.logger.error(`Error finding VIP combo slots: ${error instanceof Error ? error.message : 'Unknown'}`, error instanceof Error ? error.stack : '');
+      return [];
+    }
+  }
+
+  /**
+   * Genera slots VIP Combo donde 2 técnicos diferentes están disponibles simultáneamente
+   */
+  private findVIPComboAvailableSlots(
+    services: Service[],
+    staffByService: Map<string, Staff[]>,
+    bookings: Booking[],
+    date: string,
+    simultaneousDuration: number
+  ): MultiServiceSlot[] {
+    const slots: MultiServiceSlot[] = [];
+    const allTimeSlots = this.generateTimeSlots();
+
+    this.logger.log(`   Checking ${allTimeSlots.length} possible time slots for VIP Combo...`);
+    this.logger.log(`   Existing bookings: ${bookings.length}`);
+    if (bookings.length > 0) {
+      this.logger.log(`   Bookings detail:`);
+      bookings.forEach(b => {
+        const startStr = `${String(b.startTime.getHours()).padStart(2, '0')}:${String(b.startTime.getMinutes()).padStart(2, '0')}`;
+        const endStr = `${String(b.endTime.getHours()).padStart(2, '0')}:${String(b.endTime.getMinutes()).padStart(2, '0')}`;
+        this.logger.log(`      Staff ${b.staffId.substring(0, 8)}...: ${startStr}-${endStr}`);
+      });
+    }
+
+    let checkedSlots = 0;
+    let rejectedByBusinessHours = 0;
+    let rejectedByNoStaff = 0;
+
+    for (const slot of allTimeSlots) {
+      const [hour, minute] = slot.time.split(':').map(Number);
+      const slotStart = new Date(`${date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`);
+      const slotEnd = new Date(slotStart.getTime() + simultaneousDuration * 60000);
+
+      checkedSlots++;
+
+      // Verificar que termine antes del cierre (21:30)
+      const endTimeInMinutes = slotEnd.getHours() * 60 + slotEnd.getMinutes();
+      const businessEndMinutes = 21 * 60 + 30;
+
+      if (endTimeInMinutes > businessEndMinutes) {
+        rejectedByBusinessHours++;
+        continue;
+      }
+
+      // Intentar asignar 2 técnicos DIFERENTES para el mismo slot
+      const assignments = this.tryAssignTwoStaffSimultaneously(
+        services,
+        staffByService,
+        bookings,
+        slotStart,
+        slotEnd
+      );
+
+      if (!assignments) {
+        rejectedByNoStaff++;
+      }
+
+      if (assignments) {
+        const formatLocalTime = (date: Date): string => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          const hours = String(date.getHours()).padStart(2, '0');
+          const minutes = String(date.getMinutes()).padStart(2, '0');
+          const seconds = String(date.getSeconds()).padStart(2, '0');
+          return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+        };
+
+        // Calcular precio total (servicios + addons)
+        const totalPrice = services.reduce((sum, service) => {
+          const servicePrice = service.price || 0;
+          const addonsPrice = (service.addOns || []).reduce((addonSum, addon) => addonSum + (addon.price || 0), 0);
+          return sum + servicePrice + addonsPrice;
+        }, 0);
+
+        slots.push({
+          startTime: formatLocalTime(slotStart),
+          endTime: formatLocalTime(slotEnd),
+          totalDuration: simultaneousDuration,
+          totalPrice: totalPrice,
+          available: true,
+          services: assignments,
+          assignments,
+        });
+      }
+    }
+
+    this.logger.log(`\n📊 SLOT CHECK SUMMARY:`);
+    this.logger.log(`   Total slots checked: ${checkedSlots}`);
+    this.logger.log(`   Rejected by business hours: ${rejectedByBusinessHours}`);
+    this.logger.log(`   Rejected by no staff available: ${rejectedByNoStaff}`);
+    this.logger.log(`   ✅ Available slots: ${slots.length}`);
+
+    return slots;
+  }
+
+  /**
+   * Intenta asignar 2 técnicos DIFERENTES para trabajar simultáneamente
+   * Ambos deben estar libres durante todo el slot
+   */
+  private tryAssignTwoStaffSimultaneously(
+    services: Service[],
+    staffByService: Map<string, Staff[]>,
+    bookings: Booking[],
+    slotStart: Date,
+    slotEnd: Date
+  ): StaffAssignment[] | null {
+    const [service1, service2] = services;
+    const staff1Candidates = staffByService.get(service1.id) || [];
+    const staff2Candidates = staffByService.get(service2.id) || [];
+    
+    const slotTimeStr = `${String(slotStart.getHours()).padStart(2, '0')}:${String(slotStart.getMinutes()).padStart(2, '0')}`;
+    
+    // Log candidates for first few slots only
+    if (slotStart.getHours() <= 8) {
+      this.logger.log(`   🔍 Slot ${slotTimeStr}: Checking staff availability`);
+      this.logger.log(`      Service1 (${service1.name}) candidates: ${staff1Candidates.map(s => s.name).join(', ')}`);
+      this.logger.log(`      Service2 (${service2.name}) candidates: ${staff2Candidates.map(s => s.name).join(', ')}`);
+    }
+
+    // Encontrar todos los técnicos disponibles para servicio 1
+    const availableStaff1 = staff1Candidates.filter(staff => 
+      this.isStaffAvailable(staff.id, bookings, slotStart, slotEnd)
+    );
+
+    // Encontrar todos los técnicos disponibles para servicio 2
+    const availableStaff2 = staff2Candidates.filter(staff => 
+      this.isStaffAvailable(staff.id, bookings, slotStart, slotEnd)
+    );
+
+    if (slotStart.getHours() <= 8) {
+      this.logger.log(`      Available for Service1: ${availableStaff1.map(s => s.name).join(', ') || 'NONE'}`);
+      this.logger.log(`      Available for Service2: ${availableStaff2.map(s => s.name).join(', ') || 'NONE'}`);
+    }
+
+    if (availableStaff1.length === 0 || availableStaff2.length === 0) {
+      return null;
+    }
+
+    // Buscar una combinación donde sean 2 técnicos DIFERENTES
+    for (const tech1 of availableStaff1) {
+      for (const tech2 of availableStaff2) {
+        if (tech1.id !== tech2.id) {
+          // ¡Encontramos 2 técnicos diferentes disponibles!
+          const formatTime = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+          
+          return [
+            {
+              serviceId: service1.id,
+              serviceName: service1.name,
+              staffId: tech1.id,
+              staffName: tech1.name,
+              startTime: formatTime(slotStart),
+              endTime: formatTime(slotEnd),
+              duration: this.getServiceTotalDuration(service1),
+            },
+            {
+              serviceId: service2.id,
+              serviceName: service2.name,
+              staffId: tech2.id,
+              staffName: tech2.name,
+              startTime: formatTime(slotStart), // MISMO horario de inicio
+              endTime: formatTime(slotEnd),     // MISMO horario de fin
+              duration: this.getServiceTotalDuration(service2),
+            }
+          ];
+        }
+      }
+    }
+
+    // No encontramos 2 técnicos diferentes disponibles
+    return null;
+  }
+
+  /**
+   * Verifica si un técnico está disponible durante un rango de tiempo
+   * NOTA: Usa hora local para comparación consistente
+   */
+  private isStaffAvailable(
+    staffId: string,
+    bookings: Booking[],
+    start: Date,
+    end: Date
+  ): boolean {
+    // Usar hora local para consistencia con slots generados en hora local
+    const getMinutesOfDay = (date: Date): number => {
+      return date.getHours() * 60 + date.getMinutes();
+    };
+
+    const slotStartMin = getMinutesOfDay(start);
+    const slotEndMin = getMinutesOfDay(end);
+
+    // Debug para el primer booking
+    if (bookings.length > 0) {
+      const debugBooking = bookings.find(b => b.staffId === staffId);
+      if (debugBooking) {
+        this.logger.debug(`   🔍 Checking staff ${staffId.substring(0,8)}:`);
+        this.logger.debug(`      Slot: ${slotStartMin}-${slotEndMin}min`);
+        this.logger.debug(`      Booking raw: ${debugBooking.startTime} - ${debugBooking.endTime}`);
+        this.logger.debug(`      Booking hours: ${debugBooking.startTime.getHours()}:${debugBooking.startTime.getMinutes()} - ${debugBooking.endTime.getHours()}:${debugBooking.endTime.getMinutes()}`);
+      }
+    }
+
+    for (const booking of bookings) {
+      if (booking.staffId !== staffId) continue;
+
+      const bookingStartMin = getMinutesOfDay(booking.startTime);
+      const bookingEndMin = getMinutesOfDay(booking.endTime);
+
+      // Hay conflicto si los rangos se superponen
+      if (slotStartMin < bookingEndMin && slotEndMin > bookingStartMin) {
+        this.logger.debug(`      ❌ CONFLICT: slot ${slotStartMin}-${slotEndMin} vs booking ${bookingStartMin}-${bookingEndMin}`);
+        return false;
+      }
+    }
+
+    return true;
   }
 
 }
