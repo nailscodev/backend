@@ -2,6 +2,7 @@ import { Module, OnModuleInit } from '@nestjs/common';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { UserEntity } from '../common/entities/user.entity';
+import { UserTokenEntity } from '../users/infrastructure/persistence/entities/user-token.entity';
 import { ServiceEntity } from '../services/infrastructure/persistence/entities/service.entity';
 import { CategoryEntity } from '../categories/infrastructure/persistence/entities/category.entity';
 import { StaffEntity } from '../staff/infrastructure/persistence/entities/staff.entity';
@@ -31,7 +32,7 @@ import { defineAssociations } from './associations';
         synchronize: false, // Use manual SQL scripts instead of auto-sync
         logging: configService.get('NODE_ENV') === 'development',
         autoLoadModels: true,
-        models: [UserEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity],
+        models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity],
       }),
     }),
   ],

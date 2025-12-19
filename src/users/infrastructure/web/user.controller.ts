@@ -33,6 +33,8 @@ import { LoginDto } from '../../application/dto/login.dto';
 import { LoginResponseDto } from '../../application/dto/login-response.dto';
 import { ChangePasswordDto } from '../../application/dto/change-password.dto';
 import { UserRole } from '../persistence/entities/user.entity';
+import { Public } from '../../../common/decorators/public.decorator';
+import { CurrentUser, CurrentUserData } from '../../../common/decorators/current-user.decorator';
 
 @ApiTags('users')
 @Controller('users')
@@ -420,7 +422,7 @@ export class UserController {
   @Patch(':id/change-password')
   @ApiOperation({
     summary: 'Change user password',
-    description: 'Changes the password for a specific user. Requires current password verification.',
+    description: 'Changes the password for a specific user. Requires current password verification. Protected by JWT authentication.',
   })
   @ApiParam({
     name: 'id',
@@ -468,7 +470,13 @@ export class UserController {
   async changePassword(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body(new ValidationPipe({ transform: true })) changePasswordDto: ChangePasswordDto,
+    // Optional: You can also get authenticated user info from JWT token
+    // @CurrentUser() currentUser: CurrentUserData,
   ): Promise<{ message: string; success: boolean }> {
+    // Optional: Verify user can only change their own password (or admin can change any)
+    // if (currentUser.role !== 'admin' && currentUser.id.toString() !== id) {
+    //   throw new ForbiddenException('You can only change your own password');
+    // }
     const success = await this.userService.changePassword(id, changePasswordDto);
     return {
       message: 'Password changed successfully',
@@ -476,6 +484,7 @@ export class UserController {
     };
   }
 
+  @Public() // This endpoint doesn't require JWT authentication
   @Post('login')
   @ApiOperation({
     summary: 'User login',

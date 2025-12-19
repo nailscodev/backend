@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { DatabaseModule } from './database/database.module';
 // import { AuthModule } from './auth/auth.module'; // TODO: Implementar completamente
@@ -18,6 +18,7 @@ import { CsrfController } from './common/controllers/csrf.controller';
 import { CsrfService } from './common/services/csrf.service';
 import { CustomThrottlerGuard } from './common/guards/custom-throttler.guard';
 import { CsrfGuard } from './common/guards/csrf.guard';
+import { JwtAuthInterceptor } from './common/interceptors/jwt-auth.interceptor';
 
 /**
  * Main application module with security features
@@ -25,6 +26,7 @@ import { CsrfGuard } from './common/guards/csrf.guard';
  * This module configures the application with:
  * - Rate limiting protection against brute force attacks via ThrottlerModule
  * - CSRF protection via CsrfGuard and CsrfService for state-changing operations
+ * - JWT authentication protection for all POST, PUT, DELETE requests via JwtAuthInterceptor
  * - Global security guards and interceptors
  */
 @Module({
@@ -71,6 +73,10 @@ import { CsrfGuard } from './common/guards/csrf.guard';
     {
       provide: APP_GUARD,
       useClass: CsrfGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: JwtAuthInterceptor,
     },
   ],
 })
