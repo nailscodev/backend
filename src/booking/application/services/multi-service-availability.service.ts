@@ -1333,12 +1333,16 @@ export class MultiServiceAvailabilityService {
   async findVIPComboSlots(
     serviceIds: string[],
     date: string,
-    servicesWithAddons?: any[]
+    servicesWithAddons?: any[],
+    selectedTechnicianId?: string,
+    selectedServiceId?: string
   ): Promise<MultiServiceSlot[]> {
     try {
       this.logger.log(`\n🌟 === FINDING VIP COMBO SLOTS (SIMULTANEOUS) ===`);
       this.logger.log(`📅 Date: ${date}`);
       this.logger.log(`🎯 Service IDs: ${JSON.stringify(serviceIds)}`);
+      this.logger.log(`👤 Selected Technician: ${selectedTechnicianId || 'none'}`);
+      this.logger.log(`🔧 Selected Service: ${selectedServiceId || 'none'}`);
 
       if (serviceIds.length !== 2) {
         this.logger.warn('❌ VIP Combo requires exactly 2 services');
@@ -1409,12 +1413,15 @@ export class MultiServiceAvailabilityService {
       const existingBookings = await this.getBookingsForDate(date);
 
       // 5. Generar slots donde 2 técnicos puedan trabajar simultáneamente
+      // Si hay técnico seleccionado, DEBE estar en todos los slots
       const availableSlots = this.findVIPComboAvailableSlots(
         services,
         staffByService,
         existingBookings,
         date,
-        simultaneousDuration
+        simultaneousDuration,
+        selectedTechnicianId,
+        selectedServiceId
       );
 
       this.logger.log(`\n✅ VIP COMBO RESULT: Found ${availableSlots.length} simultaneous slots`);
@@ -1435,12 +1442,15 @@ export class MultiServiceAvailabilityService {
     staffByService: Map<string, Staff[]>,
     bookings: Booking[],
     date: string,
-    simultaneousDuration: number
+    simultaneousDuration: number,
+    selectedTechnicianId?: string,
+    selectedServiceId?: string
   ): MultiServiceSlot[] {
     const slots: MultiServiceSlot[] = [];
     const allTimeSlots = this.generateTimeSlots();
 
     this.logger.log(`   Checking ${allTimeSlots.length} possible time slots for VIP Combo...`);
+    this.logger.log(`   Selected technician: ${selectedTechnicianId || 'none'} for service ${selectedServiceId || 'none'}`);
     this.logger.log(`   Existing bookings: ${bookings.length}`);
     if (bookings.length > 0) {
       this.logger.log(`   Bookings detail:`);
@@ -1454,6 +1464,7 @@ export class MultiServiceAvailabilityService {
     let checkedSlots = 0;
     let rejectedByBusinessHours = 0;
     let rejectedByNoStaff = 0;
+    let rejectedBySelectedStaffBusy = 0;
 
     for (const slot of allTimeSlots) {
       const [hour, minute] = slot.time.split(':').map(Number);
@@ -1472,16 +1483,24 @@ export class MultiServiceAvailabilityService {
       }
 
       // Intentar asignar 2 técnicos DIFERENTES para el mismo slot
+      // Si hay técnico seleccionado, debe estar en todos los slots
       const assignments = this.tryAssignTwoStaffSimultaneously(
         services,
         staffByService,
         bookings,
         slotStart,
-        slotEnd
+        slotEnd,
+        selectedTechnicianId,
+        selectedServiceId
       );
 
       if (!assignments) {
-        rejectedByNoStaff++;
+        // Check if it failed because the selected technician is busy
+        if (selectedTechnicianId && !this.isStaffAvailable(selectedTechnicianId, bookings, slotStart, slotEnd)) {
+          rejectedBySelectedStaffBusy++;
+        } else {
+          rejectedByNoStaff++;
+        }
       }
 
       if (assignments) {
@@ -1526,19 +1545,154 @@ export class MultiServiceAvailabilityService {
   /**
    * Intenta asignar 2 técnicos DIFERENTES para trabajar simultáneamente
    * Ambos deben estar libres durante todo el slot
+   * 
+   * Si hay técnico seleccionado (selectedTechnicianId):
+   * - El técnico seleccionado DEBE estar en el slot
+   * - Si está ocupado, el slot no está disponible
+   * - Solo se busca alternativa para el OTRO servicio
+   * - Si no se especifica selectedServiceId, se auto-detecta basado en qué servicios puede hacer el técnico
    */
   private tryAssignTwoStaffSimultaneously(
     services: Service[],
     staffByService: Map<string, Staff[]>,
     bookings: Booking[],
     slotStart: Date,
-    slotEnd: Date
+    slotEnd: Date,
+    selectedTechnicianId?: string,
+    selectedServiceId?: string
   ): StaffAssignment[] | null {
     const [service1, service2] = services;
     const staff1Candidates = staffByService.get(service1.id) || [];
     const staff2Candidates = staffByService.get(service2.id) || [];
     
     const slotTimeStr = `${String(slotStart.getHours()).padStart(2, '0')}:${String(slotStart.getMinutes()).padStart(2, '0')}`;
+    const formatTime = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    
+    // Si hay técnico seleccionado, usar lógica especial
+    if (selectedTechnicianId) {
+      // Verificar que el técnico seleccionado esté disponible
+      const selectedIsAvailable = this.isStaffAvailable(selectedTechnicianId, bookings, slotStart, slotEnd);
+      
+      if (!selectedIsAvailable) {
+        // El técnico seleccionado está ocupado - slot NO disponible
+        return null;
+      }
+      
+      // Auto-detectar qué servicio puede hacer el técnico seleccionado
+      const canDoService1 = staff1Candidates.some(s => s.id === selectedTechnicianId);
+      const canDoService2 = staff2Candidates.some(s => s.id === selectedTechnicianId);
+      
+      // Si se especificó selectedServiceId, verificar que sea válido
+      let selectedForService1 = false;
+      let selectedForService2 = false;
+      
+      if (selectedServiceId) {
+        selectedForService1 = selectedServiceId === service1.id && canDoService1;
+        selectedForService2 = selectedServiceId === service2.id && canDoService2;
+      } else {
+        // Auto-detectar: preferir el servicio que SOLO puede hacer el técnico seleccionado
+        if (canDoService1 && !canDoService2) {
+          selectedForService1 = true;
+        } else if (canDoService2 && !canDoService1) {
+          selectedForService2 = true;
+        } else if (canDoService1 && canDoService2) {
+          // El técnico puede hacer ambos servicios - elegir el primero
+          // (o podríamos elegir el que tiene menos opciones de staff alternativo)
+          selectedForService1 = true;
+        }
+      }
+      
+      if (!selectedForService1 && !selectedForService2) {
+        // El técnico seleccionado no puede hacer ninguno de los servicios
+        return null;
+      }
+      
+      // Encontrar el técnico seleccionado en los candidatos
+      let selectedStaff: Staff | undefined;
+      if (selectedForService1) {
+        selectedStaff = staff1Candidates.find(s => s.id === selectedTechnicianId);
+      } else if (selectedForService2) {
+        selectedStaff = staff2Candidates.find(s => s.id === selectedTechnicianId);
+      }
+      
+      if (!selectedStaff) {
+        // El técnico seleccionado no puede hacer este servicio
+        return null;
+      }
+      
+      // Buscar técnico para el OTRO servicio (que no sea el seleccionado)
+      let otherService: Service;
+      let otherCandidates: Staff[];
+      
+      if (selectedForService1) {
+        otherService = service2;
+        otherCandidates = staff2Candidates;
+      } else {
+        otherService = service1;
+        otherCandidates = staff1Candidates;
+      }
+      
+      // Buscar técnico disponible para el otro servicio (que sea DIFERENTE)
+      const otherAvailable = otherCandidates.filter(staff => 
+        staff.id !== selectedTechnicianId && 
+        this.isStaffAvailable(staff.id, bookings, slotStart, slotEnd)
+      );
+      
+      if (otherAvailable.length === 0) {
+        // No hay otro técnico disponible para el otro servicio
+        return null;
+      }
+      
+      // Usar el primer técnico disponible para el otro servicio
+      const otherStaff = otherAvailable[0];
+      
+      // Construir las asignaciones en el orden correcto
+      if (selectedForService1) {
+        return [
+          {
+            serviceId: service1.id,
+            serviceName: service1.name,
+            staffId: selectedStaff.id,
+            staffName: selectedStaff.name,
+            startTime: formatTime(slotStart),
+            endTime: formatTime(slotEnd),
+            duration: this.getServiceTotalDuration(service1),
+          },
+          {
+            serviceId: service2.id,
+            serviceName: service2.name,
+            staffId: otherStaff.id,
+            staffName: otherStaff.name,
+            startTime: formatTime(slotStart),
+            endTime: formatTime(slotEnd),
+            duration: this.getServiceTotalDuration(service2),
+          }
+        ];
+      } else {
+        return [
+          {
+            serviceId: service1.id,
+            serviceName: service1.name,
+            staffId: otherStaff.id,
+            staffName: otherStaff.name,
+            startTime: formatTime(slotStart),
+            endTime: formatTime(slotEnd),
+            duration: this.getServiceTotalDuration(service1),
+          },
+          {
+            serviceId: service2.id,
+            serviceName: service2.name,
+            staffId: selectedStaff.id,
+            staffName: selectedStaff.name,
+            startTime: formatTime(slotStart),
+            endTime: formatTime(slotEnd),
+            duration: this.getServiceTotalDuration(service2),
+          }
+        ];
+      }
+    }
+    
+    // Sin técnico seleccionado: lógica original (buscar cualquier combinación válida)
     
     // Log candidates for first few slots only
     if (slotStart.getHours() <= 8) {
@@ -1571,8 +1725,6 @@ export class MultiServiceAvailabilityService {
       for (const tech2 of availableStaff2) {
         if (tech1.id !== tech2.id) {
           // ¡Encontramos 2 técnicos diferentes disponibles!
-          const formatTime = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-          
           return [
             {
               serviceId: service1.id,

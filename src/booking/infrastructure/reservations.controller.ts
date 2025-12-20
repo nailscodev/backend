@@ -389,6 +389,7 @@ export class ReservationsController {
   }
 
   @Post('vip-combo-slots')
+  @Public() // Allow public access for booking flow
   @SkipCsrf()
   @ApiOperation({
     summary: 'Get available time slots for VIP Combo (simultaneous services)',
@@ -435,10 +436,10 @@ export class ReservationsController {
   })
   @HttpCode(HttpStatus.OK)
   async getVIPComboSlots(
-    @Body() body: { servicesWithAddons: any[]; date: string },
+    @Body() body: { servicesWithAddons: any[]; date: string; selectedTechnicianId?: string; selectedServiceId?: string },
   ) {
     try {
-      const { servicesWithAddons, date } = body;
+      const { servicesWithAddons, date, selectedTechnicianId, selectedServiceId } = body;
 
       // Validation
       if (!servicesWithAddons || !Array.isArray(servicesWithAddons) || servicesWithAddons.length !== 2) {
@@ -451,11 +452,17 @@ export class ReservationsController {
 
       const serviceIds = servicesWithAddons.map(s => s.id);
 
+      console.log(`\n🌟 VIP COMBO REQUEST:`);
+      console.log(`   Selected Technician: ${selectedTechnicianId || 'none'}`);
+      console.log(`   Selected Service: ${selectedServiceId || 'none'}`);
+
       // Call the VIP combo availability service
       const availableSlots = await this.multiServiceAvailabilityService.findVIPComboSlots(
         serviceIds,
         date,
-        servicesWithAddons
+        servicesWithAddons,
+        selectedTechnicianId,
+        selectedServiceId
       );
 
       console.log(`\n🌟 VIP COMBO CONTROLLER RESPONSE:`);
@@ -507,6 +514,7 @@ export class ReservationsController {
   }
 
   @Public()
+  @SkipCsrf()
   @Post()
   @ApiOperation({
     summary: 'Create a new booking',
