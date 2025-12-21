@@ -212,15 +212,10 @@ export class CsrfGuard implements CanActivate {
    * @private
    */
   private extractCsrfTokenFromRequest(request: IExtendedRequest): string | null {
-    // Check Authorization header first (Bearer token)
-    const authHeader = request.headers.authorization;
-    if (authHeader?.startsWith('Bearer ')) {
-      return authHeader.substring(7);
-    }
-
-    // Check X-CSRF-Token header
+    // Check X-CSRF-Token header El bearer token es para el JWT, no para el CSRF
     const csrfHeader = request.headers['x-csrf-token'] as string;
     if (csrfHeader) {
+      this.logger.debug(`CSRF token found in X-CSRF-Token header: ${csrfHeader.substring(0, 20)}...`);
       return csrfHeader;
     }
 
@@ -229,6 +224,7 @@ export class CsrfGuard implements CanActivate {
       const body = request.body as Record<string, unknown>;
       const bodyToken = body._token;
       if (typeof bodyToken === 'string') {
+        this.logger.debug(`CSRF token found in request body`);
         return bodyToken;
       }
     }
@@ -236,9 +232,11 @@ export class CsrfGuard implements CanActivate {
     // Check query parameters
     const queryToken = request.query._token;
     if (typeof queryToken === 'string') {
+      this.logger.debug(`CSRF token found in query parameters`);
       return queryToken;
     }
 
+    this.logger.warn('No CSRF token found in request');
     return null;
   }
 
