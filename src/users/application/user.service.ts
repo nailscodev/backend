@@ -315,6 +315,37 @@ export class UserService {
   }
 
   /**
+   * Revokes a JWT token by marking it as revoked in the database
+   */
+  async revokeToken(token: string): Promise<void> {
+    try {
+      // Hash the token to match how it's stored in the database
+      const tokenHash = this.hashToken(token);
+
+      // Find the token in the database
+      const userToken = await this.userTokenModel.findOne({
+        where: {
+          token: tokenHash,
+          revoked: false,
+        },
+      });
+
+      if (!userToken) {
+        this.logger.warn('Token not found or already revoked');
+        return; // Don't throw error, just log and return
+      }
+
+      // Mark token as revoked
+      await userToken.update({ revoked: true });
+      
+      this.logger.log(`Token revoked successfully for user: ${userToken.userId}`);
+    } catch (error: unknown) {
+      this.logger.error('Failed to revoke token', error);
+      throw new BadRequestException('Failed to revoke token');
+    }
+  }
+
+  /**
    * Authenticates user login
    */
   async login(loginDto: LoginDto): Promise<LoginResponseDto> {
