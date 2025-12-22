@@ -2,6 +2,11 @@ import { Table, Column, Model, DataType } from 'sequelize-typescript';
 import { ApiProperty } from '@nestjs/swagger';
 import { BookingStatus } from '../../../domain/value-objects/booking-status.vo';
 
+export enum PaymentMethod {
+  CASH = 'CASH',
+  CARD = 'CARD',
+}
+
 @Table({
   tableName: 'bookings',
   paranoid: false, // Disable soft deletes for now
@@ -122,6 +127,19 @@ export class BookingEntity extends Model<BookingEntity> {
     defaultValue: BookingStatus.PENDING,
   })
   declare status: BookingStatus;
+
+  @ApiProperty({
+    description: 'Payment method used for this booking',
+    enum: ['CASH', 'CARD'],
+    example: 'CARD',
+    required: false,
+  })
+  @Column({
+    type: DataType.ENUM('CASH', 'CARD'),
+    allowNull: true,
+    field: 'paymentMethod',
+  })
+  declare paymentMethod?: 'CASH' | 'CARD';
 
   @ApiProperty({
     description: 'Total booking amount',
