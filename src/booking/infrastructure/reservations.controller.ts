@@ -34,6 +34,7 @@ import { BookingStatus } from '../domain/value-objects/booking-status.vo';
 import { MultiServiceAvailabilityService } from '../application/services/multi-service-availability.service';
 import { SkipCsrf } from '../../common/decorators/csrf.decorator';
 import { Public } from '../../common/decorators/public.decorator';
+import { DashboardStatsDto } from './dto/dashboard-stats.dto';
 
 // Interfaces for type safety
 interface StaffMember {
@@ -136,6 +137,109 @@ export class ReservationsController {
         totalPages: Math.ceil(total / actualLimit),
         hasNextPage: page < Math.ceil(total / actualLimit),
         hasPrevPage: page > 1,
+      },
+    };
+  }
+
+  @Get('dashboard/stats')
+  @ApiOperation({
+    summary: 'Get dashboard statistics',
+    description: 'Retrieve dashboard statistics including cash, bank payments, bookings count, distinct services, and new customers for a given date range.',
+  })
+  @ApiQuery({ name: 'startDate', required: true, type: 'string', description: 'Start date in YYYY-MM-DD format' })
+  @ApiQuery({ name: 'endDate', required: true, type: 'string', description: 'End date in YYYY-MM-DD format' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Dashboard statistics retrieved successfully',
+    type: DashboardStatsDto,
+  })
+  async getDashboardStats(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ): Promise<{ success: boolean; data: DashboardStatsDto }> {
+    if (!startDate || !endDate) {
+      throw new BadRequestException('startDate and endDate are required');
+    }
+
+    // Get completed bookings with payment method
+    const completedBookings = await this.bookingModel.findAll({
+      where: {
+        status: BookingStatus.COMPLETED,
+        appointmentDate: {
+          [Op.between]: [startDate, endDate],
+        },
+      },
+      attributes: ['totalAmount', 'paymentMethod'],
+    });
+
+    // Calculate cash and bank totals based on payment method
+    let cash = 0;
+    let bank = 0;
+    
+    for (const booking of completedBookings) {
+      const amount = parseFloat(String(booking.totalAmount || 0));
+      if (booking.paymentMethod === 'CASH') {
+        cash += amount;
+      } else if (booking.paymentMethod === 'CARD') {
+        bank += amount;
+      }
+    }
+
+    // Count completed bookings
+    const bookingsCount = await this.bookingModel.count({
+      where: {
+        status: BookingStatus.COMPLETED,
+        appointmentDate: {
+          [Op.between]: [startDate, endDate],
+        },
+      },
+    });
+
+    // Count distinct services
+    const distinctServicesResult: any[] = await this.sequelize.query(
+      `
+      SELECT COUNT(DISTINCT "serviceId") as count
+      FROM bookings
+      WHERE status = 'completed'
+        AND "appointmentDate" >= :startDate
+        AND "appointmentDate" <= :endDate
+      `,
+      {
+        replacements: { startDate, endDate },
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    const distinctServices = parseInt(distinctServicesResult[0]?.count || '0');
+
+    // Count new customers (created in the date range with completed bookings)
+    const newCustomersResult: any[] = await this.sequelize.query(
+      `
+      SELECT COUNT(DISTINCT c.id) as count
+      FROM customers c
+      INNER JOIN bookings b ON b."customerId" = c.id
+      WHERE b.status = 'completed'
+        AND b."appointmentDate" >= :startDate
+        AND b."appointmentDate" <= :endDate
+        AND c."createdAt" >= :startDate
+        AND c."createdAt" <= (:endDate || ' 23:59:59')::timestamp
+      `,
+      {
+        replacements: { startDate, endDate },
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    const newCustomers = parseInt(newCustomersResult[0]?.count || '0');
+
+    return {
+      success: true,
+      data: {
+        cash,
+        bank,
+        bookings: bookingsCount,
+        distinctServices,
+        newCustomers,
       },
     };
   }

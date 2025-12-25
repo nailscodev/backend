@@ -153,7 +153,7 @@ export class JwtAuthInterceptor implements NestInterceptor {
       // Verify JWT signature and decode
       const secret = process.env.JWT_SECRET || 'fallback-secret';
       const decoded = jwt.verify(token, secret) as {
-        userId: number;
+        sub: string; // userId as UUID string
         username: string;
         email: string;
         role: string;
@@ -165,7 +165,7 @@ export class JwtAuthInterceptor implements NestInterceptor {
       // Check if token exists in database and is not revoked
       const userToken = await this.userTokenModel.findOne({
         where: {
-          userId: decoded.userId,
+          userId: decoded.sub,
           token: tokenHash,
           revoked: false,
         },
@@ -177,20 +177,20 @@ export class JwtAuthInterceptor implements NestInterceptor {
       });
 
       if (!userToken) {
-        this.logger.warn(`Token not found or revoked for user ${decoded.userId}`);
+        this.logger.warn(`Token not found or revoked for user ${decoded.sub}`);
         throw new UnauthorizedException('Invalid or revoked token');
       }
 
       // Check if token is expired
       if (userToken.expiresAt && new Date() > userToken.expiresAt) {
-        this.logger.warn(`Expired token for user ${decoded.userId}`);
+        this.logger.warn(`Expired token for user ${decoded.sub}`);
         throw new UnauthorizedException('Token has expired');
       }
 
       // Check if user is active
       const user = userToken.user as UserEntity;
       if (!user || !user.isActive) {
-        this.logger.warn(`Inactive user ${decoded.userId} attempted to access protected endpoint`);
+        this.logger.warn(`Inactive user ${decoded.sub} attempted to access protected endpoint`);
         throw new UnauthorizedException('User account is inactive');
       }
 

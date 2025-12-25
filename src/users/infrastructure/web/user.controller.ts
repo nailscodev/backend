@@ -14,6 +14,7 @@ import {
   ParseBoolPipe,
   ParseEnumPipe,
   HttpCode,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -530,6 +531,40 @@ export class UserController {
     @Body(new ValidationPipe({ transform: true })) loginDto: LoginDto,
   ): Promise<LoginResponseDto> {
     return this.userService.login(loginDto);
+  }
+
+  @Post('logout')
+  @ApiOperation({
+    summary: 'User logout',
+    description: 'Revokes the current JWT token, preventing further use. Requires authentication.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Logout successful',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Logged out successfully' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Invalid or missing token',
+  })
+  @HttpCode(HttpStatus.OK)
+  async logout(@Req() request: any): Promise<{ success: boolean; message: string }> {
+    // Extract token from Authorization header
+    const authHeader = request.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return { success: false, message: 'No token provided' };
+    }
+
+    const token = authHeader.substring(7);
+    await this.userService.revokeToken(token);
+    
+    return { success: true, message: 'Logged out successfully' };
   }
 
   @Patch(':id/update-last-login')
