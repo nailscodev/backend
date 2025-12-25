@@ -252,6 +252,62 @@ export class ServicesController {
     return await this.servicesService.getRemovalAddonsByServiceIds(serviceIdArray);
   }
 
+  @Get('combo-eligible/check')
+  @SkipResponseWrapper(true)
+  @ApiOperation({
+    summary: 'Check combo eligibility',
+    description: 'Checks if the given service IDs match any combo eligible rule'
+  })
+  @ApiQuery({
+    name: 'serviceIds',
+    required: true,
+    type: String,
+    description: 'Comma-separated list of service UUIDs to check',
+    example: 'uuid1,uuid2'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Combo eligibility checked successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        isEligible: { type: 'boolean', example: true },
+        matchedRule: {
+          type: 'object',
+          description: 'The matching combo eligible rule if found',
+        },
+        suggestedCombo: {
+          type: 'object',
+          description: 'The suggested combo service to offer',
+        }
+      }
+    }
+  })
+  async checkComboEligible(
+    @Query('serviceIds') serviceIds: string,
+  ) {
+    if (!serviceIds) {
+      return { isEligible: false };
+    }
+
+    const serviceIdArray = serviceIds.split(',').map(id => id.trim());
+    return this.servicesService.checkComboEligible(serviceIdArray);
+  }
+
+  @Get('combo-eligible/rules')
+  @SkipResponseWrapper(true)
+  @ApiOperation({
+    summary: 'Get all combo eligible rules',
+    description: 'Retrieves all active combo eligible rules'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Combo eligible rules retrieved successfully',
+  })
+  async getComboEligibleRules() {
+    return this.servicesService.getAllComboEligibleRules();
+  }
+
   @Get(':id')
   @ApiOperation({
     summary: 'Get service by ID',
