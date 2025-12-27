@@ -153,6 +153,19 @@ export class BookingEntity extends Model<BookingEntity> {
   declare totalAmount?: number;
 
   @ApiProperty({
+    description: 'Indicates if the booking was made via web',
+    example: true,
+    required: false,
+  })
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: true,
+    field: 'web',
+  })
+  declare web: boolean;
+
+  @ApiProperty({
     description: 'Special notes or requests for the booking',
     example: 'Cliente prefiere técnica específica',
   })

@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsDateString, IsArray, IsEnum, IsOptional, IsString, IsNumber, Min } from 'class-validator';
+import { IsNotEmpty, IsDateString, IsArray, IsEnum, IsOptional, IsString, IsNumber, Min, IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { BookingStatus } from '../../domain/value-objects/booking-status.vo';
 
@@ -81,6 +81,15 @@ export class CreateBookingDto {
   @IsNumber()
   @Min(0)
   totalAmount?: number;
+
+  @ApiProperty({
+    description: 'Indicates if the booking was made via web (defaults to true)',
+    example: true,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  web?: boolean;
 
   @ApiProperty({
     description: 'Special notes or requests for the booking',

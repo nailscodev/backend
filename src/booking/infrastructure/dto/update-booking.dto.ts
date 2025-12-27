@@ -1,4 +1,4 @@
-import { IsOptional, IsUUID, IsDateString, IsArray, IsEnum, IsString, IsNumber, Min } from 'class-validator';
+import { IsOptional, IsUUID, IsDateString, IsArray, IsEnum, IsString, IsNumber, Min, IsBoolean } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { BookingStatus } from '../../domain/value-objects/booking-status.vo';
 

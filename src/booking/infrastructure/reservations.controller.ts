@@ -35,6 +35,10 @@ import { MultiServiceAvailabilityService } from '../application/services/multi-s
 import { SkipCsrf } from '../../common/decorators/csrf.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { DashboardStatsDto } from './dto/dashboard-stats.dto';
+import { BestSellingServiceDto } from './dto/best-selling-service.dto';
+import { TopStaffDto } from './dto/top-staff.dto';
+import { UpcomingBookingDto } from './dto/upcoming-booking.dto';
+import { BookingsBySourceDto } from './dto/bookings-by-source.dto';
 
 // Interfaces for type safety
 interface StaffMember {
@@ -241,6 +245,247 @@ export class ReservationsController {
         distinctServices,
         newCustomers,
       },
+    };
+  }
+
+  @Get('dashboard/best-selling-services')
+  @ApiOperation({
+    summary: 'Get best selling services',
+    description: 'Retrieve the top performing services by bookings count and revenue for a given date range.',
+  })
+  @ApiQuery({ name: 'startDate', required: true, type: 'string', description: 'Start date in YYYY-MM-DD format' })
+  @ApiQuery({ name: 'endDate', required: true, type: 'string', description: 'End date in YYYY-MM-DD format' })
+  @ApiQuery({ name: 'limit', required: false, type: 'number', description: 'Number of services to return (default: 5)' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Best selling services retrieved successfully',
+    type: [BestSellingServiceDto],
+  })
+  async getBestSellingServices(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 5,
+  ): Promise<{ success: boolean; data: BestSellingServiceDto[] }> {
+    if (!startDate || !endDate) {
+      throw new BadRequestException('startDate and endDate are required');
+    }
+
+    const result: any[] = await this.sequelize.query(
+      `
+      SELECT 
+        s.id as "serviceId",
+        s.name as "serviceName",
+        COUNT(b.id) as "bookingsCount",
+        SUM(b."totalAmount") as "totalRevenue",
+        AVG(b."totalAmount") as "averagePrice"
+      FROM bookings b
+      INNER JOIN services s ON b."serviceId" = s.id
+      WHERE b.status = 'completed'
+        AND b."appointmentDate" >= :startDate
+        AND b."appointmentDate" <= :endDate
+      GROUP BY s.id, s.name
+      ORDER BY COUNT(b.id) DESC, SUM(b."totalAmount") DESC
+      LIMIT :limit
+      `,
+      {
+        replacements: { startDate, endDate, limit },
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    const bestSellingServices = result.map(row => ({
+      serviceId: row.serviceId,
+      serviceName: row.serviceName,
+      bookingsCount: parseInt(row.bookingsCount || '0'),
+      totalRevenue: parseFloat(row.totalRevenue || '0'),
+      averagePrice: parseFloat(row.averagePrice || '0'),
+    }));
+
+    return {
+      success: true,
+      data: bestSellingServices,
+    };
+  }
+
+  @Get('dashboard/top-staff')
+  @ApiOperation({
+    summary: 'Get top performing staff',
+    description: 'Retrieve staff members ranked by bookings count and revenue for a given date range.',
+  })
+  @ApiQuery({ name: 'startDate', required: true, type: 'string', description: 'Start date in YYYY-MM-DD format' })
+  @ApiQuery({ name: 'endDate', required: true, type: 'string', description: 'End date in YYYY-MM-DD format' })
+  @ApiQuery({ name: 'limit', required: false, type: 'number', description: 'Number of staff members to return (default: 10)' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Top staff retrieved successfully',
+    type: [TopStaffDto],
+  })
+  async getTopStaff(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
+  ): Promise<{ success: boolean; data: TopStaffDto[] }> {
+    if (!startDate || !endDate) {
+      throw new BadRequestException('startDate and endDate are required');
+    }
+
+    const result: any[] = await this.sequelize.query(
+      `
+      SELECT 
+        s.id as "staffId",
+        CONCAT(s."firstName", ' ', s."lastName") as "staffName",
+        COUNT(b.id) as "bookingsCount",
+        SUM(b."totalAmount") as "totalRevenue",
+        s.role as role
+      FROM bookings b
+      INNER JOIN staff s ON b."staffId" = s.id
+      WHERE b.status = 'completed'
+        AND b."appointmentDate" >= :startDate
+        AND b."appointmentDate" <= :endDate
+      GROUP BY s.id, s."firstName", s."lastName", s.role
+      ORDER BY COUNT(b.id) DESC, SUM(b."totalAmount") DESC
+      LIMIT :limit
+      `,
+      {
+        replacements: { startDate, endDate, limit },
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    console.log('Top Staff Query Result:', result);
+    console.log('Query parameters:', { startDate, endDate, limit });
+
+    const topStaff = result.map(row => ({
+      staffId: row.staffId,
+      staffName: row.staffName,
+      bookingsCount: parseInt(row.bookingsCount || '0'),
+      totalRevenue: parseFloat(row.totalRevenue || '0'),
+      role: row.role || 'Technician',
+    }));
+
+    console.log('Top Staff Mapped:', topStaff);
+
+    return {
+      success: true,
+      data: topStaff,
+    };
+  }
+
+  @Get('dashboard/bookings-by-source')
+  @ApiOperation({
+    summary: 'Get bookings by source',
+    description: 'Retrieve count of bookings grouped by source (web vs other) for a given date range.',
+  })
+  @ApiQuery({ name: 'startDate', required: true, type: 'string', description: 'Start date in YYYY-MM-DD format' })
+  @ApiQuery({ name: 'endDate', required: true, type: 'string', description: 'End date in YYYY-MM-DD format' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Bookings by source retrieved successfully',
+    type: BookingsBySourceDto,
+  })
+  async getBookingsBySource(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ): Promise<{ success: boolean; data: BookingsBySourceDto }> {
+    if (!startDate || !endDate) {
+      throw new BadRequestException('startDate and endDate are required');
+    }
+
+    const result: any[] = await this.sequelize.query(
+      `
+      SELECT 
+        web,
+        COUNT(*) as count
+      FROM bookings
+      WHERE status = 'completed'
+        AND "appointmentDate" >= :startDate
+        AND "appointmentDate" <= :endDate
+      GROUP BY web
+      `,
+      {
+        replacements: { startDate, endDate },
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    console.log('Bookings by Source Query Result:', result);
+
+    // Initialize counts
+    let webCount = 0;
+    let otherCount = 0;
+
+    // Process results
+    result.forEach(row => {
+      if (row.web === true) {
+        webCount = parseInt(row.count || '0');
+      } else {
+        otherCount = parseInt(row.count || '0');
+      }
+    });
+
+    const data: BookingsBySourceDto = {
+      web: webCount,
+      other: otherCount,
+    };
+
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  @Get('upcoming')
+  @ApiOperation({
+    summary: 'Get upcoming bookings',
+    description: 'Retrieve upcoming confirmed bookings starting from now.',
+  })
+  @ApiQuery({ name: 'limit', required: false, type: 'number', description: 'Number of bookings to return (default: 10)' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Upcoming bookings retrieved successfully',
+    type: [UpcomingBookingDto],
+  })
+  async getUpcomingBookings(
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
+  ): Promise<{ success: boolean; data: UpcomingBookingDto[] }> {
+    
+    const result: any[] = await this.sequelize.query(
+      `
+      SELECT 
+        b.id,
+        CONCAT(c."firstName", ' ', c."lastName") as "customerName",
+        s.name as "serviceName",
+        CONCAT(st."firstName", ' ', st."lastName") as "staffName",
+        b."appointmentDate",
+        b.status,
+        b."totalAmount"
+      FROM bookings b
+      INNER JOIN customers c ON b."customerId" = c.id
+      INNER JOIN services s ON b."serviceId" = s.id
+      INNER JOIN staff st ON b."staffId" = st.id
+      WHERE b.status IN ('pending', 'confirmed')
+      ORDER BY b."appointmentDate" DESC
+      LIMIT :limit
+      `,
+      {
+        replacements: { limit },
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    const upcomingBookings = result.map(row => ({
+      id: row.id,
+      customerName: row.customerName,
+      serviceName: row.serviceName,
+      staffName: row.staffName,
+      appointmentDate: row.appointmentDate,
+      status: row.status,
+      totalAmount: parseFloat(row.totalAmount || '0'),
+    }));
+
+    return {
+      success: true,
+      data: upcomingBookings,
     };
   }
 
