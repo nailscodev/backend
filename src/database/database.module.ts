@@ -15,6 +15,7 @@ import { AddOnLangEntity } from '../addons/infrastructure/persistence/entities/a
 import { ServiceAddon } from '../shared/domain/service-addon.model';
 import { ServiceLangEntity } from '../services/infrastructure/persistence/entities/service-lang.entity';
 import { LanguageEntity } from '../shared/domain/entities/language.entity';
+import { ComboEligibleEntity } from '../services/infrastructure/persistence/entities/combo-eligible.entity';
 import { defineAssociations } from './associations';
 
 @Module({
@@ -32,7 +33,7 @@ import { defineAssociations } from './associations';
         synchronize: false, // Use manual SQL scripts instead of auto-sync
         logging: configService.get('NODE_ENV') === 'development',
         autoLoadModels: true,
-        models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity],
+        models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity],
       }),
     }),
   ],

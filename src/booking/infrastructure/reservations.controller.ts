@@ -635,6 +635,7 @@ export class ReservationsController {
   }
 
   @Post('multi-service-slots')
+  @Public() // Allow public access for booking flow (combo packages without VIP)
   @SkipCsrf() // Read operation, skip CSRF for performance
   @ApiOperation({
     summary: 'Get available time slots for multiple consecutive services',
@@ -1192,6 +1193,7 @@ export class ReservationsController {
    * POST /bookings/verify-slot-with-permutations
    */
   @Post('verify-slot-with-permutations')
+  @Public() // Allow public access for booking flow
   @SkipCsrf()
   @ApiOperation({
     summary: 'Verify slot availability using all permutations',

@@ -32,6 +32,8 @@ export class StaffService {
   constructor(
     @InjectModel(StaffEntity)
     private readonly staffModel: typeof StaffEntity,
+    @InjectModel(ServiceEntity)
+    private readonly serviceModel: typeof ServiceEntity,
   ) { }
 
   /**
@@ -181,6 +183,7 @@ export class StaffService {
 
   /**
    * Finds staff members who can perform AT LEAST ONE of the specified services
+   * If a service is a combo, it expands to its associated services
    */
   async findStaffByServiceIds(serviceIds: string[]): Promise<StaffResponseDto[]> {
 
@@ -189,7 +192,13 @@ export class StaffService {
     }
 
     try {
-      // Find staff that can perform AT LEAST ONE of the selected services (union approach)
+      // First, check if any of the services are combos and expand them to their associated services
+      const expandedServiceIds = await this.expandComboServices(serviceIds);
+      
+      this.logger.log(`Finding staff for services: ${serviceIds.join(', ')}`);
+      this.logger.log(`Expanded to (after combo resolution): ${expandedServiceIds.join(', ')}`);
+
+      // Find staff that can perform AT LEAST ONE of the expanded services (union approach)
       const staff = await this.staffModel.findAll({
         where: {
           status: StaffStatus.ACTIVE,
@@ -198,18 +207,49 @@ export class StaffService {
             [Op.in]: literal(`(
               SELECT DISTINCT staff_id 
               FROM staff_services ss
-              WHERE ss.service_id IN (${serviceIds.map(id => `'${id}'`).join(', ')})
+              WHERE ss.service_id IN (${expandedServiceIds.map(id => `'${id}'`).join(', ')})
             )`)
           }
         },
         order: [['lastName', 'ASC'], ['firstName', 'ASC']]
       });
 
+      this.logger.log(`Found ${staff.length} staff members for expanded services`);
       return staff.map(s => this.mapToResponseDto(s));
     } catch (error: unknown) {
       this.logger.error(`Failed to find staff by service IDs: ${serviceIds.join(', ')}`, error);
       throw new BadRequestException('Failed to find staff by services');
     }
+  }
+
+  /**
+   * Expands combo services to their associated service IDs
+   * If a service has associatedServiceIds (is a combo), return those instead of the combo ID
+   */
+  private async expandComboServices(serviceIds: string[]): Promise<string[]> {
+    const expandedIds: string[] = [];
+
+    // Fetch all services to check which ones are combos
+    const services = await this.serviceModel.findAll({
+      where: { id: { [Op.in]: serviceIds } },
+      attributes: ['id', 'name', 'associatedServiceIds']
+    });
+
+    for (const serviceId of serviceIds) {
+      const service = services.find(s => s.id === serviceId);
+      
+      if (service && service.associatedServiceIds && service.associatedServiceIds.length > 0) {
+        // This is a combo - use its associated services instead
+        this.logger.log(`Service ${service.name} (${serviceId}) is a combo, expanding to: ${service.associatedServiceIds.join(', ')}`);
+        expandedIds.push(...service.associatedServiceIds);
+      } else {
+        // Regular service - keep as is
+        expandedIds.push(serviceId);
+      }
+    }
+
+    // Remove duplicates
+    return [...new Set(expandedIds)];
   }
 
   /**

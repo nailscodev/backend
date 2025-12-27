@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/sequelize';
 import { ServiceEntity } from '../infrastructure/persistence/entities/service.entity';
 import { ServiceIncompatibilityEntity } from '../infrastructure/persistence/entities/service-incompatibility.entity';
 import { RemovalStepEntity } from '../infrastructure/persistence/entities/removal-step.entity';
+import { ComboEligibleEntity } from '../infrastructure/persistence/entities/combo-eligible.entity';
 import { CategoryEntity } from '../../categories/infrastructure/persistence/entities/category.entity';
 import { ServiceLangEntity } from '../infrastructure/persistence/entities/service-lang.entity';
 import { LanguageEntity } from '../../shared/domain/entities/language.entity';
@@ -45,6 +46,8 @@ export class ServicesService {
     private readonly serviceIncompatibilityModel: typeof ServiceIncompatibilityEntity,
     @InjectModel(RemovalStepEntity)
     private readonly removalStepModel: typeof RemovalStepEntity,
+    @InjectModel(ComboEligibleEntity)
+    private readonly comboEligibleModel: typeof ComboEligibleEntity,
     @InjectModel(ServiceLangEntity)
     private readonly serviceLangModel: typeof ServiceLangEntity,
     @InjectModel(LanguageEntity)
@@ -362,6 +365,74 @@ export class ServicesService {
       return requiresRemoval;
     } catch (error) {
       this.logger.error('Error checking removal step requirement:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if the given service IDs match any combo eligible rule
+   * Returns the matching rule with suggested combo if found
+   */
+  async checkComboEligible(serviceIds: string[]): Promise<{
+    isEligible: boolean;
+    matchedRule?: ComboEligibleEntity;
+    suggestedCombo?: ServiceEntity;
+  }> {
+    if (!serviceIds || serviceIds.length === 0) {
+      return { isEligible: false };
+    }
+
+    try {
+      // Sort service IDs to ensure consistent comparison
+      const sortedServiceIds = [...serviceIds].sort();
+
+      // Find all active combo eligible rules
+      const rules = await this.comboEligibleModel.findAll({
+        where: { isActive: true },
+      });
+
+      // Check each rule to see if it matches the provided service IDs
+      for (const rule of rules) {
+        const ruleServiceIds = [...rule.serviceIds].sort();
+
+        // Check if the arrays are equal (same services selected)
+        if (
+          sortedServiceIds.length === ruleServiceIds.length &&
+          sortedServiceIds.every((id, index) => id === ruleServiceIds[index])
+        ) {
+          // Found a matching rule
+          let suggestedCombo: ServiceEntity | undefined;
+
+          if (rule.suggestedComboId) {
+            suggestedCombo = await this.serviceModel.findByPk(rule.suggestedComboId) ?? undefined;
+          }
+
+          return {
+            isEligible: true,
+            matchedRule: rule,
+            suggestedCombo,
+          };
+        }
+      }
+
+      return { isEligible: false };
+    } catch (error) {
+      this.logger.error('Error checking combo eligibility:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all active combo eligible rules
+   */
+  async getAllComboEligibleRules(): Promise<ComboEligibleEntity[]> {
+    try {
+      return await this.comboEligibleModel.findAll({
+        where: { isActive: true },
+        order: [['createdAt', 'ASC']],
+      });
+    } catch (error) {
+      this.logger.error('Error fetching combo eligible rules:', error);
       throw error;
     }
   }

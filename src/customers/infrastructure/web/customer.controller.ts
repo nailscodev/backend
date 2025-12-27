@@ -24,6 +24,7 @@ import { UpdateCustomerDto, SearchCustomersDto } from '../../application/dto/upd
 import { CustomerResponseDto } from '../../application/dto/customer-response.dto';
 import { StrictThrottle, LightThrottle, SearchThrottle } from '../../../common/decorators/throttle.decorator';
 import { CsrfProtected, SkipCsrf } from '../../../common/decorators/csrf.decorator';
+import { Public } from '../../../common/decorators/public.decorator';
 
 @ApiTags('customers')
 @Controller('customers')
@@ -31,6 +32,7 @@ export class CustomerController {
   constructor(private readonly customerService: CustomerService) {}
 
   @Post()
+  @Public() // Allow public access for booking flow
   @HttpCode(HttpStatus.CREATED)
   @StrictThrottle() // 5 requests per 15 minutes for account creation
   @CsrfProtected() // Require CSRF token for customer creation
@@ -79,6 +81,7 @@ export class CustomerController {
   }
 
   @Get('email/:email')
+  @Public() // Allow public access for booking flow (check if customer exists)
   @SkipCsrf() // Read operation, skip CSRF
   @ApiOperation({ summary: 'Get customer by email' })
   @ApiParam({ name: 'email', description: 'Customer email' })

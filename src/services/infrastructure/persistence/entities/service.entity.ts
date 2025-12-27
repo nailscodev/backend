@@ -190,6 +190,18 @@ export class ServiceEntity extends Model<ServiceEntity> {
   declare combo: boolean;
 
   @ApiProperty({
+    description: 'Associated service IDs for combo packages (the services that make up this combo)',
+    example: ['123e4567-e89b-12d3-a456-426614174001', '123e4567-e89b-12d3-a456-426614174002'],
+  })
+  @Column({
+    type: DataType.ARRAY(DataType.UUID),
+    allowNull: true,
+    defaultValue: [],
+    field: 'associatedserviceids',
+  })
+  declare associatedServiceIds?: string[];
+
+  @ApiProperty({
     description: 'When the service was created',
     example: '2025-09-21T13:00:00Z',
   })
