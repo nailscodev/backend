@@ -18,23 +18,71 @@ import { LanguageEntity } from '../shared/domain/entities/language.entity';
 import { ComboEligibleEntity } from '../services/infrastructure/persistence/entities/combo-eligible.entity';
 import { defineAssociations } from './associations';
 
+// Helper function to parse DATABASE_URL
+function parseDatabaseUrl(url: string) {
+  const regex = /^postgres(?:ql)?:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)$/;
+  const match = url.match(regex);
+  if (match) {
+    return {
+      username: match[1],
+      password: match[2],
+      host: match[3],
+      port: parseInt(match[4], 10),
+      database: match[5].split('?')[0], // Remove query params if any
+    };
+  }
+  return null;
+}
+
 @Module({
   imports: [
     SequelizeModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        dialect: 'postgres',
-        host: configService.get('DB_HOST', 'localhost'),
-        port: configService.get('DB_PORT', 5432),
-        username: configService.get('DB_USERNAME', 'postgres'),
-        password: configService.get('DB_PASSWORD') || undefined,
-        database: configService.get('DB_NAME', 'nailsandco'),
-        synchronize: false, // Use manual SQL scripts instead of auto-sync
-        logging: configService.get('NODE_ENV') === 'development',
-        autoLoadModels: true,
-        models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity],
-      }),
+      useFactory: (configService: ConfigService) => {
+        const databaseUrl = configService.get('DATABASE_URL');
+        const isProduction = configService.get('NODE_ENV') === 'production';
+        
+        // If DATABASE_URL is provided (Render, Heroku, etc.), parse it
+        if (databaseUrl) {
+          const dbConfig = parseDatabaseUrl(databaseUrl);
+          if (dbConfig) {
+            console.log(`Connecting to database at ${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`);
+            return {
+              dialect: 'postgres',
+              host: dbConfig.host,
+              port: dbConfig.port,
+              username: dbConfig.username,
+              password: dbConfig.password,
+              database: dbConfig.database,
+              synchronize: false,
+              logging: !isProduction,
+              autoLoadModels: true,
+              models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity],
+              dialectOptions: isProduction ? {
+                ssl: {
+                  require: true,
+                  rejectUnauthorized: false,
+                },
+              } : {},
+            };
+          }
+        }
+        
+        // Fallback to individual environment variables (local development)
+        return {
+          dialect: 'postgres',
+          host: configService.get('DB_HOST', 'localhost'),
+          port: configService.get('DB_PORT', 5432),
+          username: configService.get('DB_USERNAME', 'postgres'),
+          password: configService.get('DB_PASSWORD') || undefined,
+          database: configService.get('DB_NAME', 'nailsandco'),
+          synchronize: false,
+          logging: !isProduction,
+          autoLoadModels: true,
+          models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity],
+        };
+      },
     }),
   ],
   exports: [SequelizeModule],
