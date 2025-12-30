@@ -20,14 +20,15 @@ import { defineAssociations } from './associations';
 
 // Helper function to parse DATABASE_URL
 function parseDatabaseUrl(url: string) {
-  const regex = /^postgres(?:ql)?:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)$/;
+  // Support URLs with or without port: postgresql://user:pass@host:port/db or postgresql://user:pass@host/db
+  const regex = /^postgres(?:ql)?:\/\/([^:]+):([^@]+)@([^:/]+)(?::(\d+))?\/(.+)$/;
   const match = url.match(regex);
   if (match) {
     return {
       username: match[1],
       password: match[2],
       host: match[3],
-      port: parseInt(match[4], 10),
+      port: match[4] ? parseInt(match[4], 10) : 5432, // Default to 5432 if no port
       database: match[5].split('?')[0], // Remove query params if any
     };
   }
