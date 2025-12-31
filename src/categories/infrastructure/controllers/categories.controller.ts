@@ -4,7 +4,7 @@ import { CategoriesService } from '../../application/services/categories.service
 import { CategoryEntity } from '../persistence/entities/category.entity';
 
 @ApiTags('categories')
-@Controller('api/v1/categories')
+@Controller('categories')
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) { }
 
