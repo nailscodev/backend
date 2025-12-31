@@ -33,6 +33,14 @@ import { defineAssociations } from './associations';
         synchronize: false, // Use manual SQL scripts instead of auto-sync
         logging: configService.get('NODE_ENV') === 'development',
         autoLoadModels: true,
+        dialectOptions: {
+          charset: 'utf8',
+          collate: 'utf8_general_ci',
+        },
+        define: {
+          charset: 'utf8',
+          collate: 'utf8_general_ci',
+        },
         models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity],
       }),
     }),

@@ -39,6 +39,7 @@ import { BestSellingServiceDto } from './dto/best-selling-service.dto';
 import { TopStaffDto } from './dto/top-staff.dto';
 import { UpcomingBookingDto } from './dto/upcoming-booking.dto';
 import { BookingsBySourceDto } from './dto/bookings-by-source.dto';
+import { ManualAdjustment } from '../../common/entities/manual-adjustment.entity';
 
 // Interfaces for type safety
 interface StaffMember {
@@ -61,6 +62,8 @@ export class ReservationsController {
   constructor(
     @InjectModel(BookingEntity)
     private bookingModel: typeof BookingEntity,
+    @InjectModel(ManualAdjustment)
+    private manualAdjustmentModel: typeof ManualAdjustment,
     private sequelize: Sequelize,
     private multiServiceAvailabilityService: MultiServiceAvailabilityService,
   ) { }
@@ -77,6 +80,8 @@ export class ReservationsController {
   @ApiQuery({ name: 'staffId', required: false, type: 'string', description: 'Filter by staff ID (UUID)' })
   @ApiQuery({ name: 'serviceId', required: false, type: 'string', description: 'Filter by service ID (UUID)' })
   @ApiQuery({ name: 'date', required: false, type: 'string', description: 'Filter by date (YYYY-MM-DD format)' })
+  @ApiQuery({ name: 'startDate', required: false, type: 'string', description: 'Filter by start date range (YYYY-MM-DD format)' })
+  @ApiQuery({ name: 'endDate', required: false, type: 'string', description: 'Filter by end date range (YYYY-MM-DD format)' })
   @ApiQuery({ name: 'search', required: false, type: 'string', description: 'Search in notes' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -90,6 +95,8 @@ export class ReservationsController {
     @Query('staffId') staffId?: string,
     @Query('serviceId') serviceId?: string,
     @Query('date') date?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
     @Query('search') search?: string,
   ) {
     const where: Record<string, any> = {};
@@ -118,6 +125,13 @@ export class ReservationsController {
 
     if (date) {
       where.appointmentDate = date;
+    }
+
+    // Add date range filter
+    if (startDate && endDate) {
+      where.appointmentDate = {
+        [Op.between]: [startDate, endDate],
+      };
     }
 
     // Limit pagination
@@ -245,6 +259,215 @@ export class ReservationsController {
         distinctServices,
         newCustomers,
       },
+    };
+  }
+
+  @Get('dashboard/revenue-by-service')
+  @ApiOperation({
+    summary: 'Get revenue by service',
+    description: 'Retrieve revenue grouped by service for a given date range.',
+  })
+  @ApiQuery({ name: 'startDate', required: true, type: 'string', description: 'Start date in YYYY-MM-DD format' })
+  @ApiQuery({ name: 'endDate', required: true, type: 'string', description: 'End date in YYYY-MM-DD format' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Revenue by service retrieved successfully',
+  })
+  async getRevenueByService(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ): Promise<{ success: boolean; data: Array<{ service: string; revenue: number }> }> {
+    if (!startDate || !endDate) {
+      throw new BadRequestException('startDate and endDate are required');
+    }
+
+    const result: any[] = await this.sequelize.query(
+      `
+      SELECT 
+        s.name as "serviceName",
+        SUM(b."totalAmount") as "totalRevenue"
+      FROM bookings b
+      INNER JOIN services s ON b."serviceId" = s.id
+      WHERE b.status = 'completed'
+        AND b."appointmentDate" >= :startDate::date
+        AND b."appointmentDate" <= :endDate::date
+      GROUP BY s.name
+      ORDER BY SUM(b."totalAmount") DESC
+      `,
+      {
+        replacements: { startDate, endDate },
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    const revenueByService = result.map(row => ({
+      service: row.serviceName,
+      revenue: parseFloat(row.totalRevenue || '0'),
+    }));
+
+    return {
+      success: true,
+      data: revenueByService,
+    };
+  }
+
+  @Get('invoices')
+  @ApiOperation({
+    summary: 'Get all invoices',
+    description: 'Retrieve all invoices including completed bookings and manual adjustments for a given date range with pagination.',
+  })
+  @ApiQuery({ name: 'startDate', required: true, type: 'string', description: 'Start date in YYYY-MM-DD format' })
+  @ApiQuery({ name: 'endDate', required: true, type: 'string', description: 'End date in YYYY-MM-DD format' })
+  @ApiQuery({ name: 'page', required: false, type: 'number', description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: 'number', description: 'Items per page (default: 10)' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Invoices retrieved successfully',
+  })
+  async getInvoices(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
+  ): Promise<{ success: boolean; data: any[]; pagination: any }> {
+    if (!startDate || !endDate) {
+      throw new BadRequestException('startDate and endDate are required');
+    }
+
+    // Get completed bookings with customer and service info
+    const bookingsResult: any[] = await this.sequelize.query(
+      `
+      SELECT 
+        b.id,
+        'booking' as "type",
+        CONCAT(c."firstName", ' ', c."lastName") as "customerName",
+        c.email as "customerEmail",
+        s.name as "serviceName",
+        b."appointmentDate",
+        b."startTime",
+        b."endTime",
+        b."paymentMethod",
+        b."totalAmount",
+        b."createdAt"
+      FROM bookings b
+      INNER JOIN customers c ON b."customerId" = c.id
+      INNER JOIN services s ON b."serviceId" = s.id
+      WHERE b.status = 'completed'
+        AND b."appointmentDate" >= :startDate
+        AND b."appointmentDate" <= :endDate
+      `,
+      {
+        replacements: { startDate, endDate },
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    // Get manual adjustments
+    const adjustmentsResult: any[] = await this.sequelize.query(
+      `
+      SELECT 
+        ma.id,
+        CASE 
+          WHEN ma.type = 'income' THEN 'adjustment_income'
+          ELSE 'adjustment_expense'
+        END as "type",
+        'Manual Adjustment' as "customerName",
+        '' as "customerEmail",
+        ma.description as "serviceName",
+        DATE(ma."createdAt") as "appointmentDate",
+        TO_CHAR(ma."createdAt", 'HH24:MI') as "startTime",
+        TO_CHAR(ma."createdAt", 'HH24:MI') as "endTime",
+        ma."paymentMethod",
+        CASE 
+          WHEN ma.type = 'expense' THEN -ma.amount
+          ELSE ma.amount
+        END as "totalAmount",
+        ma."createdAt"
+      FROM manual_adjustments ma
+      WHERE DATE(ma."createdAt") >= :startDate
+        AND DATE(ma."createdAt") <= :endDate
+      `,
+      {
+        replacements: { startDate, endDate },
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    // Combine and sort by date (most recent first)
+    const allInvoices = [...bookingsResult, ...adjustmentsResult].sort((a, b) => {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    // Apply pagination
+    const total = allInvoices.length;
+    const totalPages = Math.ceil(total / limit);
+    const offset = (page - 1) * limit;
+    const paginatedInvoices = allInvoices.slice(offset, offset + limit);
+
+    return {
+      success: true,
+      data: paginatedInvoices,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    };
+  }
+
+  @Post('manual-adjustments')
+  @ApiOperation({
+    summary: 'Create a manual adjustment',
+    description: 'Create a manual adjustment (income or expense) for cash/bank reconciliation.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', enum: ['income', 'expense'], description: 'Type of adjustment' },
+        description: { type: 'string', description: 'Description of the adjustment' },
+        amount: { type: 'number', description: 'Amount of the adjustment' },
+        paymentMethod: { type: 'string', enum: ['CASH', 'CARD'], description: 'Payment method' },
+        createdBy: { type: 'string', format: 'uuid', description: 'User ID who created the adjustment (optional)' },
+      },
+      required: ['type', 'description', 'amount', 'paymentMethod'],
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Manual adjustment created successfully',
+  })
+  async createManualAdjustment(
+    @Body() createDto: {
+      type: 'income' | 'expense';
+      description: string;
+      amount: number;
+      paymentMethod: 'CASH' | 'CARD';
+      createdBy?: string;
+    },
+  ): Promise<{ success: boolean; data: ManualAdjustment }> {
+    if (!createDto.type || !createDto.description || !createDto.amount || !createDto.paymentMethod) {
+      throw new BadRequestException('type, description, amount, and paymentMethod are required');
+    }
+
+    if (createDto.amount <= 0) {
+      throw new BadRequestException('amount must be greater than 0');
+    }
+
+    const adjustment = await this.manualAdjustmentModel.create({
+      type: createDto.type,
+      description: createDto.description,
+      amount: createDto.amount,
+      paymentMethod: createDto.paymentMethod,
+      createdBy: createDto.createdBy || null,
+    });
+
+    return {
+      success: true,
+      data: adjustment,
     };
   }
 

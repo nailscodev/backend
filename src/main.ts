@@ -12,6 +12,12 @@ async function bootstrap() {
       : ['error', 'warn', 'log', 'debug'],
   });
 
+  // Set content-type header with UTF-8 charset
+  app.use((req: any, res: any, next: any) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    next();
+  });
+
   // Global pipes
   app.useGlobalPipes(
     new ValidationPipe({

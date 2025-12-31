@@ -197,7 +197,7 @@ export class ServiceEntity extends Model<ServiceEntity> {
     type: DataType.ARRAY(DataType.UUID),
     allowNull: true,
     defaultValue: [],
-    field: 'associatedserviceids',
+    field: 'associatedServiceIds',
   })
   declare associatedServiceIds?: string[];
 
