@@ -185,6 +185,7 @@ export class StaffService {
   /**
    * Finds staff members who can perform AT LEAST ONE of the specified services
    * If a service is a combo, it expands to its associated services
+   * Falls back to returning all available staff if staff_services has no data
    */
   async findStaffByServiceIds(serviceIds: string[]): Promise<StaffResponseDto[]> {
 
@@ -199,6 +200,15 @@ export class StaffService {
       this.logger.log(`Finding staff for services: ${serviceIds.join(', ')}`);
       this.logger.log(`Expanded to (after combo resolution): ${expandedServiceIds.join(', ')}`);
 
+      // Validate that all IDs are valid UUIDs to prevent SQL injection
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const validServiceIds = expandedServiceIds.filter(id => uuidRegex.test(id));
+      
+      if (validServiceIds.length === 0) {
+        this.logger.warn('No valid service IDs provided, returning all available staff');
+        return await this.findAvailableStaff();
+      }
+
       // Find staff that can perform AT LEAST ONE of the expanded services (union approach)
       const staff = await this.staffModel.findAll({
         where: {
@@ -208,7 +218,7 @@ export class StaffService {
             [Op.in]: literal(`(
               SELECT DISTINCT staff_id 
               FROM staff_services ss
-              WHERE ss.service_id IN (${expandedServiceIds.map(id => `'${id}'`).join(', ')})
+              WHERE ss.service_id IN (${validServiceIds.map(id => `'${id}'`).join(', ')})
             )`)
           }
         },
@@ -216,10 +226,19 @@ export class StaffService {
       });
 
       this.logger.log(`Found ${staff.length} staff members for expanded services`);
+      
+      // If no staff found via staff_services, fall back to all available staff
+      if (staff.length === 0) {
+        this.logger.warn('No staff found via staff_services, returning all available staff');
+        return await this.findAvailableStaff();
+      }
+      
       return staff.map(s => this.mapToResponseDto(s));
     } catch (error: unknown) {
       this.logger.error(`Failed to find staff by service IDs: ${serviceIds.join(', ')}`, error);
-      throw new BadRequestException('Failed to find staff by services');
+      // Fall back to returning all available staff instead of throwing an error
+      this.logger.warn('Falling back to all available staff due to error');
+      return await this.findAvailableStaff();
     }
   }
 
