@@ -59,7 +59,7 @@ export class StaffService {
         role: createStaffDto.role,
         status: createStaffDto.status || StaffStatus.ACTIVE,
         specialties: createStaffDto.specialties || [],
-        workingDays: createStaffDto.workingDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+        // workingDays: createStaffDto.workingDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], // DB column not yet created
         startDate: createStaffDto.startDate ? new Date(createStaffDto.startDate) : undefined,
         bio: createStaffDto.bio,
         commissionPercentage: createStaffDto.commissionPercentage,
@@ -146,9 +146,7 @@ export class StaffService {
           status: StaffStatus.ACTIVE,
           isBookable: true
         },
-        order: [['lastName', 'ASC'], ['firstName', 'ASC']],
-        // Explicitly exclude workingDays to avoid errors if column doesn't exist in DB
-        attributes: { exclude: ['workingDays'] }
+        order: [['lastName', 'ASC'], ['firstName', 'ASC']]
       });
 
       return staff.map(s => this.mapToResponseDto(s));
@@ -496,7 +494,7 @@ export class StaffService {
       status: staff.dataValues.status,
 
       specialties: staff.dataValues.specialties || [],
-      workingDays: staff.dataValues.workingDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+      workingDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], // Default - DB column not yet created
       commissionPercentage: staff.dataValues.commissionPercentage,
       hourlyRate: staff.dataValues.hourlyRate,
       startDate: staff.dataValues.startDate,

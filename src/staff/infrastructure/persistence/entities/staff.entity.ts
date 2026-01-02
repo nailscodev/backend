@@ -136,17 +136,20 @@ export class StaffEntity extends Model<StaffEntity> {
   })
   specialties?: string[];
 
-  @ApiProperty({
-    description: 'Days of the week the staff member works',
-    example: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-    required: false,
-  })
-  @Column({
-    type: DataType.ARRAY(DataType.STRING),
-    allowNull: true,
-    defaultValue: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-  })
-  workingDays?: string[];
+  // NOTE: workingDays column removed - need to run migration on Render DB first:
+  // ALTER TABLE staff ADD COLUMN IF NOT EXISTS "workingDays" TEXT[] DEFAULT ARRAY['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  // Then uncomment this:
+  // @ApiProperty({
+  //   description: 'Days of the week the staff member works',
+  //   example: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+  //   required: false,
+  // })
+  // @Column({
+  //   type: DataType.ARRAY(DataType.STRING),
+  //   allowNull: true,
+  //   defaultValue: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+  // })
+  // workingDays?: string[];
 
   @ApiProperty({
     description: 'Commission percentage (0-100)',
