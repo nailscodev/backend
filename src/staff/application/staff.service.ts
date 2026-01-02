@@ -146,7 +146,9 @@ export class StaffService {
           status: StaffStatus.ACTIVE,
           isBookable: true
         },
-        order: [['lastName', 'ASC'], ['firstName', 'ASC']]
+        order: [['lastName', 'ASC'], ['firstName', 'ASC']],
+        // Explicitly exclude workingDays to avoid errors if column doesn't exist in DB
+        attributes: { exclude: ['workingDays'] }
       });
 
       return staff.map(s => this.mapToResponseDto(s));
