@@ -87,6 +87,17 @@ export class CreateStaffDto {
   specialties?: string[];
 
   @ApiProperty({
+    description: 'Days of the week the staff member works (Mon, Tue, Wed, Thu, Fri, Sat, Sun)',
+    example: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+    required: false,
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  workingDays?: string[];
+
+  @ApiProperty({
     description: 'Commission percentage (0-100)',
     example: 30,
     minimum: 0,

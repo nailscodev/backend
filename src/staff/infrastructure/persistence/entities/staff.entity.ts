@@ -137,6 +137,18 @@ export class StaffEntity extends Model<StaffEntity> {
   specialties?: string[];
 
   @ApiProperty({
+    description: 'Days of the week the staff member works',
+    example: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+    required: false,
+  })
+  @Column({
+    type: DataType.ARRAY(DataType.STRING),
+    allowNull: true,
+    defaultValue: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+  })
+  workingDays?: string[];
+
+  @ApiProperty({
     description: 'Commission percentage (0-100)',
     example: 30,
     required: false,
