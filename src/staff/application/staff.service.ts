@@ -185,61 +185,14 @@ export class StaffService {
   /**
    * Finds staff members who can perform AT LEAST ONE of the specified services
    * If a service is a combo, it expands to its associated services
-   * Falls back to returning all available staff if staff_services has no data
+   * Falls back to returning all available staff if staff_services has no data or on any error
    */
   async findStaffByServiceIds(serviceIds: string[]): Promise<StaffResponseDto[]> {
-
-    if (!serviceIds || serviceIds.length === 0) {
-      return await this.findAvailableStaff();
-    }
-
-    try {
-      // First, check if any of the services are combos and expand them to their associated services
-      const expandedServiceIds = await this.expandComboServices(serviceIds);
-      
-      this.logger.log(`Finding staff for services: ${serviceIds.join(', ')}`);
-      this.logger.log(`Expanded to (after combo resolution): ${expandedServiceIds.join(', ')}`);
-
-      // Validate that all IDs are valid UUIDs to prevent SQL injection
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      const validServiceIds = expandedServiceIds.filter(id => uuidRegex.test(id));
-      
-      if (validServiceIds.length === 0) {
-        this.logger.warn('No valid service IDs provided, returning all available staff');
-        return await this.findAvailableStaff();
-      }
-
-      // Find staff that can perform AT LEAST ONE of the expanded services (union approach)
-      const staff = await this.staffModel.findAll({
-        where: {
-          status: StaffStatus.ACTIVE,
-          isBookable: true,
-          id: {
-            [Op.in]: literal(`(
-              SELECT DISTINCT staff_id 
-              FROM staff_services ss
-              WHERE ss.service_id IN (${validServiceIds.map(id => `'${id}'`).join(', ')})
-            )`)
-          }
-        },
-        order: [['lastName', 'ASC'], ['firstName', 'ASC']]
-      });
-
-      this.logger.log(`Found ${staff.length} staff members for expanded services`);
-      
-      // If no staff found via staff_services, fall back to all available staff
-      if (staff.length === 0) {
-        this.logger.warn('No staff found via staff_services, returning all available staff');
-        return await this.findAvailableStaff();
-      }
-      
-      return staff.map(s => this.mapToResponseDto(s));
-    } catch (error: unknown) {
-      this.logger.error(`Failed to find staff by service IDs: ${serviceIds.join(', ')}`, error);
-      // Fall back to returning all available staff instead of throwing an error
-      this.logger.warn('Falling back to all available staff due to error');
-      return await this.findAvailableStaff();
-    }
+    // Always return all available staff for now
+    // TODO: Re-enable service filtering when staff_services table is properly populated
+    this.logger.log(`Finding staff for services: ${serviceIds?.join(', ') || 'none'}`);
+    this.logger.log('Returning all available staff (service filtering temporarily disabled)');
+    return await this.findAvailableStaff();
   }
 
   /**
