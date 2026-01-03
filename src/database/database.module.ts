@@ -16,6 +16,7 @@ import { ServiceAddon } from '../shared/domain/service-addon.model';
 import { ServiceLangEntity } from '../services/infrastructure/persistence/entities/service-lang.entity';
 import { LanguageEntity } from '../shared/domain/entities/language.entity';
 import { ComboEligibleEntity } from '../services/infrastructure/persistence/entities/combo-eligible.entity';
+import { CategoryLangEntity } from '../categories/infrastructure/persistence/entities/category-lang.entity';
 import { defineAssociations } from './associations';
 
 // Helper function to parse DATABASE_URL
@@ -59,7 +60,7 @@ function parseDatabaseUrl(url: string) {
               synchronize: false,
               logging: !isProduction,
               autoLoadModels: true,
-              models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity],
+              models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity, CategoryLangEntity],
               dialectOptions: isProduction ? {
                 ssl: {
                   require: true,
@@ -81,7 +82,7 @@ function parseDatabaseUrl(url: string) {
           synchronize: false,
           logging: !isProduction,
           autoLoadModels: true,
-          models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity],
+          models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity, CategoryLangEntity],
         };
       },
     }),
