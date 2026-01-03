@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/sequelize';
 import { CategoryEntity } from '../../infrastructure/persistence/entities/category.entity';
 import { CategoryLangEntity } from '../../infrastructure/persistence/entities/category-lang.entity';
 import { LanguageEntity } from '../../../shared/domain/entities/language.entity';
+import { Optional } from '@nestjs/common';
 
 @Injectable()
 export class CategoriesService {
@@ -11,9 +12,9 @@ export class CategoriesService {
   constructor(
     @InjectModel(CategoryEntity)
     private readonly categoryModel: typeof CategoryEntity,
-    @InjectModel(CategoryLangEntity)
+    @Optional() @InjectModel(CategoryLangEntity)
     private readonly categoryLangModel: typeof CategoryLangEntity,
-    @InjectModel(LanguageEntity)
+    @Optional() @InjectModel(LanguageEntity)
     private readonly languageModel: typeof LanguageEntity,
   ) { }
 
@@ -24,8 +25,8 @@ export class CategoriesService {
     category: CategoryEntity,
     languageCode?: string,
   ): Promise<CategoryEntity> {
-    if (!languageCode) {
-      // No language specified, return original
+    if (!languageCode || !this.languageModel || !this.categoryLangModel) {
+      // No language specified or models not available, return original
       return category;
     }
 
@@ -69,8 +70,8 @@ export class CategoriesService {
         order: [['displayOrder', 'ASC']],
       });
 
-      // Apply translations if language code is provided
-      if (languageCode) {
+      // Apply translations if language code is provided and models are available
+      if (languageCode && this.languageModel && this.categoryLangModel) {
         const translatedCategories = await Promise.all(
           categories.map(category => this.applyCategoryTranslations(category, languageCode))
         );
