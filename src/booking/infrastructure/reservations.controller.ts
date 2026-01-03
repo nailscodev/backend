@@ -190,16 +190,42 @@ export class ReservationsController {
       attributes: ['totalAmount', 'paymentMethod'],
     });
 
+    // Get manual adjustments in the date range
+    const manualAdjustments = await this.manualAdjustmentModel.findAll({
+      where: {
+        createdAt: {
+          [Op.between]: [
+            new Date(startDate + ' 00:00:00'),
+            new Date(endDate + ' 23:59:59')
+          ],
+        },
+      },
+      attributes: ['amount', 'paymentMethod', 'type'],
+    });
+
     // Calculate cash and bank totals based on payment method
     let cash = 0;
     let bank = 0;
     
+    // Add bookings to totals
     for (const booking of completedBookings) {
       const amount = parseFloat(String(booking.totalAmount || 0));
       if (booking.paymentMethod === 'CASH') {
         cash += amount;
       } else if (booking.paymentMethod === 'CARD') {
         bank += amount;
+      }
+    }
+
+    // Add manual adjustments to totals (expenses are negative)
+    for (const adjustment of manualAdjustments) {
+      const amount = parseFloat(String(adjustment.amount || 0));
+      const adjustmentAmount = adjustment.type === 'expense' ? -amount : amount;
+      
+      if (adjustment.paymentMethod === 'CASH') {
+        cash += adjustmentAmount;
+      } else if (adjustment.paymentMethod === 'CARD') {
+        bank += adjustmentAmount;
       }
     }
 
@@ -355,6 +381,7 @@ export class ReservationsController {
       WHERE b.status = 'completed'
         AND b."appointmentDate" >= :startDate
         AND b."appointmentDate" <= :endDate
+      ORDER BY b."appointmentDate" DESC, b."startTime" DESC
       `,
       {
         replacements: { startDate, endDate },
@@ -386,6 +413,7 @@ export class ReservationsController {
       FROM manual_adjustments ma
       WHERE DATE(ma."createdAt") >= :startDate
         AND DATE(ma."createdAt") <= :endDate
+      ORDER BY ma."createdAt" DESC
       `,
       {
         replacements: { startDate, endDate },
@@ -393,9 +421,13 @@ export class ReservationsController {
       },
     );
 
-    // Combine and sort by date (most recent first)
+    // Combine and sort by appointment date and time (most recent first)
     const allInvoices = [...bookingsResult, ...adjustmentsResult].sort((a, b) => {
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      // For bookings: use appointmentDate + startTime
+      // For adjustments: use the appointmentDate (which is derived from createdAt in the query)
+      const dateA = new Date(a.appointmentDate + 'T' + a.startTime);
+      const dateB = new Date(b.appointmentDate + 'T' + b.startTime);
+      return dateB.getTime() - dateA.getTime();
     });
 
     // Apply pagination
