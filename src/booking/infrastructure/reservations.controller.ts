@@ -1175,9 +1175,17 @@ export class ReservationsController {
     @Body(new ValidationPipe({ transform: true })) createBookingDto: CreateBookingDto,
   ) {
     try {
+      // Combine appointmentDate with startTime/endTime to create full datetime
+      // Frontend sends startTime as "HH:mm:ss", we need to combine with date for DB
+      const appointmentDate = createBookingDto.appointmentDate;
+      const fullStartTime = `${appointmentDate}T${createBookingDto.startTime}`;
+      const fullEndTime = `${appointmentDate}T${createBookingDto.endTime}`;
+
       // Set default status to 'pending' if not provided
       const bookingData = {
         ...createBookingDto,
+        startTime: fullStartTime,
+        endTime: fullEndTime,
         status: createBookingDto.status || 'pending',
       };
 
@@ -1193,8 +1201,8 @@ export class ReservationsController {
       });
 
       // Check if there's any time overlap
-      const requestStartTime = new Date(createBookingDto.startTime);
-      const requestEndTime = new Date(createBookingDto.endTime);
+      const requestStartTime = new Date(fullStartTime);
+      const requestEndTime = new Date(fullEndTime);
 
       for (const booking of conflictingBookings) {
         const existingStartTime = new Date(booking.startTime);
