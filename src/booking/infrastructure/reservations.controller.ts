@@ -421,28 +421,6 @@ export class ReservationsController {
       },
     );
 
-    console.log('\n========== INVOICES SORTING DEBUG ==========');
-    console.log('Bookings count:', bookingsResult.length);
-    console.log('Adjustments count:', adjustmentsResult.length);
-    
-    if (bookingsResult.length > 0) {
-      console.log('\nSample booking:', {
-        type: bookingsResult[0].type,
-        date: bookingsResult[0].appointmentDate,
-        startTime: bookingsResult[0].startTime,
-        startTimeType: typeof bookingsResult[0].startTime
-      });
-    }
-    
-    if (adjustmentsResult.length > 0) {
-      console.log('\nSample adjustment:', {
-        type: adjustmentsResult[0].type,
-        date: adjustmentsResult[0].appointmentDate,
-        startTime: adjustmentsResult[0].startTime,
-        startTimeType: typeof adjustmentsResult[0].startTime
-      });
-    }
-
     // Combine and sort by appointment date and time (most recent first)
     const allInvoices = [...bookingsResult, ...adjustmentsResult].sort((a, b) => {
       // Normalizar appointmentDate a string YYYY-MM-DD
@@ -456,19 +434,6 @@ export class ReservationsController {
       // Normalizar startTime a HH:MM
       let timeStrA: string;
       let timeStrB: string;
-      
-      console.log('\nComparing:', {
-        aType: a.type,
-        aDate: dateStrA,
-        aTimeRaw: a.startTime,
-        aTimeType: typeof a.startTime,
-        aTimeIsDate: a.startTime instanceof Date,
-        bType: b.type,
-        bDate: dateStrB,
-        bTimeRaw: b.startTime,
-        bTimeType: typeof b.startTime,
-        bTimeIsDate: b.startTime instanceof Date
-      });
       
       // Si startTime es un objeto Date (bookings), extraer HH:MM
       if (a.startTime instanceof Date) {
@@ -489,34 +454,13 @@ export class ReservationsController {
         timeStrB = String(b.startTime);
       }
       
-      console.log('After normalization:', {
-        aTime: timeStrA,
-        bTime: timeStrB
-      });
-      
       // Crear timestamps completos para comparación precisa
       const timestampA = new Date(`${dateStrA}T${timeStrA}:00`);
       const timestampB = new Date(`${dateStrB}T${timeStrB}:00`);
       
-      console.log('Timestamps:', {
-        aTimestamp: timestampA.toISOString(),
-        bTimestamp: timestampB.toISOString(),
-        diff: timestampB.getTime() - timestampA.getTime()
-      });
-      
       // Ordenar de más reciente a más antiguo
       return timestampB.getTime() - timestampA.getTime();
     });
-    
-    console.log('\n========== FINAL ORDER (first 5) ==========');
-    allInvoices.slice(0, 5).forEach((invoice, idx) => {
-      console.log(`${idx + 1}.`, {
-        type: invoice.type,
-        date: invoice.appointmentDate,
-        time: invoice.startTime
-      });
-    });
-    console.log('==========================================\n');
 
     // Apply pagination
     const total = allInvoices.length;
