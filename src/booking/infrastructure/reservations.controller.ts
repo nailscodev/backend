@@ -842,14 +842,24 @@ export class ReservationsController {
         bookedSlotsByStaff.set(staff, new Set());
       }
 
-      // Extract time from timestamp - startTime and endTime are Date objects from Sequelize
-      // Convert to local time since our database stores times in local timezone (-03)
-      const startTimeObj = new Date(booking.startTime);
-      const endTimeObj = new Date(booking.endTime);
+      // Extract time from booking - can be either a Date object or a time string (HH:MM:SS)
+      // depending on how PostgreSQL returns it
+      let startTime: string;
+      let endTime: string;
 
-      // Format as HH:MM using local time (not UTC)
-      const startTime = startTimeObj.toTimeString().slice(0, 5);
-      const endTime = endTimeObj.toTimeString().slice(0, 5);
+      if (typeof booking.startTime === 'string') {
+        // Already a time string like "21:30:00"
+        startTime = booking.startTime.slice(0, 5);
+        endTime = (booking.endTime as string).slice(0, 5);
+      } else {
+        // It's a Date object, extract time
+        const startTimeObj = new Date(booking.startTime);
+        const endTimeObj = new Date(booking.endTime);
+        startTime = startTimeObj.toTimeString().slice(0, 5);
+        endTime = endTimeObj.toTimeString().slice(0, 5);
+      }
+
+      console.log(`[AVAILABILITY] Booking found: staff=${staff}, startTime=${startTime}, endTime=${endTime}`);
 
       allTimeSlots.forEach(slot => {
         // Check if this slot would overlap with the existing booking
