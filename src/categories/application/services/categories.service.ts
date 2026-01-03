@@ -63,20 +63,30 @@ export class CategoriesService {
   }
 
   async findAll(languageCode?: string): Promise<CategoryEntity[]> {
-    const categories = await this.categoryModel.findAll({
-      where: { isActive: true },
-      order: [['displayOrder', 'ASC']],
-    });
+    try {
+      const categories = await this.categoryModel.findAll({
+        where: { isActive: true },
+        order: [['displayOrder', 'ASC']],
+      });
 
-    // Apply translations if language code is provided
-    if (languageCode) {
-      const translatedCategories = await Promise.all(
-        categories.map(category => this.applyCategoryTranslations(category, languageCode))
-      );
-      return translatedCategories;
+      // Apply translations if language code is provided
+      if (languageCode) {
+        const translatedCategories = await Promise.all(
+          categories.map(category => this.applyCategoryTranslations(category, languageCode))
+        );
+        return translatedCategories;
+      }
+
+      return categories;
+    } catch (error) {
+      this.logger.error(`Error fetching categories: ${error.message}`, error.stack);
+      // Return categories without translations if there's an error
+      const categories = await this.categoryModel.findAll({
+        where: { isActive: true },
+        order: [['displayOrder', 'ASC']],
+      });
+      return categories;
     }
-
-    return categories;
   }
 
   async findOne(id: string, languageCode?: string): Promise<any> {
