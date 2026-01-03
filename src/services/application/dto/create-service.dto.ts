@@ -113,4 +113,40 @@ export class CreateServiceDto {
   @IsNumber()
   @IsOptional()
   displayOrder?: number;
+
+  @ApiPropertyOptional({
+    description: 'English title for translation',
+    example: 'Classic Manicure',
+    maxLength: 255,
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(255)
+  titleEN?: string;
+
+  @ApiPropertyOptional({
+    description: 'English description for translation',
+    example: 'Complete manicure with traditional polish',
+  })
+  @IsString()
+  @IsOptional()
+  descriptionEN?: string;
+
+  @ApiPropertyOptional({
+    description: 'Spanish title for translation',
+    example: 'Manicure Clásica',
+    maxLength: 255,
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(255)
+  titleES?: string;
+
+  @ApiPropertyOptional({
+    description: 'Spanish description for translation',
+    example: 'Manicure completa con esmaltado tradicional',
+  })
+  @IsString()
+  @IsOptional()
+  descriptionES?: string;
 }

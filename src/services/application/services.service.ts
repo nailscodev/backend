@@ -113,7 +113,75 @@ export class ServicesService {
       services.map((service) => this.applyServiceTranslations(service, languageCode)),
     );
   }
+  /**
+   * Save translations for a service
+   */
+  private async saveTranslations(
+    serviceId: string,
+    dto: CreateServiceDto | UpdateServiceDto
+  ): Promise<void> {
+    try {
+      // Get language entities
+      const languages = await LanguageEntity.findAll();
+      const enLanguage = languages.find(l => l.code === 'EN');
+      const esLanguage = languages.find(l => l.code === 'ES');
 
+      if (!enLanguage || !esLanguage) {
+        this.logger.warn('Language entities not found');
+        return;
+      }
+
+      // Save English translation if provided
+      if ((dto as any).titleEN || (dto as any).descriptionEN) {
+        const existingEN = await ServiceLangEntity.findOne({
+          where: {
+            serviceId,
+            languageId: enLanguage.id,
+          },
+        });
+
+        if (existingEN) {
+          await existingEN.update({
+            title: (dto as any).titleEN || dto.name,
+            description: (dto as any).descriptionEN || dto.description,
+          });
+        } else {
+          await ServiceLangEntity.create({
+            serviceId,
+            languageId: enLanguage.id,
+            title: (dto as any).titleEN || dto.name,
+            description: (dto as any).descriptionEN || dto.description,
+          } as any);
+        }
+      }
+
+      // Save Spanish translation if provided
+      if ((dto as any).titleES || (dto as any).descriptionES) {
+        const existingES = await ServiceLangEntity.findOne({
+          where: {
+            serviceId,
+            languageId: esLanguage.id,
+          },
+        });
+
+        if (existingES) {
+          await existingES.update({
+            title: (dto as any).titleES || dto.name,
+            description: (dto as any).descriptionES || dto.description,
+          });
+        } else {
+          await ServiceLangEntity.create({
+            serviceId,
+            languageId: esLanguage.id,
+            title: (dto as any).titleES || dto.name,
+            description: (dto as any).descriptionES || dto.description,
+          } as any);
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Error saving translations: ${error.message}`);
+    }
+  }
   async create(createServiceDto: CreateServiceDto): Promise<ServiceEntity> {
 
     const serviceData = {
@@ -133,6 +201,9 @@ export class ServicesService {
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const createdService = await this.serviceModel.create(serviceData as any);
+
+    // Save translations if provided
+    await this.saveTranslations(createdService.id, createServiceDto);
 
     return createdService;
   }
@@ -207,7 +278,7 @@ export class ServicesService {
     return this.getCategories();
   }
 
-  async findOne(id: string): Promise<ServiceEntity> {
+  async findOne(id: string, languageCode?: string): Promise<ServiceEntity> {
     const service = await this.serviceModel.findByPk(id, {
       include: [
         {
@@ -220,6 +291,12 @@ export class ServicesService {
     if (!service) {
       throw new NotFoundException(`Service with ID ${id} not found`);
     }
+    
+    // Apply translations if language code is provided
+    if (languageCode) {
+      return this.applyServiceTranslations(service, languageCode);
+    }
+    
     return service;
   }
 
@@ -227,6 +304,10 @@ export class ServicesService {
 
     const service = await this.findOne(id);
     await service.update(updateServiceDto);
+    
+    // Save translations if provided
+    await this.saveTranslations(id, updateServiceDto);
+    
     return service;
   }
 

@@ -314,6 +314,12 @@ export class ServicesController {
     description: 'Retrieves a specific service by its ID'
   })
   @ApiParam({ name: 'id', type: String, description: 'Service UUID' })
+  @ApiQuery({
+    name: 'lang',
+    required: false,
+    description: 'Language code for translations (EN, ES)',
+    example: 'EN'
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Service retrieved successfully'
@@ -322,8 +328,11 @@ export class ServicesController {
     status: HttpStatus.NOT_FOUND,
     description: 'Service not found'
   })
-  async findOne(@Param('id', ParseUUIDPipe) id: string): Promise<ServiceEntity> {
-    return this.servicesService.findOne(id);
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('lang') lang?: string
+  ): Promise<ServiceEntity> {
+    return this.servicesService.findOne(id, lang);
   }
 
   @Post()
