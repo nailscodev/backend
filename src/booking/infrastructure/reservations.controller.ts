@@ -421,14 +421,102 @@ export class ReservationsController {
       },
     );
 
+    console.log('\n========== INVOICES SORTING DEBUG ==========');
+    console.log('Bookings count:', bookingsResult.length);
+    console.log('Adjustments count:', adjustmentsResult.length);
+    
+    if (bookingsResult.length > 0) {
+      console.log('\nSample booking:', {
+        type: bookingsResult[0].type,
+        date: bookingsResult[0].appointmentDate,
+        startTime: bookingsResult[0].startTime,
+        startTimeType: typeof bookingsResult[0].startTime
+      });
+    }
+    
+    if (adjustmentsResult.length > 0) {
+      console.log('\nSample adjustment:', {
+        type: adjustmentsResult[0].type,
+        date: adjustmentsResult[0].appointmentDate,
+        startTime: adjustmentsResult[0].startTime,
+        startTimeType: typeof adjustmentsResult[0].startTime
+      });
+    }
+
     // Combine and sort by appointment date and time (most recent first)
     const allInvoices = [...bookingsResult, ...adjustmentsResult].sort((a, b) => {
-      // For bookings: use appointmentDate + startTime
-      // For adjustments: use the appointmentDate (which is derived from createdAt in the query)
-      const dateA = new Date(a.appointmentDate + 'T' + a.startTime);
-      const dateB = new Date(b.appointmentDate + 'T' + b.startTime);
-      return dateB.getTime() - dateA.getTime();
+      // Normalizar appointmentDate a string YYYY-MM-DD
+      const dateStrA = a.appointmentDate instanceof Date 
+        ? a.appointmentDate.toISOString().split('T')[0]
+        : String(a.appointmentDate);
+      const dateStrB = b.appointmentDate instanceof Date 
+        ? b.appointmentDate.toISOString().split('T')[0]
+        : String(b.appointmentDate);
+      
+      // Normalizar startTime a HH:MM
+      let timeStrA: string;
+      let timeStrB: string;
+      
+      console.log('\nComparing:', {
+        aType: a.type,
+        aDate: dateStrA,
+        aTimeRaw: a.startTime,
+        aTimeType: typeof a.startTime,
+        aTimeIsDate: a.startTime instanceof Date,
+        bType: b.type,
+        bDate: dateStrB,
+        bTimeRaw: b.startTime,
+        bTimeType: typeof b.startTime,
+        bTimeIsDate: b.startTime instanceof Date
+      });
+      
+      // Si startTime es un objeto Date (bookings), extraer HH:MM
+      if (a.startTime instanceof Date) {
+        timeStrA = a.startTime.toTimeString().substring(0, 5);
+      } else if (typeof a.startTime === 'string' && a.startTime.includes('T')) {
+        // Si es un string con timestamp ISO, extraer la hora
+        timeStrA = new Date(a.startTime).toTimeString().substring(0, 5);
+      } else {
+        // Si es un string simple como "01:06", usar como está
+        timeStrA = String(a.startTime);
+      }
+      
+      if (b.startTime instanceof Date) {
+        timeStrB = b.startTime.toTimeString().substring(0, 5);
+      } else if (typeof b.startTime === 'string' && b.startTime.includes('T')) {
+        timeStrB = new Date(b.startTime).toTimeString().substring(0, 5);
+      } else {
+        timeStrB = String(b.startTime);
+      }
+      
+      console.log('After normalization:', {
+        aTime: timeStrA,
+        bTime: timeStrB
+      });
+      
+      // Crear timestamps completos para comparación precisa
+      const timestampA = new Date(`${dateStrA}T${timeStrA}:00`);
+      const timestampB = new Date(`${dateStrB}T${timeStrB}:00`);
+      
+      console.log('Timestamps:', {
+        aTimestamp: timestampA.toISOString(),
+        bTimestamp: timestampB.toISOString(),
+        diff: timestampB.getTime() - timestampA.getTime()
+      });
+      
+      // Ordenar de más reciente a más antiguo
+      return timestampB.getTime() - timestampA.getTime();
     });
+    
+    console.log('\n========== FINAL ORDER (first 5) ==========');
+    allInvoices.slice(0, 5).forEach((invoice, idx) => {
+      console.log(`${idx + 1}.`, {
+        type: invoice.type,
+        date: invoice.appointmentDate,
+        time: invoice.startTime
+      });
+    });
+    console.log('==========================================\n');
 
     // Apply pagination
     const total = allInvoices.length;
