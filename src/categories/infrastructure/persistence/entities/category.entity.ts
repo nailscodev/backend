@@ -39,6 +39,12 @@ export class CategoryEntity extends Model {
   declare displayOrder: number;
 
   @Column({
+    type: DataType.STRING(500),
+    allowNull: true,
+  })
+  declare imageUrl: string;
+
+  @Column({
     type: DataType.BOOLEAN,
     allowNull: false,
     defaultValue: true,
