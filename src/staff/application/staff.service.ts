@@ -183,7 +183,7 @@ export class StaffService {
   }
 
   /**
-   * Finds staff members who can perform ALL of the specified services
+   * Finds staff members who can perform AT LEAST ONE of the specified services
    * If a service is a combo, it expands to its associated services
    * Falls back to returning all available staff if staff_services has no data
    */
@@ -201,30 +201,27 @@ export class StaffService {
       const expandedServiceIds = await this.expandComboServices(serviceIds);
       this.logger.log(`Expanded service IDs: ${expandedServiceIds.join(', ')}`);
 
-      // Find staff members who can perform ALL the specified services
-      // Using raw SQL for efficiency with the many-to-many relationship
+      // Find staff members who can perform AT LEAST ONE of the specified services
+      // For VIP combo, two different technicians can each do one service
       const staff = await this.staffModel.findAll({
         where: {
           status: StaffStatus.ACTIVE,
           isBookable: true,
           id: {
             [Op.in]: literal(`(
-              SELECT staff_id FROM staff_services 
+              SELECT DISTINCT staff_id FROM staff_services 
               WHERE service_id IN ('${expandedServiceIds.join("','")}')
-              GROUP BY staff_id 
-              HAVING COUNT(DISTINCT service_id) = ${expandedServiceIds.length}
             )`)
           }
         },
         order: [['lastName', 'ASC'], ['firstName', 'ASC']]
       });
 
-      this.logger.log(`Found ${staff.length} staff members who can perform ALL ${expandedServiceIds.length} services`);
+      this.logger.log(`Found ${staff.length} staff members who can perform at least one of ${expandedServiceIds.length} services`);
 
-      // If no staff found with ALL services, return empty array (don't fall back)
-      // This ensures users only see staff who can actually do all their selected services
+      // If no staff found, return empty array (don't fall back)
       if (staff.length === 0) {
-        this.logger.warn('No staff found who can perform all selected services');
+        this.logger.warn('No staff found who can perform any of the selected services');
         return [];
       }
 
