@@ -1139,29 +1139,68 @@ export class ReservationsController {
   })
   @ApiQuery({ name: 'date', required: true, type: 'string', description: 'Date in YYYY-MM-DD format' })
   async debugBookingsForDate(@Query('date') date: string) {
-    // Get raw bookings from DB
-    const rawResult = await this.sequelize.query<{
-      staffId: string;
-      startTime: string;
-      endTime: string;
-      status: string;
-    }>(
-      `SELECT "staffId", "startTime"::text, "endTime"::text, status
+    // Test 1: Raw query with ::text cast
+    const withTextCast = await this.sequelize.query<any>(
+      `SELECT "staffId", "startTime"::text as "startTimeText", "endTime"::text as "endTimeText", status
        FROM bookings
        WHERE "appointmentDate" = $1
          AND status IN ('pending', 'confirmed')`,
-      {
-        bind: [date],
-        type: 'SELECT' as any,
-      }
+      { bind: [date], type: 'SELECT' as any }
     );
+
+    // Test 2: Raw query WITHOUT ::text cast (what getBookingsForDate uses)
+    const withoutCast = await this.sequelize.query<any>(
+      `SELECT "staffId", "startTime", "endTime", status
+       FROM bookings
+       WHERE "appointmentDate" = $1
+         AND status IN ('pending', 'confirmed')`,
+      { bind: [date], type: 'SELECT' as any }
+    );
+
+    // Test parseTime function
+    const parseTime = (timeValue: any): { hours: number; minutes: number; typeInfo: string } => {
+      const typeInfo = `typeof=${typeof timeValue}, isDate=${timeValue instanceof Date}, value=${String(timeValue)}`;
+      
+      if (timeValue instanceof Date) {
+        return { hours: timeValue.getHours(), minutes: timeValue.getMinutes(), typeInfo };
+      }
+      
+      const timeStr = String(timeValue);
+      const simpleTimeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+      if (simpleTimeMatch) {
+        return { 
+          hours: parseInt(simpleTimeMatch[1], 10), 
+          minutes: parseInt(simpleTimeMatch[2], 10),
+          typeInfo
+        };
+      }
+      
+      return { hours: -1, minutes: -1, typeInfo: `PARSE_FAILED: ${typeInfo}` };
+    };
+
+    const parsedBookings = withoutCast.map((b: any) => ({
+      staffId: b.staffId?.substring(0, 8) + '...',
+      startTime: parseTime(b.startTime),
+      endTime: parseTime(b.endTime),
+    }));
 
     return {
       success: true,
       date,
-      rawBookingsCount: rawResult.length,
-      rawBookings: rawResult,
-      message: 'These are the raw booking records from the database'
+      withTextCast: withTextCast.map((b: any) => ({
+        staffId: b.staffId?.substring(0, 8),
+        startTimeText: b.startTimeText,
+        endTimeText: b.endTimeText
+      })),
+      withoutCast: withoutCast.map((b: any) => ({
+        staffId: b.staffId?.substring(0, 8),
+        startTimeRaw: String(b.startTime),
+        endTimeRaw: String(b.endTime),
+        startTimeType: typeof b.startTime,
+        startTimeIsDate: b.startTime instanceof Date,
+      })),
+      parsedBookings,
+      message: 'Comparing text cast vs no cast query results'
     };
   }
 
