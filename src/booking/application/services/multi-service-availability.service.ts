@@ -484,8 +484,18 @@ export class MultiServiceAvailabilityService {
         // Format 2: "2025-12-18T12:30:00.000Z" (ISO with Z)
         // Format 3: "2025-12-18T12:30:00" (ISO without timezone)
         
-        // Extract the time portion - handle both space and T separators
+        // Extract the time portion - handle various formats
         let timePart: string;
+        
+        // Format 4: Simple TIME format "HH:MM:SS" or "HH:MM" (no date part)
+        // This is what PostgreSQL TIME WITHOUT TIME ZONE returns
+        const simpleTimeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+        if (simpleTimeMatch) {
+          const hours = parseInt(simpleTimeMatch[1], 10);
+          const minutes = parseInt(simpleTimeMatch[2], 10);
+          this.logger.debug(`     Simple TIME format detected: ${hours}:${minutes}`);
+          return { hours, minutes };
+        }
         
         if (timeStr.includes('T')) {
           // ISO format: "2025-12-18T12:30:00.000Z"
@@ -501,12 +511,21 @@ export class MultiServiceAvailabilityService {
           } else {
             // Fallback: use Date parser
             const d = new Date(timeStr);
-            return { hours: d.getHours(), minutes: d.getMinutes() };
+            if (!isNaN(d.getTime())) {
+              return { hours: d.getHours(), minutes: d.getMinutes() };
+            }
+            this.logger.warn(`     ⚠️ Could not parse time: "${timeStr}"`);
+            return { hours: 0, minutes: 0 };
           }
         } else {
-          // Fallback: use Date parser
+          // Try Date parser as fallback, but check if valid
           const d = new Date(timeStr);
-          return { hours: d.getHours(), minutes: d.getMinutes() };
+          if (!isNaN(d.getTime())) {
+            return { hours: d.getHours(), minutes: d.getMinutes() };
+          }
+          // If we can't parse it at all, log warning and return 0
+          this.logger.warn(`     ⚠️ Unknown time format, cannot parse: "${timeStr}"`);
+          return { hours: 0, minutes: 0 };
         }
         
         // Extract hours and minutes from timePart (e.g., "12:30:00-03" or "12:30:00.000Z")
