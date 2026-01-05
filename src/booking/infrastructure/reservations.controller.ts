@@ -1130,6 +1130,41 @@ export class ReservationsController {
     }
   }
 
+  @Get('debug/bookings-for-date')
+  @Public()
+  @SkipCsrf()
+  @ApiOperation({
+    summary: 'Debug: Get parsed bookings for a date',
+    description: 'Returns raw and parsed booking data for debugging availability issues',
+  })
+  @ApiQuery({ name: 'date', required: true, type: 'string', description: 'Date in YYYY-MM-DD format' })
+  async debugBookingsForDate(@Query('date') date: string) {
+    // Get raw bookings from DB
+    const rawResult = await this.sequelize.query<{
+      staffId: string;
+      startTime: string;
+      endTime: string;
+      status: string;
+    }>(
+      `SELECT "staffId", "startTime"::text, "endTime"::text, status
+       FROM bookings
+       WHERE "appointmentDate" = $1
+         AND status IN ('pending', 'confirmed')`,
+      {
+        bind: [date],
+        type: 'SELECT' as any,
+      }
+    );
+
+    return {
+      success: true,
+      date,
+      rawBookingsCount: rawResult.length,
+      rawBookings: rawResult,
+      message: 'These are the raw booking records from the database'
+    };
+  }
+
   @Get(':id')
   @ApiOperation({
     summary: 'Get booking by ID',
