@@ -25,14 +25,14 @@ export function defineAssociations() {
 
   // Staff and Service many-to-many relationship through StaffService
   StaffEntity.belongsToMany(ServiceEntity, {
-    through: StaffServiceEntity,
+    through: 'staff_services',
     foreignKey: 'staff_id',
     otherKey: 'service_id',
     as: 'services'
   });
 
   ServiceEntity.belongsToMany(StaffEntity, {
-    through: StaffServiceEntity,
+    through: 'staff_services',
     foreignKey: 'service_id',
     otherKey: 'staff_id',
     as: 'staff'

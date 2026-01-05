@@ -9,6 +9,7 @@ import { PaginatedStaffResponseDto } from './dto/paginated-staff-response.dto';
 import { StaffEntity } from '../infrastructure/persistence/entities/staff.entity';
 import { StaffRole, StaffStatus } from '../infrastructure/persistence/entities/staff.entity';
 import { ServiceEntity } from '../../services/infrastructure/persistence/entities/service.entity';
+import { BookingEntity } from '../../booking/infrastructure/persistence/entities/booking.entity';
 
 interface PaginationParams {
   page: number;
@@ -34,6 +35,8 @@ export class StaffService {
     private readonly staffModel: typeof StaffEntity,
     @InjectModel(ServiceEntity)
     private readonly serviceModel: typeof ServiceEntity,
+    @InjectModel(BookingEntity)
+    private readonly bookingModel: typeof BookingEntity,
   ) { }
 
   /**
@@ -71,7 +74,7 @@ export class StaffService {
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const createdStaff = await this.staffModel.create(staffData as any);
-      return this.mapToResponseDto(createdStaff);
+      return await this.mapToResponseDto(createdStaff);
     } catch (error: unknown) {
       this.logger.error('Failed to create staff member', error);
       throw new BadRequestException('Failed to create staff member');
@@ -94,10 +97,18 @@ export class StaffService {
         where: whereClause,
         offset: (validatedPagination.page - 1) * validatedPagination.limit,
         limit: validatedPagination.limit,
-        order: [['lastName', 'ASC'], ['firstName', 'ASC']]
+        order: [['lastName', 'ASC'], ['firstName', 'ASC']],
+        include: [
+          {
+            model: this.serviceModel,
+            as: 'services',
+            attributes: ['id', 'name', 'duration', 'price'],
+            through: { attributes: [] }
+          }
+        ]
       });
 
-      const staffDtos = staff.map(s => this.mapToResponseDto(s));
+      const staffDtos = await Promise.all(staff.map(s => this.mapToResponseDto(s)));
 
       return {
         data: staffDtos,
@@ -119,8 +130,22 @@ export class StaffService {
    */
   async findStaffById(id: string): Promise<StaffResponseDto> {
 
-    const staff = await this.findStaffEntityById(id);
-    return this.mapToResponseDto(staff);
+    const staff = await this.staffModel.findByPk(id, {
+      include: [
+        {
+          model: this.serviceModel,
+          as: 'services',
+          attributes: ['id', 'name', 'duration', 'price'],
+          through: { attributes: [] }
+        }
+      ]
+    });
+
+    if (!staff) {
+      throw new NotFoundException(`Staff member with ID ${id} not found`);
+    }
+
+    return await this.mapToResponseDto(staff);
   }
 
   /**
@@ -132,7 +157,7 @@ export class StaffService {
       where: { email: email.toLowerCase().trim() }
     });
 
-    return staff ? this.mapToResponseDto(staff) : null;
+    return staff ? await this.mapToResponseDto(staff) : null;
   }
 
   /**
@@ -146,10 +171,18 @@ export class StaffService {
           status: StaffStatus.ACTIVE,
           isBookable: true
         },
-        order: [['lastName', 'ASC'], ['firstName', 'ASC']]
+        order: [['lastName', 'ASC'], ['firstName', 'ASC']],
+        include: [
+          {
+            model: this.serviceModel,
+            as: 'services',
+            attributes: ['id', 'name', 'duration', 'price'],
+            through: { attributes: [] }
+          }
+        ]
       });
 
-      return staff.map(s => this.mapToResponseDto(s));
+      return await Promise.all(staff.map(s => this.mapToResponseDto(s)));
     } catch (error: unknown) {
       this.logger.error('Failed to retrieve available staff', error);
       throw new BadRequestException('Failed to retrieve available staff');
@@ -175,7 +208,7 @@ export class StaffService {
         order: [['lastName', 'ASC'], ['firstName', 'ASC']]
       });
 
-      return staff.map(s => this.mapToResponseDto(s));
+      return await Promise.all(staff.map(s => this.mapToResponseDto(s)));
     } catch (error: unknown) {
       this.logger.error(`Failed to find staff by service ID: ${serviceId}`, error);
       throw new BadRequestException('Failed to find staff by service');
@@ -241,7 +274,7 @@ export class StaffService {
     try {
       const updateData = this.prepareUpdateData(updateStaffDto);
       await existingStaff.update(updateData);
-      return this.mapToResponseDto(existingStaff);
+      return await this.mapToResponseDto(existingStaff);
     } catch (error: unknown) {
       this.logger.error(`Failed to update staff member: ${id}`, error);
       throw new BadRequestException('Failed to update staff member');
@@ -328,7 +361,7 @@ export class StaffService {
 
     try {
       await staff.update({ status });
-      return this.mapToResponseDto(staff);
+      return await this.mapToResponseDto(staff);
     } catch (error: unknown) {
       this.logger.error(`Failed to update staff status: ${id}`, error);
       throw new BadRequestException('Failed to update staff status');
@@ -482,31 +515,60 @@ export class StaffService {
     return updateData;
   }
 
-  private mapToResponseDto(staff: StaffEntity): StaffResponseDto {
+  private async mapToResponseDto(staff: StaffEntity): Promise<StaffResponseDto> {
+    const services = staff.services ? staff.services.map(service => ({
+      id: service.id,
+      name: service.name,
+      duration: service.duration,
+      price: service.price
+    })) : [];
+
+    // Count pending bookings (confirmed, pending, rescheduled)
+    const pendingBookingsCount = await this.bookingModel.count({
+      where: {
+        staffId: staff.id,
+        status: {
+          [Op.in]: ['confirmed', 'pending', 'rescheduled']
+        }
+      }
+    });
+
+    // Count completed bookings
+    const completedBookingsCount = await this.bookingModel.count({
+      where: {
+        staffId: staff.id,
+        status: 'completed'
+      }
+    });
+
     return {
       id: staff.id,
-      firstName: staff.dataValues.firstName,
-      lastName: staff.dataValues.lastName,
-      fullName: `${staff.dataValues.firstName} ${staff.dataValues.lastName}`,
-      email: staff.dataValues.email,
-      phone: staff.dataValues.phone,
-      role: staff.dataValues.role,
-      status: staff.dataValues.status,
+      firstName: staff.firstName,
+      lastName: staff.lastName,
+      fullName: `${staff.firstName} ${staff.lastName}`,
+      email: staff.email,
+      phone: staff.phone,
+      role: staff.role,
+      status: staff.status,
 
-      specialties: staff.dataValues.specialties || [],
-      workingDays: staff.dataValues.workingDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-      commissionPercentage: staff.dataValues.commissionPercentage,
-      hourlyRate: staff.dataValues.hourlyRate,
-      startDate: staff.dataValues.startDate,
-      endDate: staff.dataValues.endDate,
-      bio: staff.dataValues.bio,
-      profilePictureUrl: staff.dataValues.profilePictureUrl,
-      notes: staff.dataValues.notes,
-      isBookable: staff.dataValues.isBookable,
-      isActive: staff.dataValues.status === StaffStatus.ACTIVE,
-      isAvailable: staff.dataValues.status === StaffStatus.ACTIVE && staff.dataValues.isBookable,
-      createdAt: staff.dataValues.createdAt,
-      updatedAt: staff.dataValues.updatedAt
+      specialties: staff.specialties || [],
+      workingDays: staff.workingDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+      commissionPercentage: staff.commissionPercentage,
+      hourlyRate: staff.hourlyRate,
+      startDate: staff.startDate,
+      endDate: staff.endDate,
+      bio: staff.bio,
+      profilePictureUrl: staff.profilePictureUrl,
+      notes: staff.notes,
+      isBookable: staff.isBookable,
+      isActive: staff.status === StaffStatus.ACTIVE,
+      isAvailable: staff.status === StaffStatus.ACTIVE && staff.isBookable,
+      createdAt: staff.createdAt,
+      updatedAt: staff.updatedAt,
+      services: services,
+      servicesCount: services.length,
+      pendingBookingsCount: pendingBookingsCount,
+      completedBookingsCount: completedBookingsCount
     };
   }
 }

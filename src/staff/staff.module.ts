@@ -6,9 +6,10 @@ import { StaffService } from './application/staff.service';
 import { StaffServiceRelationService } from './application/staff-service-relation.service';
 import { StaffController } from './infrastructure/web/staff.controller';
 import { ServiceEntity } from '../services/infrastructure/persistence/entities/service.entity';
+import { BookingEntity } from '../booking/infrastructure/persistence/entities/booking.entity';
 
 @Module({
-  imports: [SequelizeModule.forFeature([StaffEntity, StaffServiceEntity, ServiceEntity])],
+  imports: [SequelizeModule.forFeature([StaffEntity, StaffServiceEntity, ServiceEntity, BookingEntity])],
   controllers: [StaffController],
   providers: [StaffService, StaffServiceRelationService],
   exports: [StaffService, StaffServiceRelationService, SequelizeModule],
