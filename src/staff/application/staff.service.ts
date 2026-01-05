@@ -218,14 +218,52 @@ export class StaffService {
   /**
    * Finds staff members who can perform AT LEAST ONE of the specified services
    * If a service is a combo, it expands to its associated services
-   * Falls back to returning all available staff if staff_services has no data or on any error
+   * Falls back to returning all available staff if staff_services has no data
    */
   async findStaffByServiceIds(serviceIds: string[]): Promise<StaffResponseDto[]> {
-    // Always return all available staff for now
-    // TODO: Re-enable service filtering when staff_services table is properly populated
     this.logger.log(`Finding staff for services: ${serviceIds?.join(', ') || 'none'}`);
-    this.logger.log('Returning all available staff (service filtering temporarily disabled)');
-    return await this.findAvailableStaff();
+
+    // If no service IDs provided, return all available staff
+    if (!serviceIds || serviceIds.length === 0) {
+      this.logger.log('No service IDs provided, returning all available staff');
+      return await this.findAvailableStaff();
+    }
+
+    try {
+      // Expand combo services to their component services
+      const expandedServiceIds = await this.expandComboServices(serviceIds);
+      this.logger.log(`Expanded service IDs: ${expandedServiceIds.join(', ')}`);
+
+      // Find staff members who can perform AT LEAST ONE of the specified services
+      // For VIP combo, two different technicians can each do one service
+      const staff = await this.staffModel.findAll({
+        where: {
+          status: StaffStatus.ACTIVE,
+          isBookable: true,
+          id: {
+            [Op.in]: literal(`(
+              SELECT DISTINCT staff_id FROM staff_services 
+              WHERE service_id IN ('${expandedServiceIds.join("','")}')
+            )`)
+          }
+        },
+        order: [['lastName', 'ASC'], ['firstName', 'ASC']]
+      });
+
+      this.logger.log(`Found ${staff.length} staff members who can perform at least one of ${expandedServiceIds.length} services`);
+
+      // If no staff found, return empty array (don't fall back)
+      if (staff.length === 0) {
+        this.logger.warn('No staff found who can perform any of the selected services');
+        return [];
+      }
+
+      return staff.map(s => this.mapToResponseDto(s));
+    } catch (error: unknown) {
+      this.logger.error('Error finding staff by service IDs, falling back to all available', error);
+      // Only fall back on actual errors, not on "no results"
+      return await this.findAvailableStaff();
+    }
   }
 
   /**
