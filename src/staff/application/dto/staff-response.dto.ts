@@ -156,4 +156,46 @@ export class StaffResponseDto {
     required: false,
   })
   deletedAt?: Date;
+
+  @ApiProperty({
+    description: 'List of services this staff member provides',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        name: { type: 'string' },
+        duration: { type: 'number' },
+        price: { type: 'number' }
+      }
+    },
+    required: false,
+  })
+  services?: Array<{
+    id: string;
+    name: string;
+    duration: number;
+    price: number;
+  }>;
+
+  @ApiProperty({
+    description: 'Total number of services this staff member can provide',
+    example: 5,
+    required: false,
+  })
+  servicesCount?: number;
+
+  @ApiProperty({
+    description: 'Number of pending bookings for this staff member',
+    example: 3,
+    required: false,
+  })
+  pendingBookingsCount?: number;
+
+  @ApiProperty({
+    description: 'Number of completed bookings for this staff member',
+    example: 15,
+    required: false,
+  })
+  completedBookingsCount?: number;
 }

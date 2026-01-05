@@ -51,7 +51,7 @@ export class StaffEntity extends Model<StaffEntity> {
       len: [1, 100],
     },
   })
-  firstName: string;
+  declare firstName: string;
 
   @ApiProperty({
     description: 'Staff member last name',
@@ -65,7 +65,7 @@ export class StaffEntity extends Model<StaffEntity> {
       len: [1, 100],
     },
   })
-  lastName: string;
+  declare lastName: string;
 
   @ApiProperty({
     description: 'Staff member email address',
@@ -81,7 +81,7 @@ export class StaffEntity extends Model<StaffEntity> {
       notEmpty: true,
     },
   })
-  email: string;
+  declare email: string;
 
   @ApiProperty({
     description: 'Staff member phone number',
@@ -107,7 +107,7 @@ export class StaffEntity extends Model<StaffEntity> {
     allowNull: false,
     defaultValue: StaffRole.TECHNICIAN,
   })
-  role: StaffRole;
+  declare role: StaffRole;
 
   @ApiProperty({
     description: 'Staff member current status',
@@ -120,7 +120,7 @@ export class StaffEntity extends Model<StaffEntity> {
     allowNull: false,
     defaultValue: StaffStatus.ACTIVE,
   })
-  status: StaffStatus;
+  declare status: StaffStatus;
 
 
 
@@ -134,7 +134,7 @@ export class StaffEntity extends Model<StaffEntity> {
     allowNull: true,
     defaultValue: [],
   })
-  specialties?: string[];
+  declare specialties?: string[];
 
   @ApiProperty({
     description: 'Days of the week the staff member works',
@@ -146,7 +146,7 @@ export class StaffEntity extends Model<StaffEntity> {
     allowNull: true,
     defaultValue: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
   })
-  workingDays?: string[];
+  declare workingDays?: string[];
 
   @ApiProperty({
     description: 'Commission percentage (0-100)',
@@ -161,7 +161,7 @@ export class StaffEntity extends Model<StaffEntity> {
       max: 100,
     },
   })
-  commissionPercentage?: number;
+  declare commissionPercentage?: number;
 
   @ApiProperty({
     description: 'Hourly rate in cents',
@@ -175,7 +175,7 @@ export class StaffEntity extends Model<StaffEntity> {
       min: 0,
     },
   })
-  hourlyRate?: number;
+  declare hourlyRate?: number;
 
   @ApiProperty({
     description: 'Date when staff member started working',
@@ -186,7 +186,7 @@ export class StaffEntity extends Model<StaffEntity> {
     type: DataType.DATE,
     allowNull: true,
   })
-  startDate?: Date;
+  declare startDate?: Date;
 
   @ApiProperty({
     description: 'Date when staff member stopped working',
@@ -197,7 +197,7 @@ export class StaffEntity extends Model<StaffEntity> {
     type: DataType.DATE,
     allowNull: true,
   })
-  endDate?: Date;
+  declare endDate?: Date;
 
   @ApiProperty({
     description: 'Staff member bio or description',
@@ -208,7 +208,7 @@ export class StaffEntity extends Model<StaffEntity> {
     type: DataType.TEXT,
     allowNull: true,
   })
-  bio?: string;
+  declare bio?: string;
 
   @ApiProperty({
     description: 'Staff member profile picture URL',
@@ -222,7 +222,7 @@ export class StaffEntity extends Model<StaffEntity> {
       isUrl: true,
     },
   })
-  profilePictureUrl?: string;
+  declare profilePictureUrl?: string;
 
   @ApiProperty({
     description: 'Notes about the staff member',
@@ -233,7 +233,7 @@ export class StaffEntity extends Model<StaffEntity> {
     type: DataType.TEXT,
     allowNull: true,
   })
-  notes?: string;
+  declare notes?: string;
 
   @ApiProperty({
     description: 'Whether staff member can be booked online',
@@ -244,7 +244,7 @@ export class StaffEntity extends Model<StaffEntity> {
     allowNull: false,
     defaultValue: true,
   })
-  isBookable: boolean;
+  declare isBookable: boolean;
 
   @ApiProperty({
     description: 'When the staff member was created',
@@ -291,7 +291,7 @@ export class StaffEntity extends Model<StaffEntity> {
   }
 
   // Associations (defined in associations.ts)
-  services: ServiceEntity[];
+  declare services?: ServiceEntity[];
 }
 
 export default StaffEntity;

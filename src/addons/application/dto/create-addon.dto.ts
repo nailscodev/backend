@@ -73,4 +73,41 @@ export class CreateAddOnDto {
   @IsOptional()
   @IsUrl()
   imageUrl?: string;
+
+  // Translation fields
+  @ApiProperty({
+    description: 'Add-on title in English',
+    example: 'Nail Art Design',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  titleEn?: string;
+
+  @ApiProperty({
+    description: 'Add-on title in Spanish',
+    example: 'Diseño de Arte de Uñas',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  titleEs?: string;
+
+  @ApiProperty({
+    description: 'Add-on description in English',
+    example: 'Beautiful custom nail art designs',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  descriptionEn?: string;
+
+  @ApiProperty({
+    description: 'Add-on description in Spanish',
+    example: 'Hermosos diseños de arte de uñas personalizados',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  descriptionEs?: string;
 }

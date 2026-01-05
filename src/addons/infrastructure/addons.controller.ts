@@ -159,6 +159,12 @@ export class AddOnsController {
       offset: (page - 1) * actualLimit,
       limit: actualLimit,
       order: [['displayOrder', 'ASC'], ['name', 'ASC']],
+      include: [
+        {
+          association: 'services',
+          attributes: ['id', 'name'],
+        },
+      ],
     });
 
     // Use lang query param, or fall back to accept-language header
@@ -303,7 +309,14 @@ export class AddOnsController {
     @Query('lang') lang?: string,
     @Headers('accept-language') acceptLanguage?: string,
   ) {
-    const addOn = await this.addOnModel.findByPk(id);
+    const addOn = await this.addOnModel.findByPk(id, {
+      include: [
+        {
+          association: 'services',
+          attributes: ['id', 'name'],
+        },
+      ],
+    });
 
     if (!addOn) {
       throw new NotFoundException(`Add-on with ID ${id} not found`);
@@ -344,8 +357,42 @@ export class AddOnsController {
     @Body(new ValidationPipe({ transform: true })) createAddOnDto: CreateAddOnDto,
   ) {
     try {
+      // Extract translation fields
+      const { titleEn, titleEs, descriptionEn, descriptionEs, ...addOnData } = createAddOnDto;
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      const addOn = await this.addOnModel.create(createAddOnDto as any);
+      const addOn = await this.addOnModel.create(addOnData as any);
+
+      // Save translations if provided
+      if (titleEn !== undefined || descriptionEn !== undefined || titleEs !== undefined || descriptionEs !== undefined) {
+        // Get language IDs
+        const languages = await this.languageModel.findAll({
+          where: { code: { [Op.in]: ['EN', 'ES'] }, isActive: true },
+        });
+
+        const enLanguage = languages.find(l => l.code === 'EN');
+        const esLanguage = languages.find(l => l.code === 'ES');
+
+        // Create English translation
+        if (enLanguage && (titleEn !== undefined || descriptionEn !== undefined)) {
+          await this.addOnLangModel.create({
+            addonId: addOn.id,
+            languageId: enLanguage.id,
+            title: titleEn || addOn.name,
+            description: descriptionEn || addOn.description,
+          } as any);
+        }
+
+        // Create Spanish translation
+        if (esLanguage && (titleEs !== undefined || descriptionEs !== undefined)) {
+          await this.addOnLangModel.create({
+            addonId: addOn.id,
+            languageId: esLanguage.id,
+            title: titleEs || addOn.name,
+            description: descriptionEs || addOn.description,
+          } as any);
+        }
+      }
 
       return {
         success: true,
@@ -392,8 +439,70 @@ export class AddOnsController {
     }
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      await addOn.update(updateAddOnDto as any);
+      // Extract translation fields
+      const { titleEn, titleEs, descriptionEn, descriptionEs, ...addOnData } = updateAddOnDto as any;
+
+      // Update add-on base data
+      await addOn.update(addOnData);
+
+      // Update translations if provided
+      if (titleEn !== undefined || descriptionEn !== undefined || titleEs !== undefined || descriptionEs !== undefined) {
+        // Get language IDs
+        const languages = await this.languageModel.findAll({
+          where: { code: { [Op.in]: ['EN', 'ES'] }, isActive: true },
+        });
+
+        const enLanguage = languages.find(l => l.code === 'EN');
+        const esLanguage = languages.find(l => l.code === 'ES');
+
+        // Update English translation
+        if (enLanguage && (titleEn !== undefined || descriptionEn !== undefined)) {
+          const existingEn = await this.addOnLangModel.findOne({
+            where: {
+              addonId: addOn.id,
+              languageId: enLanguage.id,
+            },
+          });
+
+          if (existingEn) {
+            await existingEn.update({
+              title: titleEn || existingEn.title,
+              description: descriptionEn !== undefined ? descriptionEn : existingEn.description,
+            });
+          } else {
+            await this.addOnLangModel.create({
+              addonId: addOn.id,
+              languageId: enLanguage.id,
+              title: titleEn || addOn.name,
+              description: descriptionEn || addOn.description,
+            } as any);
+          }
+        }
+
+        // Update Spanish translation
+        if (esLanguage && (titleEs !== undefined || descriptionEs !== undefined)) {
+          const existingEs = await this.addOnLangModel.findOne({
+            where: {
+              addonId: addOn.id,
+              languageId: esLanguage.id,
+            },
+          });
+
+          if (existingEs) {
+            await existingEs.update({
+              title: titleEs || existingEs.title,
+              description: descriptionEs !== undefined ? descriptionEs : existingEs.description,
+            });
+          } else {
+            await this.addOnLangModel.create({
+              addonId: addOn.id,
+              languageId: esLanguage.id,
+              title: titleEs || addOn.name,
+              description: descriptionEs || addOn.description,
+            } as any);
+          }
+        }
+      }
 
       return {
         success: true,
