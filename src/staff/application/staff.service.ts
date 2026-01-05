@@ -258,7 +258,7 @@ export class StaffService {
         return [];
       }
 
-      return staff.map(s => this.mapToResponseDto(s));
+      return await Promise.all(staff.map(s => this.mapToResponseDto(s)));
     } catch (error: unknown) {
       this.logger.error('Error finding staff by service IDs, falling back to all available', error);
       // Only fall back on actual errors, not on "no results"
