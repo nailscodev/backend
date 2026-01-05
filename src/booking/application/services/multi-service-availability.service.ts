@@ -1411,6 +1411,16 @@ export class MultiServiceAvailabilityService {
 
       // 4. Obtener bookings existentes del día
       const existingBookings = await this.getBookingsForDate(date);
+      
+      this.logger.log(`\n📋 VIP COMBO: Found ${existingBookings.length} existing bookings for ${date}`);
+      if (existingBookings.length > 0) {
+        this.logger.log(`   Bookings loaded:`);
+        existingBookings.forEach(b => {
+          const startMin = b.startTime.getHours() * 60 + b.startTime.getMinutes();
+          const endMin = b.endTime.getHours() * 60 + b.endTime.getMinutes();
+          this.logger.log(`     - Staff ${b.staffId.substring(0,8)}...: ${startMin}-${endMin}min`);
+        });
+      }
 
       // 5. Generar slots donde 2 técnicos puedan trabajar simultáneamente
       // Si hay técnico seleccionado, DEBE estar en todos los slots
