@@ -463,7 +463,6 @@ export class MultiServiceAvailabilityService {
     this.logger.log(`\n📋 Raw bookings from DB for ${date}: ${result.length}`);
     result.forEach(r => {
       this.logger.log(`   RAW: "${r.startTime}" - "${r.endTime}" (Staff: ${r.staffId.substring(0, 8)}...)`);
-      this.logger.log(`   TYPE: startTime is ${typeof r.startTime}, instanceof Date: ${r.startTime instanceof Date}`);
     });
 
     // Parse times - extract hours and minutes from various formats
