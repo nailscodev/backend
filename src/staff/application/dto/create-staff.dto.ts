@@ -73,6 +73,17 @@ export class CreateStaffDto {
   @IsEnum(StaffStatus, { message: 'Invalid staff status' })
   status?: StaffStatus = StaffStatus.ACTIVE;
 
+  @ApiProperty({
+    description: 'Array of service IDs that the staff member can perform',
+    example: ['uuid-1', 'uuid-2'],
+    required: false,
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  serviceIds?: string[];
+
 
 
   @ApiProperty({

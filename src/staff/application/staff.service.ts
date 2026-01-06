@@ -74,6 +74,12 @@ export class StaffService {
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const createdStaff = await this.staffModel.create(staffData as any);
+
+      // Assign services if provided
+      if (createStaffDto.serviceIds && createStaffDto.serviceIds.length > 0) {
+        await this.assignServicesToStaff(createdStaff.id, createStaffDto.serviceIds);
+      }
+
       return await this.mapToResponseDto(createdStaff);
     } catch (error: unknown) {
       this.logger.error('Failed to create staff member', error);
@@ -258,7 +264,7 @@ export class StaffService {
         return [];
       }
 
-      return staff.map(s => this.mapToResponseDto(s));
+      return await Promise.all(staff.map(s => this.mapToResponseDto(s)));
     } catch (error: unknown) {
       this.logger.error('Error finding staff by service IDs, falling back to all available', error);
       // Only fall back on actual errors, not on "no results"
@@ -312,6 +318,12 @@ export class StaffService {
     try {
       const updateData = this.prepareUpdateData(updateStaffDto);
       await existingStaff.update(updateData);
+
+      // Update services if provided
+      if (updateStaffDto.serviceIds !== undefined) {
+        await this.assignServicesToStaff(id, updateStaffDto.serviceIds);
+      }
+
       return await this.mapToResponseDto(existingStaff);
     } catch (error: unknown) {
       this.logger.error(`Failed to update staff member: ${id}`, error);
@@ -551,6 +563,42 @@ export class StaffService {
     }
 
     return updateData;
+  }
+
+  /**
+   * Assigns services to a staff member
+   * Replaces all existing service assignments
+   */
+  private async assignServicesToStaff(staffId: string, serviceIds: string[]): Promise<void> {
+    try {
+      // Get the staff instance with services
+      const staff = await this.staffModel.findByPk(staffId);
+      if (!staff) {
+        throw new NotFoundException(`Staff member with ID ${staffId} not found`);
+      }
+
+      // Verify all services exist
+      if (serviceIds.length > 0) {
+        const services = await this.serviceModel.findAll({
+          where: { id: { [Op.in]: serviceIds } }
+        });
+
+        if (services.length !== serviceIds.length) {
+          throw new BadRequestException('One or more service IDs are invalid');
+        }
+      }
+
+      // Use Sequelize's setServices to replace all associations
+      // This will delete old relationships and create new ones
+      await staff.$set('services', serviceIds);
+
+      this.logger.log(`Assigned ${serviceIds.length} services to staff ${staffId}`);
+    } catch (error: unknown) {
+      this.logger.error(`Failed to assign services to staff ${staffId}`, error);
+      throw error instanceof BadRequestException || error instanceof NotFoundException
+        ? error
+        : new BadRequestException('Failed to assign services to staff');
+    }
   }
 
   private async mapToResponseDto(staff: StaffEntity): Promise<StaffResponseDto> {
