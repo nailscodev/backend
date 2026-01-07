@@ -39,6 +39,7 @@ import { BestSellingServiceDto } from './dto/best-selling-service.dto';
 import { TopStaffDto } from './dto/top-staff.dto';
 import { UpcomingBookingDto } from './dto/upcoming-booking.dto';
 import { BookingsBySourceDto } from './dto/bookings-by-source.dto';
+import { BookingListItemDto } from './dto/booking-list-item.dto';
 import { ManualAdjustment } from '../../common/entities/manual-adjustment.entity';
 
 // Interfaces for type safety
@@ -144,6 +145,156 @@ export class ReservationsController {
       limit: actualLimit,
       order: [['appointmentDate', 'ASC'], ['startTime', 'ASC']]
     });
+
+    return {
+      success: true,
+      data: bookings,
+      pagination: {
+        page,
+        limit: actualLimit,
+        total,
+        totalPages: Math.ceil(total / actualLimit),
+        hasNextPage: page < Math.ceil(total / actualLimit),
+        hasPrevPage: page > 1,
+      },
+    };
+  }
+
+  @Get('list')
+  @ApiOperation({
+    summary: 'Get bookings list with full details',
+    description: 'Retrieve a paginated list of bookings with customer, service, and staff information.',
+  })
+  @ApiQuery({ name: 'page', required: false, type: 'number', description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: 'number', description: 'Items per page (default: 10, max: 100)' })
+  @ApiQuery({ name: 'status', required: false, enum: BookingStatus, description: 'Filter by booking status' })
+  @ApiQuery({ name: 'startDate', required: false, type: 'string', description: 'Filter by start date range (YYYY-MM-DD format)' })
+  @ApiQuery({ name: 'endDate', required: false, type: 'string', description: 'Filter by end date range (YYYY-MM-DD format)' })
+  @ApiQuery({ name: 'search', required: false, type: 'string', description: 'Search in customer name, email, or notes' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Bookings list retrieved successfully',
+    type: [BookingListItemDto],
+  })
+  async getBookingsList(
+    @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
+    @Query('status') status?: BookingStatus,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('search') search?: string,
+  ) {
+    // Build WHERE conditions
+    const whereConditions: string[] = ['1=1'];
+    const replacements: Record<string, any> = {};
+
+    if (status) {
+      whereConditions.push(`b.status = :status`);
+      replacements.status = status;
+    }
+
+    if (startDate && endDate) {
+      whereConditions.push(`b."appointmentDate" BETWEEN :startDate AND :endDate`);
+      replacements.startDate = startDate;
+      replacements.endDate = endDate;
+    } else if (startDate) {
+      whereConditions.push(`b."appointmentDate" >= :startDate`);
+      replacements.startDate = startDate;
+    } else if (endDate) {
+      whereConditions.push(`b."appointmentDate" <= :endDate`);
+      replacements.endDate = endDate;
+    }
+
+    if (search) {
+      whereConditions.push(`(
+        CONCAT(c."firstName", ' ', c."lastName") ILIKE :search OR
+        c.email ILIKE :search OR
+        b.notes ILIKE :search
+      )`);
+      replacements.search = `%${search}%`;
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    // Limit pagination
+    const maxLimit = 100;
+    const actualLimit = Math.min(limit, maxLimit);
+    const offset = (page - 1) * actualLimit;
+
+    replacements.limit = actualLimit;
+    replacements.offset = offset;
+
+    // Get total count
+    const countResult: any[] = await this.sequelize.query(
+      `
+      SELECT COUNT(*) as total
+      FROM bookings b
+      INNER JOIN customers c ON b."customerId" = c.id
+      WHERE ${whereClause}
+      `,
+      {
+        replacements,
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    const total = parseInt(countResult[0]?.total || '0');
+
+    // Get bookings with full details
+    const result: any[] = await this.sequelize.query(
+      `
+      SELECT 
+        b.id,
+        CONCAT(c."firstName", ' ', c."lastName") as "customerName",
+        c.email as "customerEmail",
+        c.phone as "customerPhone",
+        s.name as "serviceName",
+        cat.id as "categoryId",
+        cat.name as "categoryName",
+        CONCAT(st."firstName", ' ', st."lastName") as "staffName",
+        b."appointmentDate",
+        b."startTime",
+        b."endTime",
+        b.status,
+        b."paymentMethod",
+        b."totalAmount",
+        b.web,
+        b.notes,
+        b."createdAt"
+      FROM bookings b
+      INNER JOIN customers c ON b."customerId" = c.id
+      INNER JOIN services s ON b."serviceId" = s.id
+      INNER JOIN categories cat ON s.category_id = cat.id
+      INNER JOIN staff st ON b."staffId" = st.id
+      WHERE ${whereClause}
+      ORDER BY b."appointmentDate" DESC, b."startTime" DESC
+      LIMIT :limit OFFSET :offset
+      `,
+      {
+        replacements,
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    const bookings: BookingListItemDto[] = result.map(row => ({
+      id: row.id,
+      customerName: row.customerName,
+      customerEmail: row.customerEmail,
+      customerPhone: row.customerPhone,
+      serviceName: row.serviceName,
+      categoryId: row.categoryId,
+      categoryName: row.categoryName,
+      staffName: row.staffName,
+      appointmentDate: row.appointmentDate,
+      startTime: row.startTime,
+      endTime: row.endTime,
+      status: row.status,
+      paymentMethod: row.paymentMethod,
+      totalAmount: parseFloat(row.totalAmount || '0'),
+      web: row.web,
+      notes: row.notes,
+      createdAt: row.createdAt,
+    }));
 
     return {
       success: true,
