@@ -170,7 +170,9 @@ export class ReservationsController {
   @ApiQuery({ name: 'status', required: false, enum: BookingStatus, description: 'Filter by booking status' })
   @ApiQuery({ name: 'startDate', required: false, type: 'string', description: 'Filter by start date range (YYYY-MM-DD format)' })
   @ApiQuery({ name: 'endDate', required: false, type: 'string', description: 'Filter by end date range (YYYY-MM-DD format)' })
-  @ApiQuery({ name: 'search', required: false, type: 'string', description: 'Search in customer name, email, or notes' })
+  @ApiQuery({ name: 'search', required: false, type: 'string', description: 'Search in customer name, email, staff name, or notes' })
+  @ApiQuery({ name: 'customerId', required: false, type: 'string', description: 'Filter by customer ID' })
+  @ApiQuery({ name: 'staffId', required: false, type: 'string', description: 'Filter by staff ID' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Bookings list retrieved successfully',
@@ -183,6 +185,8 @@ export class ReservationsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('search') search?: string,
+    @Query('customerId') customerId?: string,
+    @Query('staffId') staffId?: string,
   ) {
     // Build WHERE conditions
     const whereConditions: string[] = ['1=1'];
@@ -191,6 +195,16 @@ export class ReservationsController {
     if (status) {
       whereConditions.push(`b.status = :status`);
       replacements.status = status;
+    }
+
+    if (customerId) {
+      whereConditions.push(`b."customerId" = :customerId`);
+      replacements.customerId = customerId;
+    }
+
+    if (staffId) {
+      whereConditions.push(`b."staffId" = :staffId`);
+      replacements.staffId = staffId;
     }
 
     if (startDate && endDate) {
@@ -209,7 +223,8 @@ export class ReservationsController {
       whereConditions.push(`(
         CONCAT(c."firstName", ' ', c."lastName") ILIKE :search OR
         c.email ILIKE :search OR
-        b.notes ILIKE :search
+        b.notes ILIKE :search OR
+        CONCAT(st."firstName", ' ', st."lastName") ILIKE :search
       )`);
       replacements.search = `%${search}%`;
     }
@@ -230,6 +245,7 @@ export class ReservationsController {
       SELECT COUNT(*) as total
       FROM bookings b
       INNER JOIN customers c ON b."customerId" = c.id
+      LEFT JOIN staff st ON b."staffId" = st.id
       WHERE ${whereClause}
       `,
       {
@@ -265,7 +281,7 @@ export class ReservationsController {
       INNER JOIN customers c ON b."customerId" = c.id
       INNER JOIN services s ON b."serviceId" = s.id
       INNER JOIN categories cat ON s.category_id = cat.id
-      INNER JOIN staff st ON b."staffId" = st.id
+      LEFT JOIN staff st ON b."staffId" = st.id
       WHERE ${whereClause}
       ORDER BY b."appointmentDate" DESC, b."startTime" DESC
       LIMIT :limit OFFSET :offset
