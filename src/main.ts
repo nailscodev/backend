@@ -43,8 +43,7 @@ async function bootstrap() {
     'http://localhost:3000',
     'http://192.168.1.32:3002',
     'http://127.0.0.1:3002',
-    'https://nails-and-co.vercel.app',
-    'https://nails-and-co-ilandanieles-projects.vercel.app'
+    'https://frontend-web-wt6y.onrender.com'
   ];
   console.log('DEBUG: Allowed origins configured:', allowedOrigins);
 
