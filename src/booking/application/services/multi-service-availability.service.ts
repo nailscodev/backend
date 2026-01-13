@@ -711,7 +711,7 @@ export class MultiServiceAvailabilityService {
   ): StaffAssignment[] | null {
 
     const slotTimeStr = `${String(startTime.getHours()).padStart(2, '0')}:${String(startTime.getMinutes()).padStart(2, '0')}`;
-    const isDebugSlot = ['10:30', '11:30', '12:30', '13:30', '14:30', '15:30'].includes(slotTimeStr);
+    const isDebugSlot = ['10:30', '11:30', '12:30', '13:30', '14:30', '15:30', '16:30', '17:30', '18:30'].includes(slotTimeStr);
 
     if (isDebugSlot) {
       this.logger.log(`\n🔍 [DEBUG ${slotTimeStr}] Evaluando slot con permutaciones...`);
