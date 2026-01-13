@@ -950,6 +950,7 @@ export class ReservationsController {
   })
   @ApiQuery({ name: 'date', required: true, type: 'string', description: 'Date in YYYY-MM-DD format' })
   @ApiQuery({ name: 'staffId', required: false, type: 'string', description: 'Filter by staff ID (UUID)' })
+  @ApiQuery({ name: 'timezoneOffset', required: false, type: 'number', description: 'Timezone offset in minutes (e.g., -180 for UTC-3)' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Available time slots retrieved successfully',
@@ -957,10 +958,17 @@ export class ReservationsController {
   async getAvailableTimeSlots(
     @Query('date') date: string,
     @Query('staffId') staffId?: string,
+    @Query('timezoneOffset') timezoneOffsetStr?: string,
   ) {
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       throw new BadRequestException('Date must be in YYYY-MM-DD format');
     }
+
+    const timezoneOffset = timezoneOffsetStr ? parseInt(timezoneOffsetStr, 10) : 0;
+    console.log(`\n📅 AVAILABLE SLOTS REQUEST:`);
+    console.log(`   Date: ${date}`);
+    console.log(`   StaffId: ${staffId || 'all'}`);
+    console.log(`   Timezone Offset: ${timezoneOffset} minutes (UTC${timezoneOffset <= 0 ? '+' : '-'}${Math.abs(timezoneOffset / 60)})`);
 
     // Build where clause for existing bookings
     const where: Record<string, any> = {
@@ -1026,33 +1034,39 @@ export class ReservationsController {
         endTime = endTimeObj.toTimeString().slice(0, 5);
       }
 
-      console.log(`[AVAILABILITY] Booking found: staff=${staff}, startTime=${startTime}, endTime=${endTime}`);
+      console.log(`[AVAILABILITY] Booking found (UTC): staff=${staff}, startTime=${startTime}, endTime=${endTime}`);
 
       allTimeSlots.forEach(slot => {
         // Check if this slot would overlap with the existing booking
         // Assume each slot is 60 minutes duration (can be made configurable later)
         const slotDurationMinutes = 60;
 
-        // Calculate slot end time properly
-        const [slotHour, slotMinute] = slot.time.split(':').map(Number);
-        const slotEndHour = slotHour + Math.floor((slotMinute + slotDurationMinutes) / 60);
-        const slotEndMinute = (slotMinute + slotDurationMinutes) % 60;
-        const slotEndTimeString = `${slotEndHour.toString().padStart(2, '0')}:${slotEndMinute.toString().padStart(2, '0')}`;
-
-        // Convert times to minutes for proper comparison
+        // Convert local time to minutes
         const parseTimeToMinutes = (timeStr: string) => {
           const [hours, minutes] = timeStr.split(':').map(Number);
           return hours * 60 + minutes;
         };
 
-        const slotStartMinutes = parseTimeToMinutes(slot.time);
-        const slotEndMinutes = parseTimeToMinutes(slotEndTimeString);
+        // Convert slot time (local) to UTC
+        // JavaScript's getTimezoneOffset() returns POSITIVE values for zones behind UTC
+        // UTC-3 returns +180, so we ADD 180 to local time to get UTC
+        const convertLocalToUTC = (timeStr: string): number => {
+          const localMinutes = parseTimeToMinutes(timeStr);
+          const utcMinutes = localMinutes + timezoneOffset; // ADD offset to get UTC
+          return utcMinutes;
+        };
+
+        // Calculate slot end time in UTC minutes
+        const slotStartMinutesUTC = convertLocalToUTC(slot.time);
+        const slotEndMinutesUTC = slotStartMinutesUTC + slotDurationMinutes;
+
+        // Parse booking times (already in UTC)
         const bookingStartMinutes = parseTimeToMinutes(startTime);
         const bookingEndMinutes = parseTimeToMinutes(endTime);
 
         // Check for overlap: slot overlaps with booking if:
         // slot start < booking end AND slot end > booking start
-        const slotOverlaps = slotStartMinutes < bookingEndMinutes && slotEndMinutes > bookingStartMinutes;
+        const slotOverlaps = slotStartMinutesUTC < bookingEndMinutes && slotEndMinutesUTC > bookingStartMinutes;
 
         if (slotOverlaps) {
           bookedSlotsByStaff.get(staff)!.add(slot.time);
@@ -1096,6 +1110,372 @@ export class ReservationsController {
       date,
       staffId: staffId || 'all'
     };
+  }
+
+  /**
+   * POST /bookings/backoffice-availability
+   * Efficient endpoint for backoffice booking creation
+   * Returns available slots considering all services, addons, removals, and staff selection
+   */
+  @Post('backoffice-availability')
+  @ApiOperation({
+    summary: 'Get available time slots for backoffice booking creation',
+    description: 'Optimized endpoint for backoffice that returns available slots based on services, addons, removals, and selected staff. Supports both consecutive and VIP combo modes.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        services: {
+          type: 'array',
+          description: 'Array of services with their configuration',
+          items: {
+            type: 'object',
+            properties: {
+              serviceId: { type: 'string' },
+              duration: { type: 'number' },
+              bufferTime: { type: 'number' },
+              staffId: { type: 'string', description: 'Staff ID or "any" for any available staff' },
+              addons: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    duration: { type: 'number' }
+                  }
+                }
+              }
+            }
+          }
+        },
+        removals: {
+          type: 'array',
+          description: 'Array of removal addons (applied to first service)',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              duration: { type: 'number' }
+            }
+          }
+        },
+        date: { type: 'string', description: 'Date in YYYY-MM-DD format' },
+        isVIPCombo: { type: 'boolean', description: 'True for simultaneous services, false for consecutive' },
+        timezoneOffset: { type: 'number', description: 'Timezone offset in minutes (e.g., -180 for UTC-3). Used to convert local times to UTC for proper availability checking.' }
+      },
+      required: ['services', 'date']
+    }
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Available time slots retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        data: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              startTime: { type: 'string' },
+              endTime: { type: 'string' },
+              totalDuration: { type: 'number' },
+              staffAssignments: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    serviceId: { type: 'string' },
+                    staffId: { type: 'string' },
+                    staffName: { type: 'string' }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  })
+  @HttpCode(HttpStatus.OK)
+  async getBackofficeAvailability(
+    @Body() body: {
+      services: Array<{
+        serviceId: string;
+        duration: number;
+        bufferTime: number;
+        staffId?: string;
+        addons?: Array<{ id: string; duration: number }>;
+      }>;
+      removals?: Array<{ id: string; duration: number }>;
+      date: string;
+      isVIPCombo?: boolean;
+      timezoneOffset?: number;
+    },
+  ) {
+    try {
+      const { services, removals = [], date, isVIPCombo = false, timezoneOffset = 0 } = body;
+
+      // Validation
+      if (!services || !Array.isArray(services) || services.length === 0) {
+        throw new BadRequestException('services must be a non-empty array');
+      }
+
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        throw new BadRequestException('Date must be in YYYY-MM-DD format');
+      }
+
+      console.log(`\n📅 BACKOFFICE AVAILABILITY REQUEST:`);
+      console.log(`   Date: ${date}`);
+      console.log(`   Services: ${services.length}`);
+      console.log(`   Removals: ${removals.length}`);
+      console.log(`   Mode: ${isVIPCombo ? 'VIP COMBO (Simultaneous)' : 'CONSECUTIVE'}`);
+      console.log(`   Timezone Offset: ${timezoneOffset} minutes (UTC${timezoneOffset <= 0 ? '+' : '-'}${Math.abs(timezoneOffset / 60)})`);
+
+      // Get all active staff with proper typing
+      interface StaffRecord {
+        id: string;
+        firstName: string;
+        lastName: string;
+      }
+
+      const allActiveStaff = await this.sequelize.query<StaffRecord>(
+        `SELECT id, "firstName", "lastName" FROM staff WHERE status = 'ACTIVE' AND "isBookable" = true`,
+        {
+          type: QueryTypes.SELECT,
+          raw: true
+        }
+      );
+
+      // Get existing bookings for the date
+      const existingBookings = await this.bookingModel.findAll({
+        where: {
+          appointmentDate: date,
+          status: { [Op.not]: BookingStatus.CANCELLED }
+        },
+        attributes: ['id', 'staffId', 'startTime', 'endTime'],
+        order: [['startTime', 'ASC']]
+      });
+
+      console.log(`📋 Found ${existingBookings.length} existing bookings for ${date}:`, 
+        existingBookings.map(b => ({
+          id: b.id,
+          staffId: b.staffId,
+          startTime: String(b.startTime),
+          endTime: String(b.endTime)
+        }))
+      );
+
+      // Calculate total duration for each service including addons and removals
+      const servicesWithTotalDuration = services.map((service, index) => {
+        const addonsDuration = (service.addons || []).reduce((sum, addon) => sum + addon.duration, 0);
+        const removalsDuration = index === 0 ? removals.reduce((sum, removal) => sum + removal.duration, 0) : 0;
+        return {
+          ...service,
+          totalDuration: service.duration + addonsDuration + removalsDuration + (service.bufferTime || 0)
+        };
+      });
+
+      // Generate time slots (9:00 AM - 7:00 PM, 30-min intervals)
+      const generateTimeSlots = () => {
+        const slots: string[] = [];
+        for (let hour = 9; hour < 19; hour++) {
+          for (let minute = 0; minute < 60; minute += 30) {
+            slots.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`);
+          }
+        }
+        return slots;
+      };
+
+      const allTimeSlots = generateTimeSlots();
+      const availableSlots: any[] = [];
+
+      // Helper: Check if staff is available in a time range
+      // NOTE: startTime and endTime are in LOCAL time, existingBookings are in UTC
+      // We need to convert local time to UTC before comparing
+      const isStaffAvailable = (staffId: string, startTime: string, endTime: string): boolean => {
+        const parseTime = (timeStr: string) => {
+          const [h, m] = timeStr.split(':').map(Number);
+          return h * 60 + m;
+        };
+
+        // Convert local time to UTC
+        // JavaScript's getTimezoneOffset() returns POSITIVE values for zones behind UTC
+        // UTC-3 returns +180, meaning we ADD 180 to local time to get UTC
+        // Example: 9:00 AM local (540 min) + 180 = 720 min (12:00 PM UTC)
+        const convertLocalToUTC = (timeStr: string): number => {
+          const localMinutes = parseTime(timeStr);
+          const utcMinutes = localMinutes + timezoneOffset; // ADD offset to get UTC
+          return utcMinutes;
+        };
+
+        const slotStartUTC = convertLocalToUTC(startTime);
+        const slotEndUTC = convertLocalToUTC(endTime);
+
+        console.log(`\n🔍 Checking availability for staff ${staffId}:`, {
+          requestedSlot: `${startTime} - ${endTime} (local)`,
+          convertedToUTC: `${Math.floor(slotStartUTC/60).toString().padStart(2,'0')}:${(slotStartUTC%60).toString().padStart(2,'0')}:00 - ${Math.floor(slotEndUTC/60).toString().padStart(2,'0')}:${(slotEndUTC%60).toString().padStart(2,'0')}:00 (${slotStartUTC} - ${slotEndUTC} minutes)`,
+          existingBookingsForStaff: existingBookings.filter(b => b.staffId === staffId).length
+        });
+
+        for (const booking of existingBookings) {
+          if (booking.staffId !== staffId) continue;
+
+          const bookingStart = parseTime(String(booking.startTime));
+          const bookingEnd = parseTime(String(booking.endTime));
+
+          console.log(`  📅 Existing booking (UTC): ${booking.startTime} - ${booking.endTime} (${bookingStart} - ${bookingEnd} minutes)`);
+
+          // Check overlap
+          if (slotStartUTC < bookingEnd && slotEndUTC > bookingStart) {
+            console.log(`  ❌ CONFLICT DETECTED: Slot overlaps with existing booking`);
+            return false;
+          } else {
+            console.log(`  ✅ No conflict with this booking`);
+          }
+        }
+        
+        console.log(`  ✅ Staff ${staffId} is AVAILABLE for ${startTime} - ${endTime} (local)`);
+        return true;
+      };
+
+      // Helper: Add minutes to time string
+      const addMinutes = (timeStr: string, minutes: number): string => {
+        const [h, m] = timeStr.split(':').map(Number);
+        const totalMinutes = h * 60 + m + minutes;
+        const newHour = Math.floor(totalMinutes / 60);
+        const newMinute = totalMinutes % 60;
+        return `${newHour.toString().padStart(2, '0')}:${newMinute.toString().padStart(2, '0')}:00`;
+      };
+
+      // Process each time slot
+      for (const startTime of allTimeSlots) {
+        if (isVIPCombo) {
+          // VIP COMBO: All services start at the same time with different staff
+          const maxDuration = Math.max(...servicesWithTotalDuration.map(s => s.totalDuration));
+          const endTime = addMinutes(startTime, maxDuration);
+
+          const staffAssignments: any[] = [];
+          let allServicesCanBeScheduled = true;
+
+          for (const service of servicesWithTotalDuration) {
+            const serviceEndTime = addMinutes(startTime, service.totalDuration);
+            
+            if (service.staffId && service.staffId !== 'any') {
+              // Specific staff requested
+              if (isStaffAvailable(service.staffId, startTime, serviceEndTime)) {
+                const staffInfo = allActiveStaff.find(s => s.id === service.staffId);
+                staffAssignments.push({
+                  serviceId: service.serviceId,
+                  staffId: service.staffId,
+                  staffName: staffInfo ? `${staffInfo.firstName} ${staffInfo.lastName}` : 'Unknown'
+                });
+              } else {
+                allServicesCanBeScheduled = false;
+                break;
+              }
+            } else {
+              // Any staff - find first available
+              const availableStaff = allActiveStaff.find(s => 
+                isStaffAvailable(s.id, startTime, serviceEndTime)
+              );
+              
+              if (availableStaff) {
+                staffAssignments.push({
+                  serviceId: service.serviceId,
+                  staffId: availableStaff.id,
+                  staffName: `${availableStaff.firstName} ${availableStaff.lastName}`
+                });
+              } else {
+                allServicesCanBeScheduled = false;
+                break;
+              }
+            }
+          }
+
+          if (allServicesCanBeScheduled) {
+            availableSlots.push({
+              startTime,
+              endTime,
+              totalDuration: maxDuration,
+              staffAssignments
+            });
+          }
+        } else {
+          // CONSECUTIVE: Services one after another
+          let currentStartTime = startTime;
+          const staffAssignments: any[] = [];
+          let allServicesCanBeScheduled = true;
+
+          for (const service of servicesWithTotalDuration) {
+            const serviceEndTime = addMinutes(currentStartTime, service.totalDuration);
+
+            if (service.staffId && service.staffId !== 'any') {
+              // Specific staff requested
+              if (isStaffAvailable(service.staffId, currentStartTime, serviceEndTime)) {
+                const staffInfo = allActiveStaff.find(s => s.id === service.staffId);
+                staffAssignments.push({
+                  serviceId: service.serviceId,
+                  staffId: service.staffId,
+                  staffName: staffInfo ? `${staffInfo.firstName} ${staffInfo.lastName}` : 'Unknown',
+                  startTime: currentStartTime,
+                  endTime: serviceEndTime
+                });
+              } else {
+                allServicesCanBeScheduled = false;
+                break;
+              }
+            } else {
+              // Any staff - find first available
+              const availableStaff = allActiveStaff.find(s => 
+                isStaffAvailable(s.id, currentStartTime, serviceEndTime)
+              );
+              
+              if (availableStaff) {
+                staffAssignments.push({
+                  serviceId: service.serviceId,
+                  staffId: availableStaff.id,
+                  staffName: `${availableStaff.firstName} ${availableStaff.lastName}`,
+                  startTime: currentStartTime,
+                  endTime: serviceEndTime
+                });
+              } else {
+                allServicesCanBeScheduled = false;
+                break;
+              }
+            }
+
+            currentStartTime = serviceEndTime;
+          }
+
+          if (allServicesCanBeScheduled) {
+            const totalDuration = servicesWithTotalDuration.reduce((sum, s) => sum + s.totalDuration, 0);
+            availableSlots.push({
+              startTime,
+              endTime: currentStartTime,
+              totalDuration,
+              staffAssignments
+            });
+          }
+        }
+      }
+
+      console.log(`✅ Found ${availableSlots.length} available slots`);
+
+      return {
+        success: true,
+        data: availableSlots,
+        date,
+        mode: isVIPCombo ? 'VIP_COMBO' : 'CONSECUTIVE',
+        count: availableSlots.length
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('❌ Error in getBackofficeAvailability:', errorMessage);
+      throw error;
+    }
   }
 
   @Post('multi-service-slots')
@@ -1358,9 +1738,39 @@ export class ReservationsController {
       const fullStartTime = `${appointmentDate}T${createBookingDto.startTime}`;
       const fullEndTime = `${appointmentDate}T${createBookingDto.endTime}`;
 
+      // Handle "Any Available Technician" case - auto-assign optimal staff
+      let assignedStaffId = createBookingDto.staffId;
+      if (!createBookingDto.staffId || createBookingDto.staffId === 'any') {
+        console.log('🔄 Auto-assigning staff for "any" selection...');
+        
+        // Calculate duration in minutes
+        const startTime = new Date(`${appointmentDate}T${createBookingDto.startTime}`);
+        const endTime = new Date(`${appointmentDate}T${createBookingDto.endTime}`);
+        const durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+        
+        try {
+          const optimalStaffResult = await this.assignOptimalStaff({
+            date: appointmentDate,
+            time: createBookingDto.startTime,
+            duration: durationMinutes
+          });
+          
+          if (optimalStaffResult.success && optimalStaffResult.staffId) {
+            assignedStaffId = optimalStaffResult.staffId;
+            console.log(`✅ Auto-assigned staff: ${optimalStaffResult.staffName} (${assignedStaffId})`);
+          } else {
+            throw new BadRequestException('No staff members available at the requested time');
+          }
+        } catch (error) {
+          console.error('❌ Staff auto-assignment failed:', error);
+          throw new BadRequestException('Unable to assign staff automatically. Please select a specific staff member or try a different time.');
+        }
+      }
+
       // Set default status to 'pending' if not provided
       const bookingData = {
         ...createBookingDto,
+        staffId: assignedStaffId,
         startTime: fullStartTime,
         endTime: fullEndTime,
         status: createBookingDto.status || 'pending',
@@ -1369,7 +1779,7 @@ export class ReservationsController {
       // Check for conflicting bookings before creating
       const conflictingBookings = await this.bookingModel.findAll({
         where: {
-          staffId: createBookingDto.staffId,
+          staffId: assignedStaffId,
           appointmentDate: createBookingDto.appointmentDate,
           status: {
             [Op.notIn]: ['cancelled', 'completed']
