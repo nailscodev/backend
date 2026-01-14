@@ -60,14 +60,21 @@ export class UpdateBookingDto {
   @IsOptional()
   @IsString()
   notes?: string;
-}
-
-export class UpdateBookingStatusDto {
   @ApiPropertyOptional({
-    description: 'New booking status',
+    description: 'Updated booking status',
     enum: BookingStatus,
     example: BookingStatus.CONFIRMED,
   })
+  @IsOptional()
   @IsEnum(BookingStatus)
-  status: BookingStatus;
+  status?: BookingStatus;
+
+  @ApiPropertyOptional({
+    description: 'Updated payment method',
+    enum: ['CASH', 'CARD'],
+    example: 'CARD',
+  })
+  @IsOptional()
+  @IsEnum(['CASH', 'CARD'], { message: 'paymentMethod must be CASH or CARD' })
+  paymentMethod?: 'CASH' | 'CARD';
 }
