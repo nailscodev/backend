@@ -41,6 +41,7 @@ import { UpcomingBookingDto } from './dto/upcoming-booking.dto';
 import { BookingsBySourceDto } from './dto/bookings-by-source.dto';
 import { BookingListItemDto } from './dto/booking-list-item.dto';
 import { ManualAdjustment } from '../../common/entities/manual-adjustment.entity';
+import { BookingConfig } from '../../common/config/booking.config';
 
 // Interfaces for type safety
 interface StaffMember {
@@ -1272,9 +1273,10 @@ export class ReservationsController {
       const servicesWithTotalDuration = services.map((service, index) => {
         const addonsDuration = (service.addons || []).reduce((sum, addon) => sum + addon.duration, 0);
         const removalsDuration = index === 0 ? removals.reduce((sum, removal) => sum + removal.duration, 0) : 0;
+        const effectiveBufferTime = BookingConfig.getEffectiveBufferTime(service.bufferTime);
         return {
           ...service,
-          totalDuration: service.duration + addonsDuration + removalsDuration + (service.bufferTime || 0)
+          totalDuration: service.duration + addonsDuration + removalsDuration + effectiveBufferTime
         };
       });
 
@@ -1727,6 +1729,7 @@ export class ReservationsController {
     status: HttpStatus.BAD_REQUEST,
     description: 'Invalid input data or booking conflict',
   })
+  @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(
     @Body(new ValidationPipe({ transform: true })) createBookingDto: CreateBookingDto,
@@ -1844,6 +1847,59 @@ export class ReservationsController {
 
     await booking.destroy();
     return { message: `Booking with ID ${id} has been deleted` };
+  }
+
+  @Get('config/buffer-time')
+  @ApiOperation({ summary: 'Obtener configuración de buffer time global' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Buffer time actual en minutos',
+    schema: {
+      properties: {
+        bufferTime: { type: 'number' },
+        description: { type: 'string' }
+      }
+    }
+  })
+  getBufferTimeConfig() {
+    return {
+      bufferTime: BookingConfig.getDefaultBufferTime(),
+      description: 'Tiempo de limpieza/preparación entre servicios (minutos)'
+    };
+  }
+
+  @Put('config/buffer-time')
+  @ApiOperation({ summary: 'Actualizar configuración de buffer time global' })
+  @ApiBody({ 
+    schema: { 
+      properties: { 
+        bufferTime: { type: 'number', minimum: 0, description: 'Buffer time en minutos' } 
+      } 
+    } 
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Buffer time actualizado exitosamente',
+    schema: {
+      properties: {
+        success: { type: 'boolean' },
+        bufferTime: { type: 'number' },
+        message: { type: 'string' }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Buffer time inválido' })
+  updateBufferTimeConfig(@Body('bufferTime') bufferTime: number) {
+    try {
+      BookingConfig.setDefaultBufferTime(bufferTime);
+      return {
+        success: true,
+        bufferTime: BookingConfig.getDefaultBufferTime(),
+        message: 'Buffer time actualizado exitosamente'
+      };
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
   }
 
   @Put(':id/cancel')
