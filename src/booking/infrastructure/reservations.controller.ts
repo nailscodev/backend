@@ -919,7 +919,7 @@ export class ReservationsController {
       INNER JOIN services s ON b."serviceId" = s.id
       INNER JOIN staff st ON b."staffId" = st.id
       WHERE b.status IN ('pending', 'confirmed')
-      ORDER BY b."appointmentDate" DESC
+      ORDER BY b."appointmentDate" ASC
       LIMIT :limit
       `,
       {
