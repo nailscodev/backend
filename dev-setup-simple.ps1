@@ -11,6 +11,6 @@ Write-Host "Instalando dependencias..." -ForegroundColor Yellow
 npm install
 
 Write-Host "Iniciando servidor..." -ForegroundColor Green
-Write-Host "Backend: http://localhost:5000" -ForegroundColor Cyan
-Write-Host "API Docs: http://localhost:5000/api/docs" -ForegroundColor Cyan
+Write-Host "Backend: http://localhost:3001" -ForegroundColor Cyan
+Write-Host "API Docs: http://localhost:3001/api/docs" -ForegroundColor Cyan
 npm run start:dev
