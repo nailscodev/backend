@@ -143,7 +143,7 @@ export class AddOnsController {
     }
 
     if (search) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+       
       (where as any)[Op.or] = [
         { name: { [Op.iLike]: `%${search}%` } },
         { description: { [Op.iLike]: `%${search}%` } },
@@ -360,7 +360,7 @@ export class AddOnsController {
       // Extract translation fields
       const { titleEn, titleEs, descriptionEn, descriptionEs, ...addOnData } = createAddOnDto;
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+       
       const addOn = await this.addOnModel.create(addOnData as any);
 
       // Save translations if provided

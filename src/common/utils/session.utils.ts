@@ -42,11 +42,11 @@ export function extractSessionId(request: ExtendedRequest): string {
  */
 function getSessionId(request: ExtendedRequest): string | null {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+     
     const session = request.session;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+     
     if (session && typeof session === 'object' && session.id) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+       
       return String(session.id);
     }
   } catch {
@@ -60,17 +60,17 @@ function getSessionId(request: ExtendedRequest): string | null {
  */
 function getUserSessionId(request: ExtendedRequest): string | null {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+     
     const user = request.user;
     if (user && typeof user === 'object') {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+       
       if (user.sessionId) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+         
         return String(user.sessionId);
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+       
       if (user.id) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+         
         return `user_${String(user.id)}`;
       }
     }
@@ -104,11 +104,11 @@ function getClientIP(request: ExtendedRequest): string {
     }
 
     // Connection remote address
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+     
     const connection = (request as any).connection;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+     
     if (connection && connection.remoteAddress) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+       
       return String(connection.remoteAddress);
     }
 

@@ -199,7 +199,7 @@ export class ServicesService {
       imageUrl: createServiceDto.imageUrl,
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+     
     const createdService = await this.serviceModel.create(serviceData as any);
 
     // Save translations if provided

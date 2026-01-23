@@ -87,7 +87,7 @@ export class NotificationsController {
     }
 
     if (search) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+       
       (where as any)[Op.or] = [
         {
           title: {
@@ -224,7 +224,7 @@ export class NotificationsController {
     }
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+       
       await notification.update(updateNotificationDto as any);
       return notification;
     } catch (error: unknown) {
