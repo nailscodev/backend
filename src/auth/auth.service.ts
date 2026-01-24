@@ -124,7 +124,7 @@ export class AuthService {
   }): Promise<UserEntity> {
     const hashedPassword = await this.hashPassword(userData.password);
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+     
     return this.userModel.create({
       username: userData.username,
       email: userData.email,

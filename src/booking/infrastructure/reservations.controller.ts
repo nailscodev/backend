@@ -1029,7 +1029,7 @@ export class ReservationsController {
       if (typeof booking.startTime === 'string') {
         // Already a time string like "21:30:00"
         startTime = booking.startTime.slice(0, 5);
-        endTime = (booking.endTime as string).slice(0, 5);
+        endTime = (booking.endTime).slice(0, 5);
       } else {
         // It's a Date object, extract time
         const startTimeObj = new Date(booking.startTime);
@@ -1812,7 +1812,7 @@ export class ReservationsController {
         }
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+       
       const createdBooking = await this.bookingModel.create(bookingData as any);
 
       return createdBooking;
@@ -1831,7 +1831,7 @@ export class ReservationsController {
     }
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+       
       await booking.update(updateBookingDto as any);
       return booking;
     } catch (error: unknown) {

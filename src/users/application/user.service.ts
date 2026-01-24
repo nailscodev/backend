@@ -82,7 +82,7 @@ export class UserService {
         isActive: createUserDto.isActive ?? true
       };
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+       
       const createdUser = await this.userModel.create(userData as any);
 
       return this.mapToResponseDto(createdUser);
@@ -433,7 +433,7 @@ export class UserService {
     // Store only the hash of the token
     const tokenHash = this.hashToken(accessToken);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+       
       await this.userTokenModel.create({ userId: user.id, token: tokenHash, expiresAt, revoked: false } as any);
       console.log('✅ Token stored successfully');
     } catch (err) {
@@ -546,12 +546,12 @@ export class UserService {
   // Private helper methods
 
   private async hashPassword(password: string): Promise<string> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+     
     return (bcrypt as any).hash(password, this.SALT_ROUNDS) as Promise<string>;
   }
 
   private async comparePassword(password: string, hashedPassword: string): Promise<boolean> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+     
     return (bcrypt as any).compare(password, hashedPassword) as Promise<boolean>;
   }
 
@@ -606,7 +606,7 @@ export class UserService {
     const where: WhereOptions = {};
 
     if (filters.search) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+       
       (where as any)[Op.or] = [
         { name: { [Op.iLike]: `%${filters.search}%` } },
         { email: { [Op.iLike]: `%${filters.search}%` } },
@@ -625,28 +625,28 @@ export class UserService {
     if (filters.createdAfter || filters.createdBefore) {
       const createdAtConditions: any = {};
       if (filters.createdAfter) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+         
         createdAtConditions[Op.gte] = filters.createdAfter;
       }
       if (filters.createdBefore) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+         
         createdAtConditions[Op.lte] = filters.createdBefore;
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+       
       where.createdAt = createdAtConditions;
     }
 
     if (filters.lastLoginAfter || filters.lastLoginBefore) {
       const lastLoginConditions: any = {};
       if (filters.lastLoginAfter) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+         
         lastLoginConditions[Op.gte] = filters.lastLoginAfter;
       }
       if (filters.lastLoginBefore) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+         
         lastLoginConditions[Op.lte] = filters.lastLoginBefore;
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+       
       where.lastLogin = lastLoginConditions;
     }
 
@@ -683,9 +683,9 @@ export class UserService {
 
     // Update with actual counts
     roleCountsArray.forEach((item: any) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+       
       if (Object.values(UserRole).includes(item.role)) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+         
         roleCounts[item.role] = parseInt(item.count, 10);
       }
     });

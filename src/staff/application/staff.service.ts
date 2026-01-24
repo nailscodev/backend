@@ -72,7 +72,7 @@ export class StaffService {
         isBookable: createStaffDto.isBookable ?? true
       };
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+       
       const createdStaff = await this.staffModel.create(staffData as any);
 
       // Assign services if provided
@@ -428,7 +428,7 @@ export class StaffService {
     const where: WhereOptions<StaffEntity> = {};
 
     if (filters.search?.trim()) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+       
       (where as any)[Op.or] = [
         { firstName: { [Op.iLike]: `%${filters.search.trim()}%` } },
         { lastName: { [Op.iLike]: `%${filters.search.trim()}%` } },
@@ -437,21 +437,21 @@ export class StaffService {
     }
 
     if (filters.role) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+       
       (where as any).role = filters.role;
     }
 
     if (filters.status) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+       
       (where as any).status = filters.status;
     }
 
     if (filters.isActive !== undefined) {
       if (filters.isActive) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+         
         (where as any).status = StaffStatus.ACTIVE;
       } else {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+         
         (where as any).status = { [Op.ne]: StaffStatus.ACTIVE };
       }
     }
@@ -464,7 +464,7 @@ export class StaffService {
     const whereClause: WhereOptions<StaffEntity> = { email: normalizedEmail };
 
     if (excludeId) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+       
       (whereClause as any).id = { [Op.ne]: excludeId };
     }
 

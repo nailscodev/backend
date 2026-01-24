@@ -19,7 +19,7 @@ export class SequelizeCustomerRepository implements ICustomerRepository {
       if (existingCustomer) {
         await existingCustomer.update(customerData);
       } else {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+         
         await this.customerModel.create(customerData as any);
       }
     } catch (error) {
