@@ -904,6 +904,7 @@ export class ReservationsController {
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
   ): Promise<{ success: boolean; data: UpcomingBookingDto[] }> {
     
+
     const result: any[] = await this.sequelize.query(
       `
       SELECT 
@@ -912,6 +913,7 @@ export class ReservationsController {
         s.name as "serviceName",
         CONCAT(st."firstName", ' ', st."lastName") as "staffName",
         b."appointmentDate",
+        b."startTime",
         b.status,
         b."totalAmount"
       FROM bookings b
@@ -919,7 +921,7 @@ export class ReservationsController {
       INNER JOIN services s ON b."serviceId" = s.id
       INNER JOIN staff st ON b."staffId" = st.id
       WHERE b.status IN ('pending', 'confirmed')
-      ORDER BY b."appointmentDate" ASC
+      ORDER BY b."appointmentDate" ASC, b."startTime" ASC
       LIMIT :limit
       `,
       {
@@ -934,6 +936,7 @@ export class ReservationsController {
       serviceName: row.serviceName,
       staffName: row.staffName,
       appointmentDate: row.appointmentDate,
+      startTime: row.startTime,
       status: row.status,
       totalAmount: parseFloat(row.totalAmount || '0'),
     }));

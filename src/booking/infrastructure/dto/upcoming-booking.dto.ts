@@ -32,6 +32,12 @@ export class UpcomingBookingDto {
   appointmentDate: string;
 
   @ApiProperty({
+    description: 'Start time (HH:mm:ss)',
+    example: '10:00:00',
+  })
+  startTime: string;
+
+  @ApiProperty({
     description: 'Booking status',
     example: 'confirmed',
   })
