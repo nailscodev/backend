@@ -954,7 +954,6 @@ export class ReservationsController {
   })
   @ApiQuery({ name: 'date', required: true, type: 'string', description: 'Date in YYYY-MM-DD format' })
   @ApiQuery({ name: 'staffId', required: false, type: 'string', description: 'Filter by staff ID (UUID)' })
-  @ApiQuery({ name: 'timezoneOffset', required: false, type: 'number', description: 'Timezone offset in minutes (e.g., -180 for UTC-3)' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Available time slots retrieved successfully',
@@ -962,17 +961,14 @@ export class ReservationsController {
   async getAvailableTimeSlots(
     @Query('date') date: string,
     @Query('staffId') staffId?: string,
-    @Query('timezoneOffset') timezoneOffsetStr?: string,
   ) {
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       throw new BadRequestException('Date must be in YYYY-MM-DD format');
     }
 
-    const timezoneOffset = timezoneOffsetStr ? parseInt(timezoneOffsetStr, 10) : 0;
     console.log(`\n📅 AVAILABLE SLOTS REQUEST:`);
     console.log(`   Date: ${date}`);
     console.log(`   StaffId: ${staffId || 'all'}`);
-    console.log(`   Timezone Offset: ${timezoneOffset} minutes (UTC${timezoneOffset <= 0 ? '+' : '-'}${Math.abs(timezoneOffset / 60)})`);
 
     // Build where clause for existing bookings
     const where: Record<string, any> = {
@@ -1021,56 +1017,46 @@ export class ReservationsController {
         bookedSlotsByStaff.set(staff, new Set());
       }
 
-      // Extract time from booking - can be either a Date object or a time string (HH:MM:SS)
-      // depending on how PostgreSQL returns it
+      // Extract time from booking - format "HH:MM:SS" from PostgreSQL TIME
       let startTime: string;
       let endTime: string;
 
       if (typeof booking.startTime === 'string') {
-        // Already a time string like "21:30:00"
+        // Time string like "21:30:00" - take first 5 chars for "HH:MM"
         startTime = booking.startTime.slice(0, 5);
-        endTime = (booking.endTime).slice(0, 5);
+        endTime = booking.endTime.slice(0, 5);
       } else {
-        // It's a Date object, extract time
+        // Fallback for Date object (shouldn't happen with TIME type)
         const startTimeObj = new Date(booking.startTime);
         const endTimeObj = new Date(booking.endTime);
         startTime = startTimeObj.toTimeString().slice(0, 5);
         endTime = endTimeObj.toTimeString().slice(0, 5);
       }
 
-      console.log(`[AVAILABILITY] Booking found (UTC): staff=${staff}, startTime=${startTime}, endTime=${endTime}`);
+      console.log(`[AVAILABILITY] Booking found: staff=${staff}, startTime=${startTime}, endTime=${endTime}`);
 
       allTimeSlots.forEach(slot => {
         // Check if this slot would overlap with the existing booking
         // Assume each slot is 60 minutes duration (can be made configurable later)
         const slotDurationMinutes = 60;
 
-        // Convert local time to minutes
+        // Convert time to minutes for comparison
         const parseTimeToMinutes = (timeStr: string) => {
           const [hours, minutes] = timeStr.split(':').map(Number);
           return hours * 60 + minutes;
         };
 
-        // Convert slot time (local) to UTC
-        // JavaScript's getTimezoneOffset() returns POSITIVE values for zones behind UTC
-        // UTC-3 returns +180, so we ADD 180 to local time to get UTC
-        const convertLocalToUTC = (timeStr: string): number => {
-          const localMinutes = parseTimeToMinutes(timeStr);
-          const utcMinutes = localMinutes + timezoneOffset; // ADD offset to get UTC
-          return utcMinutes;
-        };
+        // Calculate slot times in minutes (no timezone conversion needed)
+        const slotStartMinutes = parseTimeToMinutes(slot.time);
+        const slotEndMinutes = slotStartMinutes + slotDurationMinutes;
 
-        // Calculate slot end time in UTC minutes
-        const slotStartMinutesUTC = convertLocalToUTC(slot.time);
-        const slotEndMinutesUTC = slotStartMinutesUTC + slotDurationMinutes;
-
-        // Parse booking times (already in UTC)
+        // Parse booking times
         const bookingStartMinutes = parseTimeToMinutes(startTime);
         const bookingEndMinutes = parseTimeToMinutes(endTime);
 
         // Check for overlap: slot overlaps with booking if:
         // slot start < booking end AND slot end > booking start
-        const slotOverlaps = slotStartMinutesUTC < bookingEndMinutes && slotEndMinutesUTC > bookingStartMinutes;
+        const slotOverlaps = slotStartMinutes < bookingEndMinutes && slotEndMinutes > bookingStartMinutes;
 
         if (slotOverlaps) {
           bookedSlotsByStaff.get(staff)!.add(slot.time);
@@ -1165,8 +1151,7 @@ export class ReservationsController {
           }
         },
         date: { type: 'string', description: 'Date in YYYY-MM-DD format' },
-        isVIPCombo: { type: 'boolean', description: 'True for simultaneous services, false for consecutive' },
-        timezoneOffset: { type: 'number', description: 'Timezone offset in minutes (e.g., -180 for UTC-3). Used to convert local times to UTC for proper availability checking.' }
+        isVIPCombo: { type: 'boolean', description: 'True for simultaneous services, false for consecutive' }
       },
       required: ['services', 'date']
     }
@@ -1216,11 +1201,10 @@ export class ReservationsController {
       removals?: Array<{ id: string; duration: number }>;
       date: string;
       isVIPCombo?: boolean;
-      timezoneOffset?: number;
     },
   ) {
     try {
-      const { services, removals = [], date, isVIPCombo = false, timezoneOffset = 0 } = body;
+      const { services, removals = [], date, isVIPCombo = false } = body;
 
       // Validation
       if (!services || !Array.isArray(services) || services.length === 0) {
@@ -1236,7 +1220,6 @@ export class ReservationsController {
       console.log(`   Services: ${services.length}`);
       console.log(`   Removals: ${removals.length}`);
       console.log(`   Mode: ${isVIPCombo ? 'VIP COMBO (Simultaneous)' : 'CONSECUTIVE'}`);
-      console.log(`   Timezone Offset: ${timezoneOffset} minutes (UTC${timezoneOffset <= 0 ? '+' : '-'}${Math.abs(timezoneOffset / 60)})`);
 
       // Get all active staff with proper typing
       interface StaffRecord {
@@ -1298,30 +1281,18 @@ export class ReservationsController {
       const availableSlots: any[] = [];
 
       // Helper: Check if staff is available in a time range
-      // NOTE: startTime and endTime are in LOCAL time, existingBookings are in UTC
-      // We need to convert local time to UTC before comparing
+      // Times are stored as local time in the database (no UTC conversion needed)
       const isStaffAvailable = (staffId: string, startTime: string, endTime: string): boolean => {
         const parseTime = (timeStr: string) => {
           const [h, m] = timeStr.split(':').map(Number);
           return h * 60 + m;
         };
 
-        // Convert local time to UTC
-        // JavaScript's getTimezoneOffset() returns POSITIVE values for zones behind UTC
-        // UTC-3 returns +180, meaning we ADD 180 to local time to get UTC
-        // Example: 9:00 AM local (540 min) + 180 = 720 min (12:00 PM UTC)
-        const convertLocalToUTC = (timeStr: string): number => {
-          const localMinutes = parseTime(timeStr);
-          const utcMinutes = localMinutes + timezoneOffset; // ADD offset to get UTC
-          return utcMinutes;
-        };
-
-        const slotStartUTC = convertLocalToUTC(startTime);
-        const slotEndUTC = convertLocalToUTC(endTime);
+        const slotStart = parseTime(startTime);
+        const slotEnd = parseTime(endTime);
 
         console.log(`\n🔍 Checking availability for staff ${staffId}:`, {
-          requestedSlot: `${startTime} - ${endTime} (local)`,
-          convertedToUTC: `${Math.floor(slotStartUTC/60).toString().padStart(2,'0')}:${(slotStartUTC%60).toString().padStart(2,'0')}:00 - ${Math.floor(slotEndUTC/60).toString().padStart(2,'0')}:${(slotEndUTC%60).toString().padStart(2,'0')}:00 (${slotStartUTC} - ${slotEndUTC} minutes)`,
+          requestedSlot: `${startTime} - ${endTime}`,
           existingBookingsForStaff: existingBookings.filter(b => b.staffId === staffId).length
         });
 
@@ -1331,10 +1302,10 @@ export class ReservationsController {
           const bookingStart = parseTime(String(booking.startTime));
           const bookingEnd = parseTime(String(booking.endTime));
 
-          console.log(`  📅 Existing booking (UTC): ${booking.startTime} - ${booking.endTime} (${bookingStart} - ${bookingEnd} minutes)`);
+          console.log(`  📅 Existing booking: ${booking.startTime} - ${booking.endTime} (${bookingStart} - ${bookingEnd} minutes)`);
 
           // Check overlap
-          if (slotStartUTC < bookingEnd && slotEndUTC > bookingStart) {
+          if (slotStart < bookingEnd && slotEnd > bookingStart) {
             console.log(`  ❌ CONFLICT DETECTED: Slot overlaps with existing booking`);
             return false;
           } else {
@@ -1342,7 +1313,7 @@ export class ReservationsController {
           }
         }
         
-        console.log(`  ✅ Staff ${staffId} is AVAILABLE for ${startTime} - ${endTime} (local)`);
+        console.log(`  ✅ Staff ${staffId} is AVAILABLE for ${startTime} - ${endTime}`);
         return true;
       };
 
@@ -1738,21 +1709,22 @@ export class ReservationsController {
     @Body(new ValidationPipe({ transform: true })) createBookingDto: CreateBookingDto,
   ) {
     try {
-      // Combine appointmentDate with startTime/endTime to create full datetime
-      // Frontend sends startTime as "HH:mm:ss", we need to combine with date for DB
+      // Frontend sends startTime as "HH:mm:ss", we store it directly as TIME
       const appointmentDate = createBookingDto.appointmentDate;
-      const fullStartTime = `${appointmentDate}T${createBookingDto.startTime}`;
-      const fullEndTime = `${appointmentDate}T${createBookingDto.endTime}`;
 
       // Handle "Any Available Technician" case - auto-assign optimal staff
       let assignedStaffId = createBookingDto.staffId;
       if (!createBookingDto.staffId || createBookingDto.staffId === 'any') {
         console.log('🔄 Auto-assigning staff for "any" selection...');
         
-        // Calculate duration in minutes
-        const startTime = new Date(`${appointmentDate}T${createBookingDto.startTime}`);
-        const endTime = new Date(`${appointmentDate}T${createBookingDto.endTime}`);
-        const durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+        // Calculate duration in minutes from time strings
+        const parseTimeToMinutes = (timeStr: string) => {
+          const [h, m] = timeStr.split(':').map(Number);
+          return h * 60 + m;
+        };
+        const startMinutes = parseTimeToMinutes(createBookingDto.startTime);
+        const endMinutes = parseTimeToMinutes(createBookingDto.endTime);
+        const durationMinutes = endMinutes - startMinutes;
         
         try {
           const optimalStaffResult = await this.assignOptimalStaff({
@@ -1777,8 +1749,8 @@ export class ReservationsController {
       const bookingData = {
         ...createBookingDto,
         staffId: assignedStaffId,
-        startTime: fullStartTime,
-        endTime: fullEndTime,
+        startTime: createBookingDto.startTime, // Just pass the time string "HH:MM:SS"
+        endTime: createBookingDto.endTime, // Just pass the time string "HH:MM:SS"
         status: createBookingDto.status || 'pending',
       };
 
@@ -1794,20 +1766,27 @@ export class ReservationsController {
       });
 
       // Check if there's any time overlap
-      const requestStartTime = new Date(fullStartTime);
-      const requestEndTime = new Date(fullEndTime);
+      // Times are stored as "HH:MM:SS" strings - compare them directly
+      const parseTimeToMinutes = (timeStr: string) => {
+        const [h, m] = timeStr.split(':').map(Number);
+        return h * 60 + m;
+      };
+
+      const requestStartMinutes = parseTimeToMinutes(createBookingDto.startTime);
+      const requestEndMinutes = parseTimeToMinutes(createBookingDto.endTime);
 
       for (const booking of conflictingBookings) {
-        const existingStartTime = new Date(booking.startTime);
-        const existingEndTime = new Date(booking.endTime);
+        const existingStartMinutes = parseTimeToMinutes(String(booking.startTime).slice(0, 5));
+        const existingEndMinutes = parseTimeToMinutes(String(booking.endTime).slice(0, 5));
 
         // Check for overlap: new booking overlaps if:
         // new start < existing end AND new end > existing start
-        const hasOverlap = requestStartTime < existingEndTime && requestEndTime > existingStartTime;
+        const hasOverlap = requestStartMinutes < existingEndMinutes && requestEndMinutes > existingStartMinutes;
 
         if (hasOverlap) {
+          const formatMinutes = (m: number) => `${Math.floor(m/60).toString().padStart(2,'0')}:${(m%60).toString().padStart(2,'0')}`;
           throw new BadRequestException(
-            `This time slot is no longer available. The staff member already has a booking from ${existingStartTime.toLocaleTimeString()} to ${existingEndTime.toLocaleTimeString()}.`
+            `This time slot is no longer available. The staff member already has a booking from ${formatMinutes(existingStartMinutes)} to ${formatMinutes(existingEndMinutes)}.`
           );
         }
       }

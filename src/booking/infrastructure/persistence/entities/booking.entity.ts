@@ -72,10 +72,10 @@ export class BookingEntity extends Model<BookingEntity> {
 
   @ApiProperty({
     description: 'The start time of the booking',
-    example: '2025-09-21T14:00:00Z',
+    example: '14:00:00',
   })
   @Column({
-    type: DataType.DATE,
+    type: DataType.TIME,
     allowNull: false,
     field: 'startTime',
   })
@@ -83,10 +83,10 @@ export class BookingEntity extends Model<BookingEntity> {
 
   @ApiProperty({
     description: 'The end time of the booking',
-    example: '2025-09-21T15:00:00Z',
+    example: '15:00:00',
   })
   @Column({
-    type: DataType.DATE,
+    type: DataType.TIME,
     allowNull: false,
     field: 'endTime',
   })

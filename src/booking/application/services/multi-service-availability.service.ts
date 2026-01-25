@@ -443,6 +443,8 @@ export class MultiServiceAvailabilityService {
 
   /**
    * Obtiene todos los bookings del día
+   * Los tiempos se almacenan como TIME en PostgreSQL (formato "HH:MM:SS")
+   * y se procesan directamente sin conversiones de timezone
    */
   private async getBookingsForDate(date: string): Promise<Booking[]> {
     const result = await this.sequelize.query<{
@@ -450,7 +452,7 @@ export class MultiServiceAvailabilityService {
       startTime: string;
       endTime: string;
     }>(
-      `SELECT "staffId", "startTime", "endTime"
+      `SELECT "staffId", "startTime"::text, "endTime"::text
        FROM bookings
        WHERE "appointmentDate" = $1
          AND status IN ('pending', 'confirmed')`,
@@ -465,88 +467,23 @@ export class MultiServiceAvailabilityService {
       this.logger.log(`   RAW: "${r.startTime}" - "${r.endTime}" (Staff: ${r.staffId.substring(0, 8)}...)`);
     });
 
-    // Parse times - extract hours and minutes from various formats
-    // Database can return Date objects OR strings depending on configuration
+    // Parse times - formato simple "HH:MM:SS" o "HH:MM" de PostgreSQL TIME
     const bookings = result.map(b => {
-      const parseTime = (timeValue: string | Date): { hours: number; minutes: number } => {
-        // If it's already a Date object, just extract the time
-        if (timeValue instanceof Date) {
-          return { hours: timeValue.getHours(), minutes: timeValue.getMinutes() };
-        }
+      const parseTimeToDate = (timeStr: string): Date => {
+        // Formato esperado: "HH:MM:SS" o "HH:MM"
+        const parts = timeStr.split(':');
+        const hours = parseInt(parts[0], 10);
+        const minutes = parseInt(parts[1], 10);
         
-        // Convert to string if needed
-        const timeStr = String(timeValue);
-        
-        // Log the raw value for debugging
-        this.logger.debug(`     Parsing time string: "${timeStr}"`);
-        
-        // Format 1: "2025-12-18 12:30:00-03" (PostgreSQL with timezone)
-        // Format 2: "2025-12-18T12:30:00.000Z" (ISO with Z)
-        // Format 3: "2025-12-18T12:30:00" (ISO without timezone)
-        
-        // Extract the time portion - handle various formats
-        let timePart: string;
-        
-        // Format 4: Simple TIME format "HH:MM:SS" or "HH:MM" (no date part)
-        // This is what PostgreSQL TIME WITHOUT TIME ZONE returns
-        const simpleTimeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
-        if (simpleTimeMatch) {
-          const hours = parseInt(simpleTimeMatch[1], 10);
-          const minutes = parseInt(simpleTimeMatch[2], 10);
-          this.logger.debug(`     Simple TIME format detected: ${hours}:${minutes}`);
-          return { hours, minutes };
-        }
-        
-        if (timeStr.includes('T')) {
-          // ISO format: "2025-12-18T12:30:00.000Z"
-          timePart = timeStr.split('T')[1]; // "12:30:00.000Z"
-        } else if (timeStr.includes(' ')) {
-          // PostgreSQL format: "2025-12-18 12:30:00-03"
-          const parts = timeStr.split(' ');
-          // Handle "Thu Dec 18 2025 12:30:00 GMT-0300" format
-          if (parts.length >= 4 && parts[3].includes(':')) {
-            timePart = parts[3]; // "12:30:00"
-          } else if (parts.length >= 2 && parts[1].includes(':')) {
-            timePart = parts[1]; // "12:30:00-03"
-          } else {
-            // Fallback: use Date parser
-            const d = new Date(timeStr);
-            if (!isNaN(d.getTime())) {
-              return { hours: d.getHours(), minutes: d.getMinutes() };
-            }
-            this.logger.warn(`     ⚠️ Could not parse time: "${timeStr}"`);
-            return { hours: 0, minutes: 0 };
-          }
-        } else {
-          // Try Date parser as fallback, but check if valid
-          const d = new Date(timeStr);
-          if (!isNaN(d.getTime())) {
-            return { hours: d.getHours(), minutes: d.getMinutes() };
-          }
-          // If we can't parse it at all, log warning and return 0
-          this.logger.warn(`     ⚠️ Unknown time format, cannot parse: "${timeStr}"`);
-          return { hours: 0, minutes: 0 };
-        }
-        
-        // Extract hours and minutes from timePart (e.g., "12:30:00-03" or "12:30:00.000Z")
-        const [hours, minutes] = timePart.split(':').map(Number);
-        
-        this.logger.debug(`     Extracted: ${hours}:${minutes}`);
-        
-        return { hours, minutes };
+        // Crear fecha con la hora local (sin conversión UTC)
+        const dateObj = new Date(`${date}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`);
+        return dateObj;
       };
-      
-      const startParsed = parseTime(b.startTime as unknown as string | Date);
-      const endParsed = parseTime(b.endTime as unknown as string | Date);
-      
-      // Create Date objects with extracted time (using date from query)
-      const startDate = new Date(`${date}T${String(startParsed.hours).padStart(2, '0')}:${String(startParsed.minutes).padStart(2, '0')}:00`);
-      const endDate = new Date(`${date}T${String(endParsed.hours).padStart(2, '0')}:${String(endParsed.minutes).padStart(2, '0')}:00`);
       
       return {
         staffId: b.staffId,
-        startTime: startDate,
-        endTime: endDate,
+        startTime: parseTimeToDate(b.startTime),
+        endTime: parseTimeToDate(b.endTime),
       };
     });
 
