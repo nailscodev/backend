@@ -80,7 +80,7 @@ export class CreateBookingDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
-  totalAmount?: number;
+  totalPrice?: number;
 
   @ApiProperty({
     description: 'Indicates if the booking was made via web (defaults to true)',
