@@ -120,14 +120,14 @@ describe('CsrfService', () => {
       expect(result.generatedAt).toBeGreaterThan(0);
     });
 
-    it('should generate token with tenant ID', async () => {
+    it('should generate unique tokens for same session', async () => {
       const sessionId = 'test-session-123';
-      const tenantId = 'tenant-456';
-      const result = await service.generateToken(sessionId, tenantId);
+      const result1 = await service.generateToken(sessionId);
+      const result2 = await service.generateToken(sessionId);
 
-      expect(result).toBeDefined();
-      expect(result.token).toBeDefined();
-      expect(result.tenantId).toBe(tenantId);
+      expect(result1).toBeDefined();
+      expect(result2).toBeDefined();
+      expect(result1.token).not.toBe(result2.token);
     });
 
     it('should generate token with IP and User Agent binding', async () => {
@@ -135,7 +135,7 @@ describe('CsrfService', () => {
       const ipAddress = '192.168.1.100';
       const userAgent = 'Mozilla/5.0 Test Browser';
       
-      const result = await service.generateToken(sessionId, undefined, ipAddress, userAgent);
+      const result = await service.generateToken(sessionId, ipAddress, userAgent);
 
       expect(result).toBeDefined();
       expect(result.token).toBeDefined();
@@ -384,11 +384,12 @@ describe('CsrfService', () => {
       expect(result).toBe(false);
     });
 
-    it('should validate with tenant ID', () => {
-      const result = service.validateTokenSync(validToken, sessionId, 'some-tenant');
+    it('should validate with correct session ID', () => {
+      const result = service.validateTokenSync(validToken, sessionId);
 
-      // Should work if token doesn't have tenant or matches
+      // Should work with correct session
       expect(typeof result).toBe('boolean');
+      expect(result).toBe(true);
     });
   });
 
@@ -455,43 +456,24 @@ describe('CsrfService', () => {
     });
   });
 
-  describe('Multi-tenant Support', () => {
-    it('should generate tokens with tenant isolation', async () => {
-      const sessionId = 'shared-session';
-      const tenant1Token = await service.generateToken(sessionId, 'tenant-1');
-      const tenant2Token = await service.generateToken(sessionId, 'tenant-2');
+  describe('Additional Security Tests', () => {
+    it('should generate unique tokens for each session', async () => {
+      const token1 = await service.generateToken('session-a');
+      const token2 = await service.generateToken('session-b');
 
-      expect(tenant1Token.token).not.toBe(tenant2Token.token);
-      expect(tenant1Token.tenantId).toBe('tenant-1');
-      expect(tenant2Token.tenantId).toBe('tenant-2');
+      expect(token1.token).not.toBe(token2.token);
+      expect(token1.sessionId).toBe('session-a');
+      expect(token2.sessionId).toBe('session-b');
     });
 
-    it('should validate tenant-specific tokens correctly', async () => {
-      const sessionId = 'tenant-session';
-      const tenantId = 'test-tenant';
-      const token = (await service.generateToken(sessionId, tenantId)).token;
+    it('should include proper metadata in generated tokens', async () => {
+      const sessionId = 'metadata-test-session';
+      const token = await service.generateToken(sessionId);
 
-      const correctContext: ICsrfRequestContext = {
-        method: 'POST',
-        sessionId,
-        tenantId,
-        clientIp: '127.0.0.1',
-        userAgent: 'Test',
-        origin: 'http://localhost:3000', // Add required origin
-        contentType: 'application/json',
-      };
-
-      const wrongTenantContext: ICsrfRequestContext = {
-        ...correctContext,
-        tenantId: 'wrong-tenant',
-      };
-
-      const correctResult = await service.validateToken(token, correctContext);
-      const wrongResult = await service.validateToken(token, wrongTenantContext);
-
-      expect(correctResult.isValid).toBe(true);
-      expect(wrongResult.isValid).toBe(false);
-      expect(wrongResult.errorCode).toBe(CsrfValidationErrorCode.TENANT_MISMATCH);
+      expect(token.token).toBeDefined();
+      expect(token.sessionId).toBe(sessionId);
+      expect(token.expiresIn).toBeGreaterThan(0);
+      expect(token.generatedAt).toBeLessThanOrEqual(Date.now());
     });
   });
 

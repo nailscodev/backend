@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { Sequelize } from 'sequelize-typescript';
 
@@ -98,7 +98,7 @@ describe('Booking System E2E Tests', () => {
         appointmentDate: testDate,
         startTime: '10:00:00',
         endTime: '10:45:00',
-        totalAmount: 2500,
+        totalPrice: 2500,
         notes: `E2E Test - Single Service - ${new Date().toISOString()}`,
       };
 
@@ -133,7 +133,7 @@ describe('Booking System E2E Tests', () => {
         appointmentDate: testDate,
         startTime: '10:00:00',
         endTime: '10:45:00',
-        totalAmount: 2500,
+        totalPrice: 2500,
         notes: 'Should fail - duplicate slot',
       };
 
@@ -233,7 +233,7 @@ describe('Booking System E2E Tests', () => {
           appointmentDate: testDate,
           startTime: assignment.startTime.split('T')[1] || assignment.startTime,
           endTime: assignment.endTime.split('T')[1] || assignment.endTime,
-          totalAmount: 2500,
+          totalPrice: 2500,
           notes: `E2E Test - Multi-Service Consecutive - ${new Date().toISOString()}`,
         };
 
@@ -353,7 +353,7 @@ describe('Booking System E2E Tests', () => {
           appointmentDate: testDate,
           startTime: assignment.startTime.split('T')[1] || assignment.startTime,
           endTime: assignment.endTime.split('T')[1] || assignment.endTime,
-          totalAmount: assignment.serviceId === testData.services.basicManicure ? 2500 : 3500,
+          totalPrice: assignment.serviceId === testData.services.basicManicure ? 2500 : 3500,
           notes: `E2E Test - VIP Combo - ${new Date().toISOString()}`,
         };
 
@@ -451,7 +451,7 @@ describe('Booking System E2E Tests', () => {
         appointmentDate: testDate,
         startTime: '10:30:00',
         endTime: '11:30:00',
-        totalAmount: 3500,
+        totalPrice: 3500,
         notes: 'Blocking booking for permutation test',
       };
 

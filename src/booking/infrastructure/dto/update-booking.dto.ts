@@ -45,13 +45,13 @@ export class UpdateBookingDto {
   addOnIds?: string[];
 
   @ApiPropertyOptional({
-    description: 'Updated total amount',
+    description: 'Updated total price',
     example: 60.00,
   })
   @IsOptional()
   @IsNumber()
   @Min(0)
-  totalAmount?: number;
+  totalPrice?: number;
 
   @ApiPropertyOptional({
     description: 'Updated special notes or requests',

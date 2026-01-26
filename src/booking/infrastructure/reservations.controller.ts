@@ -274,7 +274,7 @@ export class ReservationsController {
         b."endTime",
         b.status,
         b."paymentMethod",
-        b."totalAmount",
+        b."totalPrice",
         b.web,
         b.notes,
         b."createdAt"
@@ -307,7 +307,7 @@ export class ReservationsController {
       endTime: row.endTime,
       status: row.status,
       paymentMethod: row.paymentMethod,
-      totalAmount: parseFloat(row.totalAmount || '0'),
+      totalPrice: parseFloat(row.totalPrice || '0'),
       web: row.web,
       notes: row.notes,
       createdAt: row.createdAt,
@@ -355,7 +355,7 @@ export class ReservationsController {
           [Op.between]: [startDate, endDate],
         },
       },
-      attributes: ['totalAmount', 'paymentMethod'],
+      attributes: ['totalPrice', 'paymentMethod'],
     });
 
     // Get manual adjustments in the date range
@@ -377,7 +377,7 @@ export class ReservationsController {
     
     // Add bookings to totals
     for (const booking of completedBookings) {
-      const amount = parseFloat(String(booking.totalAmount || 0));
+      const amount = parseFloat(String(booking.totalPrice || 0));
       if (booking.paymentMethod === 'CASH') {
         cash += amount;
       } else if (booking.paymentMethod === 'CARD') {
@@ -479,14 +479,14 @@ export class ReservationsController {
       `
       SELECT 
         s.name as "serviceName",
-        SUM(b."totalAmount") as "totalRevenue"
+        SUM(b."totalPrice") as "totalRevenue"
       FROM bookings b
       INNER JOIN services s ON b."serviceId" = s.id
       WHERE b.status = 'completed'
         AND b."appointmentDate" >= :startDate::date
         AND b."appointmentDate" <= :endDate::date
       GROUP BY s.name
-      ORDER BY SUM(b."totalAmount") DESC
+      ORDER BY SUM(b."totalPrice") DESC
       `,
       {
         replacements: { startDate, endDate },
@@ -541,7 +541,7 @@ export class ReservationsController {
         b."startTime",
         b."endTime",
         b."paymentMethod",
-        b."totalAmount",
+        b."totalPrice",
         b."createdAt"
       FROM bookings b
       INNER JOIN customers c ON b."customerId" = c.id
@@ -576,7 +576,7 @@ export class ReservationsController {
         CASE 
           WHEN ma.type = 'expense' THEN -ma.amount
           ELSE ma.amount
-        END as "totalAmount",
+        END as "totalPrice",
         ma."createdAt"
       FROM manual_adjustments ma
       WHERE DATE(ma."createdAt") >= :startDate
@@ -731,15 +731,15 @@ export class ReservationsController {
         s.id as "serviceId",
         s.name as "serviceName",
         COUNT(b.id) as "bookingsCount",
-        SUM(b."totalAmount") as "totalRevenue",
-        AVG(b."totalAmount") as "averagePrice"
+        SUM(b."totalPrice") as "totalRevenue",
+        AVG(b."totalPrice") as "averagePrice"
       FROM bookings b
       INNER JOIN services s ON b."serviceId" = s.id
       WHERE b.status = 'completed'
         AND b."appointmentDate" >= :startDate
         AND b."appointmentDate" <= :endDate
       GROUP BY s.id, s.name
-      ORDER BY COUNT(b.id) DESC, SUM(b."totalAmount") DESC
+      ORDER BY COUNT(b.id) DESC, SUM(b."totalPrice") DESC
       LIMIT :limit
       `,
       {
@@ -790,7 +790,7 @@ export class ReservationsController {
         s.id as "staffId",
         CONCAT(s."firstName", ' ', s."lastName") as "staffName",
         COUNT(b.id) as "bookingsCount",
-        SUM(b."totalAmount") as "totalRevenue",
+        SUM(b."totalPrice") as "totalRevenue",
         s.role as role
       FROM bookings b
       INNER JOIN staff s ON b."staffId" = s.id
@@ -798,7 +798,7 @@ export class ReservationsController {
         AND b."appointmentDate" >= :startDate
         AND b."appointmentDate" <= :endDate
       GROUP BY s.id, s."firstName", s."lastName", s.role
-      ORDER BY COUNT(b.id) DESC, SUM(b."totalAmount") DESC
+      ORDER BY COUNT(b.id) DESC, SUM(b."totalPrice") DESC
       LIMIT :limit
       `,
       {
@@ -915,7 +915,7 @@ export class ReservationsController {
         b."appointmentDate",
         b."startTime",
         b.status,
-        b."totalAmount"
+        b."totalPrice"
       FROM bookings b
       INNER JOIN customers c ON b."customerId" = c.id
       INNER JOIN services s ON b."serviceId" = s.id
@@ -938,7 +938,7 @@ export class ReservationsController {
       appointmentDate: row.appointmentDate,
       startTime: row.startTime,
       status: row.status,
-      totalAmount: parseFloat(row.totalAmount || '0'),
+      totalPrice: parseFloat(row.totalPrice || '0'),
     }));
 
     return {
@@ -2355,7 +2355,7 @@ export class ReservationsController {
               appointmentDate: { type: 'string', format: 'date' },
               startTime: { type: 'string', format: 'date-time' },
               endTime: { type: 'string', format: 'date-time' },
-              totalAmount: { type: 'number' },
+              totalPrice: { type: 'number' },
               notes: { type: 'string' }
             }
           }
@@ -2376,7 +2376,7 @@ export class ReservationsController {
         appointmentDate: string;
         startTime: string;
         endTime: string;
-        totalAmount: number;
+        totalPrice: number;
         notes?: string;
       }>;
     }
@@ -2415,7 +2415,7 @@ export class ReservationsController {
             appointmentDate: bookingData.appointmentDate,
             startTime: new Date(bookingData.startTime),
             endTime: new Date(bookingData.endTime),
-            totalAmount: bookingData.totalAmount,
+            totalPrice: bookingData.totalPrice,
             status: BookingStatus.PENDING,
             notes: bookingData.notes || ''
           } as any,

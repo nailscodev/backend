@@ -44,8 +44,8 @@ export class UpcomingBookingDto {
   status: string;
 
   @ApiProperty({
-    description: 'Total amount',
+    description: 'Total price',
     example: 40.00,
   })
-  totalAmount: number;
+  totalPrice: number;
 }

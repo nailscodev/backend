@@ -142,15 +142,15 @@ export class BookingEntity extends Model<BookingEntity> {
   declare paymentMethod?: 'CASH' | 'CARD';
 
   @ApiProperty({
-    description: 'Total booking amount',
+    description: 'Total booking price',
     example: 50.00,
   })
   @Column({
     type: DataType.DECIMAL(10, 2),
     allowNull: true,
-    field: 'totalAmount',
+    field: 'totalPrice',
   })
-  declare totalAmount?: number;
+  declare totalPrice?: number;
 
   @ApiProperty({
     description: 'Indicates if the booking was made via web',

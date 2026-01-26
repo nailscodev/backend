@@ -81,10 +81,10 @@ export class BookingListItemDto {
   paymentMethod?: string;
 
   @ApiProperty({
-    description: 'Total amount',
+    description: 'Total price',
     example: 40.0,
   })
-  totalAmount: number;
+  totalPrice: number;
 
   @ApiProperty({
     description: 'Indicates if booking was made via web',
