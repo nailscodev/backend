@@ -33,6 +33,8 @@ import { UserStatisticsResponseDto } from '../../application/dto/user-statistics
 import { LoginDto } from '../../application/dto/login.dto';
 import { LoginResponseDto } from '../../application/dto/login-response.dto';
 import { ChangePasswordDto } from '../../application/dto/change-password.dto';
+import { ForgotPasswordDto } from '../../application/dto/forgot-password.dto';
+import { ResetPasswordDto } from '../../application/dto/reset-password.dto';
 import { UserRole } from '../persistence/entities/user.entity';
 import { Public } from '../../../common/decorators/public.decorator';
 import { CurrentUser, CurrentUserData } from '../../../common/decorators/current-user.decorator';
@@ -599,5 +601,32 @@ export class UserController {
       message: 'Last login updated successfully',
       timestamp: new Date(),
     };
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Forgot password', description: 'Starts the password recovery process by sending an email with instructions.' })
+  @ApiBody({ type: ForgotPasswordDto })
+  @ApiResponse({ status: HttpStatus.OK, description: 'If the email exists, instructions to recover the password were sent.' })
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(
+    @Body(new ValidationPipe({ transform: true })) forgotPasswordDto: ForgotPasswordDto,
+  ): Promise<{ message: string }> {
+    await this.userService.forgotPassword(forgotPasswordDto.email);
+    return { message: 'If the email exists, instructions to recover the password were sent.' };
+  }
+
+  @Public()
+  @Post('reset-password')
+  @ApiOperation({ summary: 'Reset password', description: 'Allows resetting the password using a recovery token.' })
+  @ApiBody({ type: ResetPasswordDto })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Password reset successfully.' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid or expired token.' })
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(
+    @Body(new ValidationPipe({ transform: true })) resetPasswordDto: ResetPasswordDto,
+  ): Promise<{ message: string }> {
+    await this.userService.resetPassword(resetPasswordDto.token, resetPasswordDto.newPassword);
+    return { message: 'Password reset successfully.' };
   }
 }

@@ -1,4 +1,7 @@
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { Injectable, NotFoundException, ConflictException, BadRequestException, UnauthorizedException, Logger, Inject, forwardRef } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { MailService } from '../../common/services/mail.service';
 import { userWelcomeEmail } from '../../common/templates/user-welcome-email';
 import { InjectModel } from '@nestjs/sequelize';
@@ -48,6 +51,7 @@ export class UserService {
     private readonly userTokenModel: typeof UserTokenEntity,
     @Inject(forwardRef(() => MailService))
     private readonly mailService: MailService,
+    private readonly configService: ConfigService,
   ) { }
 
   /**
@@ -557,6 +561,60 @@ export class UserService {
       this.logger.error(`Failed to update last login for user with ID: ${id}`, error);
       throw new BadRequestException('Failed to update last login');
     }
+  }
+
+   /**
+   * Inicia el proceso de recuperación de contraseña
+   */
+  async forgotPassword(email: string): Promise<void> {
+    const user = await this.userModel.findOne({ where: { email: email.toLowerCase().trim() } });
+    if (!user) {
+      // No revelar si el usuario existe o no
+      return;
+    }
+    // Generar token único y fecha de expiración (ejemplo: 1 hora)
+    const token = createHash('sha256').update(Date.now() + email + Math.random().toString()).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+    // Guardar token en la tabla user_tokens
+    await this.userTokenModel.create({
+      userId: user.id,
+      token,
+      expiresAt,
+      revoked: false,
+    } as any);
+    // Send email with the recovery link
+    try {
+      const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+      const resetUrl = `${frontendUrl}/reset-password/${token}`;
+      await this.mailService.sendMail({
+        to: user.email,
+        subject: 'Password Recovery',
+        html: `<p>Hello ${user.name || user.username},</p><p>Click the following link to reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>This link will expire in 1 hour.</p>`,
+      });
+    } catch (mailErr) {
+      this.logger.error('Error sending recovery email', mailErr);
+    }
+  }
+
+  /**
+   * Restablece la contraseña usando un token de recuperación
+   */
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    // Buscar el token
+    const userToken = await this.userTokenModel.findOne({ where: { token, revoked: false } });
+    if (!userToken || userToken.expiresAt < new Date()) {
+      throw new BadRequestException('Invalid or expired token');
+    }
+    // Find the user
+    const user = await this.userModel.findByPk(userToken.userId);
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+    // Change the password
+    const hashedPassword = await this.hashPassword(newPassword);
+    await user.update({ password: hashedPassword });
+    // Revoke the token
+    await userToken.update({ revoked: true });
   }
 
   // Private helper methods
