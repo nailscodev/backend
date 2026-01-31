@@ -57,7 +57,6 @@ export class UserController {
         value: {
           username: 'admin_user',
           email: 'admin@example.com',
-          password: 'SecurePassword123!',
           role: 'ADMIN',
           name: 'System Administrator',
           avatar: 'https://example.com/admin-avatar.jpg',
@@ -70,7 +69,6 @@ export class UserController {
         value: {
           username: 'john_doe',
           email: 'john.doe@example.com',
-          password: 'UserPassword123!',
           name: 'John Doe',
         },
       },

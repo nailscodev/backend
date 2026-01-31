@@ -1,4 +1,6 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException, UnauthorizedException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, UnauthorizedException, Logger, Inject, forwardRef } from '@nestjs/common';
+import { MailService } from '../../common/services/mail.service';
+import { userWelcomeEmail } from '../../common/templates/user-welcome-email';
 import { InjectModel } from '@nestjs/sequelize';
 import { Op, WhereOptions } from 'sequelize';
 import * as bcrypt from 'bcrypt';
@@ -44,6 +46,8 @@ export class UserService {
     private readonly userModel: typeof UserEntity,
     @InjectModel(UserTokenEntity)
     private readonly userTokenModel: typeof UserTokenEntity,
+    @Inject(forwardRef(() => MailService))
+    private readonly mailService: MailService,
   ) { }
 
   /**
@@ -69,8 +73,9 @@ export class UserService {
     }
 
     try {
-      // Hash the password
-      const hashedPassword = await this.hashPassword(createUserDto.password);
+      // Generar una contraseña aleatoria segura
+      const randomPassword = Math.random().toString(36).slice(-10) + Date.now().toString(36);
+      const hashedPassword = await this.hashPassword(randomPassword);
 
       const userData = {
         username: createUserDto.username.toLowerCase().trim(),
@@ -82,8 +87,23 @@ export class UserService {
         isActive: createUserDto.isActive ?? true
       };
 
-       
       const createdUser = await this.userModel.create(userData as any);
+
+
+      // Enviar email de bienvenida con la contraseña generada
+      try {
+        await this.mailService.sendMail({
+          to: createUserDto.email,
+          subject: 'Welcome to Nails & Co',
+          html: userWelcomeEmail({
+            name: createUserDto.name,
+            username: createUserDto.username,
+            password: randomPassword,
+          }),
+        });
+      } catch (mailErr) {
+        this.logger.error('Failed to send welcome email', mailErr);
+      }
 
       return this.mapToResponseDto(createdUser);
     } catch (error: unknown) {
@@ -203,10 +223,6 @@ export class UserService {
         throw new ConflictException('Email already exists');
       }
       updateData.email = updateUserDto.email.toLowerCase().trim();
-    }
-
-    if (updateUserDto.password !== undefined) {
-      updateData.password = await this.hashPassword(updateUserDto.password);
     }
 
     if (updateUserDto.role !== undefined) {

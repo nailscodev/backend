@@ -33,18 +33,7 @@ export class CreateUserDto {
   @Transform(({ value }: { value: any }): string => typeof value === 'string' ? value.toLowerCase().trim() : value)
   email: string;
 
-  @ApiProperty({
-    description: 'User password',
-    example: 'SecurePassword123!',
-    minLength: 8,
-  })
-  @IsString()
-  @Length(8, 255, { message: 'Password must be at least 8 characters long' })
-  @Matches(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
-    { message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character' }
-  )
-  password: string;
+  // Password field removed. Now password is not required for user creation.
 
   @ApiProperty({
     description: 'User role in the system',

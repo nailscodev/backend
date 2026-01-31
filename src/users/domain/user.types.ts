@@ -4,7 +4,8 @@ export enum UserRole {
   ADMIN = 'admin',
   MANAGER = 'manager', 
   RECEPTION = 'reception',
-  STAFF = 'staff'
+  STAFF = 'staff',
+  OWNER = 'owner'
 }
 
 export interface UserDomain {
@@ -24,7 +25,7 @@ export interface UserDomain {
 export interface CreateUserDomain {
   readonly username: string;
   readonly email: string;
-  readonly password: string;
+  readonly password?: string; // Ahora opcional, generado internamente
   readonly role?: UserRole;
   readonly name: string;
   readonly avatar?: string;
