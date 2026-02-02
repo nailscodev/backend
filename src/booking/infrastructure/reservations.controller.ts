@@ -1090,8 +1090,8 @@ export class ReservationsController {
     // Group by time periods
     const groupedSlots = {
       morning: availableSlots.filter(slot => slot.time >= '07:30' && slot.time < '12:00'),
-      afternoon: availableSlots.filter(slot => slot.time >= '12:00' && slot.time < '18:00'),
-      evening: availableSlots.filter(slot => slot.time >= '18:00' && slot.time <= '21:30')
+      afternoon: availableSlots.filter(slot => slot.time >= '12:00' && slot.time < '17:00'),
+      evening: availableSlots.filter(slot => slot.time >= '17:00' && slot.time <= '21:30')
     };
 
     return {

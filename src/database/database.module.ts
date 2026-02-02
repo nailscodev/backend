@@ -44,12 +44,13 @@ function parseDatabaseUrl(url: string) {
       useFactory: (configService: ConfigService) => {
         const databaseUrl = configService.get('DATABASE_URL');
         const isProduction = configService.get('NODE_ENV') === 'production';
+        const disableSSL = configService.get('DB_SSL') === 'false' || databaseUrl?.includes('sslmode=disable');
         
-        // If DATABASE_URL is provided (Render, Heroku, etc.), parse it
+        // If DATABASE_URL is provided (Render, Heroku, Fly.io, etc.), parse it
         if (databaseUrl) {
           const dbConfig = parseDatabaseUrl(databaseUrl);
           if (dbConfig) {
-            console.log(`Connecting to database at ${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`);
+            console.log(`Connecting to database at ${dbConfig.host}:${dbConfig.port}/${dbConfig.database} (SSL: ${!disableSSL && isProduction})`);
             return {
               dialect: 'postgres',
               host: dbConfig.host,
@@ -61,7 +62,7 @@ function parseDatabaseUrl(url: string) {
               logging: !isProduction,
               autoLoadModels: true,
               models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity, CategoryLangEntity],
-              dialectOptions: isProduction ? {
+              dialectOptions: (isProduction && !disableSSL) ? {
                 ssl: {
                   require: true,
                   rejectUnauthorized: false,
