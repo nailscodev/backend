@@ -44,7 +44,8 @@ async function bootstrap() {
     'http://localhost:3000',
     'http://192.168.1.32:3002',
     'http://127.0.0.1:3002',
-    'https://frontend-web-wt6y.onrender.com'
+    'https://frontend-web-wt6y.onrender.com',
+    'https://backoffice-web-so8xwa.fly.dev/'
   ];
   console.log('DEBUG: Allowed origins configured:', allowedOrigins);
 
