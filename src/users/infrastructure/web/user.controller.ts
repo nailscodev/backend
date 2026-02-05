@@ -15,6 +15,7 @@ import {
   ParseEnumPipe,
   HttpCode,
   Req,
+  UnauthorizedException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -36,13 +37,19 @@ import { ChangePasswordDto } from '../../application/dto/change-password.dto';
 import { ForgotPasswordDto } from '../../application/dto/forgot-password.dto';
 import { ResetPasswordDto } from '../../application/dto/reset-password.dto';
 import { UserRole } from '../persistence/entities/user.entity';
+import { ScreenRoleService } from '../../../common/services/screen-role.service';
+import { RequireAuth } from '../../../common/decorators/require-auth.decorator';
 import { Public } from '../../../common/decorators/public.decorator';
-import { CurrentUser, CurrentUserData } from '../../../common/decorators/current-user.decorator';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import type { CurrentUserData } from '../../../common/decorators/current-user.decorator';
 
 @ApiTags('users')
 @Controller('users')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly screenRoleService: ScreenRoleService,
+  ) {}
 
   @Post()
   @ApiOperation({ 
@@ -565,6 +572,69 @@ export class UserController {
     await this.userService.revokeToken(token);
     
     return { success: true, message: 'Logged out successfully' };
+  }
+
+  @Get('me/permissions')
+  @RequireAuth()
+  @ApiOperation({
+    summary: 'Get current user permissions',
+    description: 'Returns the screen permissions for the currently authenticated user.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'User permissions retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        screens: { 
+          type: 'array',
+          items: { type: 'string' },
+          example: ['admin-dashboard', 'admin-reservas', 'admin-clientes']
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Invalid or missing token',
+  })
+  async getCurrentUserPermissions(
+    @CurrentUser() currentUser: CurrentUserData,
+  ): Promise<{ screens: string[] }> {
+    console.log('🎭 Full currentUser object:', JSON.stringify(currentUser, null, 2));
+    
+    // Check if user is authenticated
+    if (!currentUser || !currentUser.role) {
+      console.error('❌ User not authenticated or role not found');
+      throw new UnauthorizedException('User not authenticated or role not found');
+    }
+
+    console.log('🎭 Getting permissions for user:', {
+      id: currentUser.id,
+      username: currentUser.username,
+      role: currentUser.role,
+      roleType: typeof currentUser.role
+    });
+
+    const screens = await this.screenRoleService.getScreenIdsByRole(currentUser.role as UserRole);
+    
+    console.log('📱 Final screens found:', screens);
+
+    return { screens };
+  }
+
+  @Get('debug/screen-roles')
+  @Public()
+  @ApiOperation({
+    summary: 'Debug: Get all screen roles (temporary)',
+    description: 'Returns all screen roles for debugging purposes.',
+  })
+  async debugScreenRoles(): Promise<any> {
+    const allRoles = await this.screenRoleService.getAllScreenRoles();
+    return {
+      total: allRoles.length,
+      roles: allRoles
+    };
   }
 
   @Patch(':id/update-last-login')

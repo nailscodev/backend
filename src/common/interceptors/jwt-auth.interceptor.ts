@@ -15,6 +15,7 @@ import { createHash } from 'crypto';
 import { UserTokenEntity } from '../../users/infrastructure/persistence/entities/user-token.entity';
 import { UserEntity } from '../../users/infrastructure/persistence/entities/user.entity';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { REQUIRE_AUTH_KEY } from '../decorators/require-auth.decorator';
 
 /**
  * Extended Express Request with user information
@@ -89,13 +90,13 @@ export class JwtAuthInterceptor implements NestInterceptor {
       context.getClass(),
     ]);
 
-    if (isPublic) {
-      return next.handle();
-    }
+    // Check if endpoint requires authentication using @RequireAuth() decorator
+    const requiresAuth = this.reflector.getAllAndOverride<boolean>(REQUIRE_AUTH_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
-    // Allow GET and OPTIONS requests without authentication
-    // All other methods (POST, PUT, PATCH, DELETE) will require authentication
-    if (method === 'GET' || method === 'OPTIONS') {
+    if (isPublic) {
       return next.handle();
     }
 
@@ -104,8 +105,10 @@ export class JwtAuthInterceptor implements NestInterceptor {
       return next.handle();
     }
 
-    // For POST, PUT, PATCH, DELETE - require authentication
-    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    // Require authentication if:
+    // 1. Method is POST, PUT, PATCH, DELETE (default behavior)
+    // 2. Endpoint has @RequireAuth() decorator (for GET/OPTIONS that need auth)
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) || requiresAuth) {
       await this.validateJwtToken(request);
     }
 

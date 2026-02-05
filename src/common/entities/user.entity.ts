@@ -6,6 +6,7 @@ export enum UserRole {
   MANAGER = 'manager',
   RECEPTION = 'reception',
   STAFF = 'staff',
+  OWNER = 'owner',
 }
 
 @Table({
