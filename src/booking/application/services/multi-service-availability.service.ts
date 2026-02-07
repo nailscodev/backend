@@ -455,7 +455,7 @@ export class MultiServiceAvailabilityService {
       `SELECT "staffId", "startTime"::text, "endTime"::text
        FROM bookings
        WHERE "appointmentDate" = $1
-         AND status IN ('pending', 'confirmed')`,
+         AND status IN ('pending', 'in_progress')`,
       {
         bind: [date],
         type: QueryTypes.SELECT,

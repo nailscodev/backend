@@ -65,7 +65,7 @@ export class CreateBookingDto {
   @ApiProperty({
     description: 'Initial status of the booking',
     enum: BookingStatus,
-    example: BookingStatus.PENDING,
+    example: BookingStatus.IN_PROGRESS,
     required: false,
   })
   @IsOptional()

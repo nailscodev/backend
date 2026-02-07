@@ -119,12 +119,12 @@ export class BookingEntity extends Model<BookingEntity> {
   @ApiProperty({
     description: 'Current status of the booking',
     enum: BookingStatus,
-    example: BookingStatus.PENDING,
+    example: BookingStatus.IN_PROGRESS,
   })
   @Column({
     type: DataType.ENUM(...Object.values(BookingStatus)),
     allowNull: false,
-    defaultValue: BookingStatus.PENDING,
+    defaultValue: BookingStatus.IN_PROGRESS,
   })
   declare status: BookingStatus;
 

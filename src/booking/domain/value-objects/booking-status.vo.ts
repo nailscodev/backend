@@ -6,7 +6,7 @@
  */
 export enum BookingStatus {
   PENDING = 'pending',
-  CONFIRMED = 'confirmed', 
+  IN_PROGRESS = 'in_progress', 
   COMPLETED = 'completed',
   CANCELLED = 'cancelled',
   NO_SHOW = 'no_show'
@@ -25,7 +25,7 @@ export function isValidBookingStatus(value: string): value is BookingStatus {
 export function getBookingStatusDisplayName(status: BookingStatus): string {
   const displayNames: Record<BookingStatus, string> = {
     [BookingStatus.PENDING]: 'Pendiente',
-    [BookingStatus.CONFIRMED]: 'Confirmado', 
+    [BookingStatus.IN_PROGRESS]: 'En Progreso', 
     [BookingStatus.COMPLETED]: 'Completado',
     [BookingStatus.CANCELLED]: 'Cancelado',
     [BookingStatus.NO_SHOW]: 'No se presentó'

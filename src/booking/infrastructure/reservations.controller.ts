@@ -70,6 +70,52 @@ export class ReservationsController {
     private multiServiceAvailabilityService: MultiServiceAvailabilityService,
   ) { }
 
+  /**
+   * Auto-update all in_progress bookings that have passed their end time to pending status
+   * Uses Miami timezone for comparison
+   */
+  private async updateExpiredBookings(): Promise<void> {
+    try {
+      // Get current time in Miami timezone (America/New_York covers Miami)
+      const now = new Date();
+      const miamiTime = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York', 
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      }).formatToParts(now);
+
+      const currentMiamiDate = `${miamiTime.find(part => part.type === 'year')?.value}-${miamiTime.find(part => part.type === 'month')?.value}-${miamiTime.find(part => part.type === 'day')?.value}`;
+      const currentMiamiTime = `${miamiTime.find(part => part.type === 'hour')?.value}:${miamiTime.find(part => part.type === 'minute')?.value}:${miamiTime.find(part => part.type === 'second')?.value}`;
+      
+      // Update query using Miami time
+      await this.sequelize.query(`
+        UPDATE bookings 
+        SET status = 'pending'
+        WHERE status = 'in_progress' 
+          AND (
+            "appointmentDate" < :currentDate
+            OR (
+              "appointmentDate" = :currentDate 
+              AND "endTime" < :currentTime
+            )
+          )
+      `, {
+        replacements: { 
+          currentDate: currentMiamiDate,
+          currentTime: currentMiamiTime 
+        },
+        type: QueryTypes.UPDATE,
+      });
+    } catch (error) {
+      console.error('Error updating expired bookings:', error);
+    }
+  }
+
   @Get()
   @ApiOperation({
     summary: 'Get all bookings',
@@ -84,7 +130,7 @@ export class ReservationsController {
   @ApiQuery({ name: 'date', required: false, type: 'string', description: 'Filter by date (YYYY-MM-DD format)' })
   @ApiQuery({ name: 'startDate', required: false, type: 'string', description: 'Filter by start date range (YYYY-MM-DD format)' })
   @ApiQuery({ name: 'endDate', required: false, type: 'string', description: 'Filter by end date range (YYYY-MM-DD format)' })
-  @ApiQuery({ name: 'search', required: false, type: 'string', description: 'Search in notes' })
+  @ApiQuery({ name: 'search', required: false, type: 'string', description: 'Search in booking ID or notes' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Bookings retrieved successfully',
@@ -120,9 +166,18 @@ export class ReservationsController {
     }
 
     if (search) {
-      where.notes = {
-        [Op.iLike]: `%${search}%`
-      };
+      (where as any)[Op.or] = [
+        {
+          id: {
+            [Op.iLike]: `%${search}%`
+          }
+        },
+        {
+          notes: {
+            [Op.iLike]: `%${search}%`
+          }
+        }
+      ];
     }
 
     if (date) {
@@ -146,6 +201,9 @@ export class ReservationsController {
       limit: actualLimit,
       order: [['appointmentDate', 'ASC'], ['startTime', 'ASC']]
     });
+
+    // Auto-update expired bookings before retrieving the list
+    await this.updateExpiredBookings();
 
     return {
       success: true,
@@ -171,7 +229,7 @@ export class ReservationsController {
   @ApiQuery({ name: 'status', required: false, enum: BookingStatus, description: 'Filter by booking status' })
   @ApiQuery({ name: 'startDate', required: false, type: 'string', description: 'Filter by start date range (YYYY-MM-DD format)' })
   @ApiQuery({ name: 'endDate', required: false, type: 'string', description: 'Filter by end date range (YYYY-MM-DD format)' })
-  @ApiQuery({ name: 'search', required: false, type: 'string', description: 'Search in customer name, email, staff name, or notes' })
+  @ApiQuery({ name: 'search', required: false, type: 'string', description: 'Search in booking ID, customer name, email, staff name, or notes' })
   @ApiQuery({ name: 'customerId', required: false, type: 'string', description: 'Filter by customer ID' })
   @ApiQuery({ name: 'staffId', required: false, type: 'string', description: 'Filter by staff ID' })
   @ApiResponse({
@@ -189,6 +247,9 @@ export class ReservationsController {
     @Query('customerId') customerId?: string,
     @Query('staffId') staffId?: string,
   ) {
+    // Auto-update expired bookings before retrieving the list
+    await this.updateExpiredBookings();
+
     // Build WHERE conditions
     const whereConditions: string[] = ['1=1'];
     const replacements: Record<string, any> = {};
@@ -222,6 +283,7 @@ export class ReservationsController {
 
     if (search) {
       whereConditions.push(`(
+        b.id::text ILIKE :search OR
         CONCAT(c."firstName", ' ', c."lastName") ILIKE :search OR
         c.email ILIKE :search OR
         b.notes ILIKE :search OR
@@ -892,7 +954,7 @@ export class ReservationsController {
   @Get('upcoming')
   @ApiOperation({
     summary: 'Get upcoming bookings',
-    description: 'Retrieve upcoming confirmed bookings starting from now.',
+    description: 'Retrieve upcoming in-progress bookings starting from now.',
   })
   @ApiQuery({ name: 'limit', required: false, type: 'number', description: 'Number of bookings to return (default: 10)' })
   @ApiResponse({
@@ -920,7 +982,7 @@ export class ReservationsController {
       INNER JOIN customers c ON b."customerId" = c.id
       INNER JOIN services s ON b."serviceId" = s.id
       INNER JOIN staff st ON b."staffId" = st.id
-      WHERE b.status IN ('pending', 'confirmed')
+      WHERE b.status IN ('pending', 'in_progress')
       ORDER BY b."appointmentDate" ASC, b."startTime" ASC
       LIMIT :limit
       `,
@@ -1745,13 +1807,13 @@ export class ReservationsController {
         }
       }
 
-      // Set default status to 'pending' if not provided
+      // Set default status to 'in_progress' if not provided
       const bookingData = {
         ...createBookingDto,
         staffId: assignedStaffId,
         startTime: createBookingDto.startTime, // Just pass the time string "HH:MM:SS"
         endTime: createBookingDto.endTime, // Just pass the time string "HH:MM:SS"
-        status: createBookingDto.status || 'pending',
+        status: createBookingDto.status || 'in_progress',
       };
 
       // Check for conflicting bookings before creating
@@ -1914,7 +1976,7 @@ export class ReservationsController {
 
     try {
       await booking.update({
-        status: BookingStatus.CONFIRMED,
+        status: BookingStatus.IN_PROGRESS,
       });
       return booking;
     } catch (error: unknown) {
@@ -2296,7 +2358,7 @@ export class ReservationsController {
           staffId: slot.staffId,
           appointmentDate: body.date,
           status: {
-            [Op.in]: ['pending', 'confirmed']
+            [Op.in]: ['pending', 'in_progress']
           }
         }
       });
@@ -2416,7 +2478,7 @@ export class ReservationsController {
             startTime: new Date(bookingData.startTime),
             endTime: new Date(bookingData.endTime),
             totalPrice: bookingData.totalPrice,
-            status: BookingStatus.PENDING,
+            status: BookingStatus.IN_PROGRESS,
             notes: bookingData.notes || ''
           } as any,
           { transaction }

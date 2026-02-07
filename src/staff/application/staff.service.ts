@@ -609,12 +609,12 @@ export class StaffService {
       price: service.price
     })) : [];
 
-    // Count pending bookings (confirmed, pending, rescheduled)
+    // Count pending bookings (in_progress, pending, rescheduled)
     const pendingBookingsCount = await this.bookingModel.count({
       where: {
         staffId: staff.id,
         status: {
-          [Op.in]: ['confirmed', 'pending', 'rescheduled']
+          [Op.in]: ['in_progress', 'pending', 'rescheduled']
         }
       }
     });

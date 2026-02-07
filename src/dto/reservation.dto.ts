@@ -3,11 +3,10 @@ import { IsString, IsOptional, IsEnum, IsNumber, IsDateString, IsBoolean } from 
 // Define types locally since entities are being converted to Sequelize
 export enum ReservationStatus {
   PENDING = 'pending',
-  CONFIRMED = 'confirmed',
-  IN_PROGRESS = 'in-progress',
+  IN_PROGRESS = 'in_progress',
   COMPLETED = 'completed',
   CANCELLED = 'cancelled',
-  NO_SHOW = 'no-show',
+  NO_SHOW = 'no_show',
 }
 
 export enum PaymentStatus {

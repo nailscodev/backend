@@ -39,7 +39,7 @@ export class UpcomingBookingDto {
 
   @ApiProperty({
     description: 'Booking status',
-    example: 'confirmed',
+    example: 'in_progress',
   })
   status: string;
 

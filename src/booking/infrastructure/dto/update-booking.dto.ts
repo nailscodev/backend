@@ -63,7 +63,7 @@ export class UpdateBookingDto {
   @ApiPropertyOptional({
     description: 'Updated booking status',
     enum: BookingStatus,
-    example: BookingStatus.CONFIRMED,
+    example: BookingStatus.IN_PROGRESS,
   })
   @IsOptional()
   @IsEnum(BookingStatus)
