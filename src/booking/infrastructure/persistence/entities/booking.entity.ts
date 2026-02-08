@@ -175,6 +175,18 @@ export class BookingEntity extends Model<BookingEntity> {
   })
   declare notes?: string;
 
+  @ApiProperty({
+    description: 'Reason for cancellation',
+    example: 'Cliente no se presentó',
+    required: false,
+  })
+  @Column({
+    type: DataType.TEXT,
+    allowNull: true,
+    field: 'cancellationReason',
+  })
+  declare cancellationReason?: string;
+
   // Automatically managed by Sequelize
   @ApiProperty({
     description: 'When the booking was created',

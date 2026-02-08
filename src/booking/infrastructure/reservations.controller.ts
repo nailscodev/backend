@@ -339,6 +339,7 @@ export class ReservationsController {
         b."totalPrice",
         b.web,
         b.notes,
+        b."cancellationReason",
         b."createdAt"
       FROM bookings b
       INNER JOIN customers c ON b."customerId" = c.id
@@ -372,6 +373,7 @@ export class ReservationsController {
       totalPrice: parseFloat(row.totalPrice || '0'),
       web: row.web,
       notes: row.notes,
+      cancellationReason: row.cancellationReason,
       createdAt: row.createdAt,
     }));
 

@@ -77,4 +77,12 @@ export class UpdateBookingDto {
   @IsOptional()
   @IsEnum(['CASH', 'CARD'], { message: 'paymentMethod must be CASH or CARD' })
   paymentMethod?: 'CASH' | 'CARD';
+
+  @ApiPropertyOptional({
+    description: 'Reason for cancellation',
+    example: 'Cliente no se presentó',
+  })
+  @IsOptional()
+  @IsString()
+  cancellationReason?: string;
 }

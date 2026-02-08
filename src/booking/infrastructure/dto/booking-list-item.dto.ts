@@ -100,6 +100,13 @@ export class BookingListItemDto {
   notes?: string;
 
   @ApiProperty({
+    description: 'Cancellation reason',
+    example: 'Customer requested cancellation',
+    required: false,
+  })
+  cancellationReason?: string;
+
+  @ApiProperty({
     description: 'Created at',
     example: '2025-12-20T10:00:00Z',
   })
