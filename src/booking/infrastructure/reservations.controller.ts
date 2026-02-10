@@ -1874,10 +1874,28 @@ export class ReservationsController {
     }
 
     try {
-       
-      await booking.update(updateBookingDto as any);
+      console.log('🔄 Updating booking with data:', JSON.stringify(updateBookingDto, null, 2));
+      console.log('📝 ServiceId received:', updateBookingDto.serviceId, 'Type:', typeof updateBookingDto.serviceId);
+      
+      // Handle addon updates explicitly
+      const updateData: any = { ...updateBookingDto };
+      
+      // Handle addOnIds (includes both normal and removal addons)
+      if ('addOnIds' in updateBookingDto) {
+        console.log('📝 Updating addOnIds (combined normal + removal):', updateBookingDto.addOnIds);
+        updateData.addOnIds = updateBookingDto.addOnIds || null;
+      }
+      
+      await booking.update(updateData);
+      
+      // Reload the booking to get updated values
+      await booking.reload();
+      
+      console.log('✅ Booking updated successfully. Final addOnIds:', booking.addOnIds);
+      
       return booking;
     } catch (error: unknown) {
+      console.error('❌ Error updating booking:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException('Error updating booking: ' + errorMessage);
     }

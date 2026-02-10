@@ -1,8 +1,19 @@
-import { IsOptional, IsUUID, IsDateString, IsArray, IsEnum, IsString, IsNumber, Min, IsBoolean } from 'class-validator';
+import { IsOptional, IsUUID, IsDateString, IsArray, IsEnum, IsString, IsNumber, Min, IsBoolean, Matches } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { BookingStatus } from '../../domain/value-objects/booking-status.vo';
 
 export class UpdateBookingDto {
+  @ApiPropertyOptional({
+    description: 'ID of the service (can be changed to modify the booking service)',
+    example: '123e4567-e89b-12d3-a456-426614174001',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, {
+    message: 'serviceId must be a valid UUID',
+  })
+  serviceId?: string;
+
   @ApiPropertyOptional({
     description: 'ID of the staff member (can be changed for reassignment)',
     example: '123e4567-e89b-12d3-a456-426614174003',
@@ -36,7 +47,7 @@ export class UpdateBookingDto {
   endTime?: string;
 
   @ApiPropertyOptional({
-    description: 'Updated array of add-on service IDs',
+    description: 'Updated array of add-on service IDs (includes both normal and removal addons)',
     example: ['123e4567-e89b-12d3-a456-426614174004'],
   })
   @IsOptional()
