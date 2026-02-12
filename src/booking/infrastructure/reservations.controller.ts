@@ -438,10 +438,13 @@ export class ReservationsController {
     // Calculate cash and bank totals based on payment method
     let cash = 0;
     let bank = 0;
+    let totalRevenue = 0;
     
     // Add bookings to totals
     for (const booking of completedBookings) {
       const amount = parseFloat(String(booking.totalPrice || 0));
+      totalRevenue += amount; // Add to total revenue
+      
       if (booking.paymentMethod === 'CASH') {
         cash += amount;
       } else if (booking.paymentMethod === 'CARD') {
@@ -449,10 +452,14 @@ export class ReservationsController {
       }
     }
 
-    // Add manual adjustments to totals (expenses are negative)
+    // Calculate manual adjustments total and add to revenue/cash/bank
+    let manualAdjustmentsTotal = 0;
     for (const adjustment of manualAdjustments) {
       const amount = parseFloat(String(adjustment.amount || 0));
       const adjustmentAmount = adjustment.type === 'expense' ? -amount : amount;
+      
+      manualAdjustmentsTotal += adjustmentAmount; // Sum all adjustments (positive and negative)
+      totalRevenue += adjustmentAmount; // Add to total revenue (net)
       
       if (adjustment.paymentMethod === 'CASH') {
         cash += adjustmentAmount;
@@ -513,10 +520,127 @@ export class ReservationsController {
       data: {
         cash,
         bank,
+        totalRevenue,
+        manualAdjustmentsTotal,
         bookings: bookingsCount,
+        completedTransactions: bookingsCount, // Same as bookings for clarity
         distinctServices,
         newCustomers,
       },
+    };
+  }
+
+  @Get('dashboard/revenue-over-time')
+  @ApiOperation({
+    summary: 'Get revenue over time',
+    description: 'Retrieve daily revenue data for a given date range for trending analysis.',
+  })
+  @ApiQuery({ name: 'startDate', required: true, type: 'string', description: 'Start date in YYYY-MM-DD format' })
+  @ApiQuery({ name: 'endDate', required: true, type: 'string', description: 'End date in YYYY-MM-DD format' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Revenue over time retrieved successfully',
+  })
+  async getRevenueOverTime(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ): Promise<{ success: boolean; data: Array<{ date: string; cash: number; bank: number; bookings: number }> }> {
+    // NOTE: returns daily breakdown split by payment method (cash / bank) plus bookings count
+    if (!startDate || !endDate) {
+      throw new BadRequestException('startDate and endDate are required');
+    }
+
+    // Get daily revenue from completed bookings split by payment method
+    const bookingsResult: any[] = await this.sequelize.query(
+      `
+      SELECT 
+        b."appointmentDate" as date,
+        b."paymentMethod" as payment_method,
+        SUM(b."totalPrice") as revenue,
+        COUNT(b.id) as bookings
+      FROM bookings b
+      WHERE b.status = 'completed'
+        AND b."appointmentDate" >= :startDate::date
+        AND b."appointmentDate" <= :endDate::date
+      GROUP BY b."appointmentDate", b."paymentMethod"
+      ORDER BY b."appointmentDate" ASC
+      `,
+      {
+        replacements: { startDate, endDate },
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    // Get daily revenue from manual adjustments split by payment method
+    const adjustmentsResult: any[] = await this.sequelize.query(
+      `
+      SELECT 
+        DATE(ma."createdAt") as date,
+        ma."paymentMethod" as payment_method,
+        SUM(CASE WHEN ma.type = 'expense' THEN -ma.amount ELSE ma.amount END) as revenue
+      FROM manual_adjustments ma
+      WHERE DATE(ma."createdAt") >= :startDate::date
+        AND DATE(ma."createdAt") <= :endDate::date
+      GROUP BY DATE(ma."createdAt"), ma."paymentMethod"
+      ORDER BY DATE(ma."createdAt") ASC
+      `,
+      {
+        replacements: { startDate, endDate },
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    // Combine bookings and adjustments by date and payment method
+    const combinedData = new Map<string, { cash: number; bank: number; bookings: number }>();
+
+    const addToDate = (dateStr: string, paymentMethod: string | null, amount: number, bookingsCount = 0) => {
+      const existing = combinedData.get(dateStr) || { cash: 0, bank: 0, bookings: 0 };
+      if (paymentMethod === 'CASH') {
+        existing.cash += amount;
+      } else {
+        // treat CARD and other as bank/card
+        existing.bank += amount;
+      }
+      existing.bookings += bookingsCount;
+      combinedData.set(dateStr, existing);
+    };
+
+    // Add bookings data
+    bookingsResult.forEach(row => {
+      const dateStr = row.date instanceof Date ? row.date.toISOString().split('T')[0] : String(row.date);
+      const paymentMethod = row.payment_method || 'CARD';
+      const revenue = parseFloat(row.revenue || '0');
+      const bookingsCount = parseInt(row.bookings || '0');
+      addToDate(dateStr, paymentMethod, revenue, bookingsCount);
+    });
+
+    // Add adjustments data
+    adjustmentsResult.forEach(row => {
+      const dateStr = row.date instanceof Date ? row.date.toISOString().split('T')[0] : String(row.date);
+      const paymentMethod = row.payment_method || 'CARD';
+      const revenue = parseFloat(row.revenue || '0');
+      addToDate(dateStr, paymentMethod, revenue, 0);
+    });
+
+    // Convert to array and fill missing dates with 0
+    const revenueOverTime: Array<{ date: string; cash: number; bank: number; bookings: number }> = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().split('T')[0];
+      const data = combinedData.get(dateStr) || { cash: 0, bank: 0, bookings: 0 };
+      revenueOverTime.push({
+        date: dateStr,
+        cash: data.cash,
+        bank: data.bank,
+        bookings: data.bookings
+      });
+    }
+
+    return {
+      success: true,
+      data: revenueOverTime,
     };
   }
 
@@ -527,6 +651,7 @@ export class ReservationsController {
   })
   @ApiQuery({ name: 'startDate', required: true, type: 'string', description: 'Start date in YYYY-MM-DD format' })
   @ApiQuery({ name: 'endDate', required: true, type: 'string', description: 'End date in YYYY-MM-DD format' })
+  @ApiQuery({ name: 'lang', required: false, type: 'string', description: 'Language code (EN/ES, default: EN)' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Revenue by service retrieved successfully',
@@ -534,6 +659,7 @@ export class ReservationsController {
   async getRevenueByService(
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
+    @Query('lang') lang: string = 'EN',
   ): Promise<{ success: boolean; data: Array<{ service: string; revenue: number }> }> {
     if (!startDate || !endDate) {
       throw new BadRequestException('startDate and endDate are required');
@@ -542,18 +668,20 @@ export class ReservationsController {
     const result: any[] = await this.sequelize.query(
       `
       SELECT 
-        s.name as "serviceName",
+        COALESCE(sl.title, s.name) as "serviceName",
         SUM(b."totalPrice") as "totalRevenue"
       FROM bookings b
       INNER JOIN services s ON b."serviceId" = s.id
+      LEFT JOIN services_lang sl ON s.id = sl.service_id 
+        AND sl.language_id = (SELECT id FROM languages WHERE code = :lang LIMIT 1)
       WHERE b.status = 'completed'
         AND b."appointmentDate" >= :startDate::date
         AND b."appointmentDate" <= :endDate::date
-      GROUP BY s.name
+      GROUP BY s.id, COALESCE(sl.title, s.name)
       ORDER BY SUM(b."totalPrice") DESC
       `,
       {
-        replacements: { startDate, endDate },
+        replacements: { startDate, endDate, lang },
         type: QueryTypes.SELECT,
       },
     );
@@ -578,6 +706,10 @@ export class ReservationsController {
   @ApiQuery({ name: 'endDate', required: true, type: 'string', description: 'End date in YYYY-MM-DD format' })
   @ApiQuery({ name: 'page', required: false, type: 'number', description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'limit', required: false, type: 'number', description: 'Items per page (default: 10)' })
+  @ApiQuery({ name: 'lang', required: false, type: 'string', description: 'Language code (EN/ES, default: EN)' })
+  @ApiQuery({ name: 'serviceId', required: false, type: 'string', description: 'Service ID filter' })
+  @ApiQuery({ name: 'paymentMethod', required: false, type: 'string', description: 'Payment method filter (cash/card)' })
+  @ApiQuery({ name: 'type', required: false, type: 'string', description: 'Transaction type filter (income/expense)' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Invoices retrieved successfully',
@@ -587,11 +719,50 @@ export class ReservationsController {
     @Query('endDate') endDate: string,
     @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
+    @Query('lang') lang: string = 'EN',
+    @Query('serviceId') serviceId?: string,
+    @Query('paymentMethod') paymentMethod?: string,
+    @Query('type') transactionType?: string,
   ): Promise<{ success: boolean; data: any[]; pagination: any }> {
     if (!startDate || !endDate) {
       throw new BadRequestException('startDate and endDate are required');
     }
 
+    // Build WHERE conditions for bookings
+    let bookingWhereConditions = `
+      WHERE b.status = 'completed'
+        AND b."appointmentDate" >= :startDate
+        AND b."appointmentDate" <= :endDate`;
+    
+    const replacements: any = { startDate, endDate, lang };
+    
+    if (paymentMethod && paymentMethod !== 'All') {
+      bookingWhereConditions += ` AND b."paymentMethod" = :paymentMethod`;
+      replacements.paymentMethod = paymentMethod;
+    }
+    
+    if (serviceId && serviceId !== 'All') {
+      if (serviceId === 'MANUAL_ADJUSTMENT') {
+        // If filtering by MANUAL_ADJUSTMENT, exclude all bookings
+        bookingWhereConditions += ` AND 1 = 0`;
+      } else {
+        // Filter by specific service ID
+        bookingWhereConditions += ` AND b."serviceId" = :serviceId`;
+        replacements.serviceId = serviceId;
+      }
+    }
+    
+    // Filter by transaction type based on totalPrice value
+    if (transactionType && transactionType !== 'All') {
+      if (transactionType === 'expense') {
+        // If filtering by expense (totalPrice < 0), exclude bookings completely since they're always positive
+        bookingWhereConditions += ` AND 1 = 0`;
+      } else if (transactionType === 'income') {
+        // If filtering by income (totalPrice >= 0), include bookings since they're always positive
+        // No additional filter needed for bookings as they're always income
+      }
+    }
+    
     // Get completed bookings with customer and service info
     const bookingsResult: any[] = await this.sequelize.query(
       `
@@ -600,7 +771,7 @@ export class ReservationsController {
         'booking' as "type",
         CONCAT(c."firstName", ' ', c."lastName") as "customerName",
         c.email as "customerEmail",
-        s.name as "serviceName",
+        COALESCE(sl.title, s.name) as "serviceName",
         b."appointmentDate",
         b."startTime",
         b."endTime",
@@ -610,17 +781,51 @@ export class ReservationsController {
       FROM bookings b
       INNER JOIN customers c ON b."customerId" = c.id
       INNER JOIN services s ON b."serviceId" = s.id
-      WHERE b.status = 'completed'
-        AND b."appointmentDate" >= :startDate
-        AND b."appointmentDate" <= :endDate
+      LEFT JOIN services_lang sl ON s.id = sl.service_id 
+        AND sl.language_id = (SELECT id FROM languages WHERE code = :lang LIMIT 1)
+      ${bookingWhereConditions}
       ORDER BY b."appointmentDate" DESC, b."startTime" DESC
       `,
       {
-        replacements: { startDate, endDate },
+        replacements,
         type: QueryTypes.SELECT,
       },
     );
 
+    // Build WHERE conditions for manual adjustments
+    let adjustmentWhereConditions = `
+      WHERE DATE(ma."createdAt") >= :startDate
+        AND DATE(ma."createdAt") <= :endDate`;
+    
+    const adjustmentReplacements: any = { startDate, endDate };
+    
+    if (paymentMethod && paymentMethod !== 'All') {
+      adjustmentWhereConditions += ` AND ma."paymentMethod" = :paymentMethod`;
+      adjustmentReplacements.paymentMethod = paymentMethod;
+    }
+    
+    if (serviceId && serviceId !== 'All') {
+      if (serviceId === 'MANUAL_ADJUSTMENT') {
+        // If filtering by MANUAL_ADJUSTMENT, include all manual adjustments (no additional filter)
+        // This is the default behavior, so no extra condition needed
+      } else {
+        // If filtering by specific serviceId, exclude all manual adjustments since they don't have services
+        adjustmentWhereConditions += ` AND 1 = 0`;
+      }
+    }
+    
+    if (transactionType && transactionType !== 'All') {
+      if (transactionType === 'income') {
+        // Filter for income: totalPrice >= 0
+        // This means: CASE WHEN ma.type = 'expense' THEN -ma.amount ELSE ma.amount END >= 0
+        adjustmentWhereConditions += ` AND (CASE WHEN ma.type = 'expense' THEN -ma.amount ELSE ma.amount END) >= 0`;
+      } else if (transactionType === 'expense') {
+        // Filter for expense: totalPrice < 0  
+        // This means: CASE WHEN ma.type = 'expense' THEN -ma.amount ELSE ma.amount END < 0
+        adjustmentWhereConditions += ` AND (CASE WHEN ma.type = 'expense' THEN -ma.amount ELSE ma.amount END) < 0`;
+      }
+    }
+    
     // Get manual adjustments
     const adjustmentsResult: any[] = await this.sequelize.query(
       `
@@ -643,12 +848,11 @@ export class ReservationsController {
         END as "totalPrice",
         ma."createdAt"
       FROM manual_adjustments ma
-      WHERE DATE(ma."createdAt") >= :startDate
-        AND DATE(ma."createdAt") <= :endDate
+      ${adjustmentWhereConditions}
       ORDER BY ma."createdAt" DESC
       `,
       {
-        replacements: { startDate, endDate },
+        replacements: adjustmentReplacements,
         type: QueryTypes.SELECT,
       },
     );
@@ -775,6 +979,7 @@ export class ReservationsController {
   @ApiQuery({ name: 'startDate', required: true, type: 'string', description: 'Start date in YYYY-MM-DD format' })
   @ApiQuery({ name: 'endDate', required: true, type: 'string', description: 'End date in YYYY-MM-DD format' })
   @ApiQuery({ name: 'limit', required: false, type: 'number', description: 'Number of services to return (default: 5)' })
+  @ApiQuery({ name: 'lang', required: false, type: 'string', description: 'Language code (EN/ES, default: EN)' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Best selling services retrieved successfully',
@@ -784,6 +989,7 @@ export class ReservationsController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 5,
+    @Query('lang') lang: string = 'EN',
   ): Promise<{ success: boolean; data: BestSellingServiceDto[] }> {
     if (!startDate || !endDate) {
       throw new BadRequestException('startDate and endDate are required');
@@ -793,21 +999,23 @@ export class ReservationsController {
       `
       SELECT 
         s.id as "serviceId",
-        s.name as "serviceName",
+        COALESCE(sl.title, s.name) as "serviceName",
         COUNT(b.id) as "bookingsCount",
         SUM(b."totalPrice") as "totalRevenue",
         AVG(b."totalPrice") as "averagePrice"
       FROM bookings b
       INNER JOIN services s ON b."serviceId" = s.id
+      LEFT JOIN services_lang sl ON s.id = sl.service_id 
+        AND sl.language_id = (SELECT id FROM languages WHERE code = :lang LIMIT 1)
       WHERE b.status = 'completed'
         AND b."appointmentDate" >= :startDate
         AND b."appointmentDate" <= :endDate
-      GROUP BY s.id, s.name
+      GROUP BY s.id, COALESCE(sl.title, s.name)
       ORDER BY COUNT(b.id) DESC, SUM(b."totalPrice") DESC
       LIMIT :limit
       `,
       {
-        replacements: { startDate, endDate, limit },
+        replacements: { startDate, endDate, limit, lang },
         type: QueryTypes.SELECT,
       },
     );
@@ -959,6 +1167,7 @@ export class ReservationsController {
     description: 'Retrieve upcoming in-progress bookings starting from now.',
   })
   @ApiQuery({ name: 'limit', required: false, type: 'number', description: 'Number of bookings to return (default: 10)' })
+  @ApiQuery({ name: 'lang', required: false, type: 'string', description: 'Language code (EN/ES, default: EN)' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Upcoming bookings retrieved successfully',
@@ -966,6 +1175,7 @@ export class ReservationsController {
   })
   async getUpcomingBookings(
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
+    @Query('lang') lang: string = 'EN',
   ): Promise<{ success: boolean; data: UpcomingBookingDto[] }> {
     
 
@@ -974,7 +1184,7 @@ export class ReservationsController {
       SELECT 
         b.id,
         CONCAT(c."firstName", ' ', c."lastName") as "customerName",
-        s.name as "serviceName",
+        COALESCE(sl.title, s.name) as "serviceName",
         CONCAT(st."firstName", ' ', st."lastName") as "staffName",
         b."appointmentDate",
         b."startTime",
@@ -983,13 +1193,15 @@ export class ReservationsController {
       FROM bookings b
       INNER JOIN customers c ON b."customerId" = c.id
       INNER JOIN services s ON b."serviceId" = s.id
+      LEFT JOIN services_lang sl ON s.id = sl.service_id 
+        AND sl.language_id = (SELECT id FROM languages WHERE code = :lang LIMIT 1)
       INNER JOIN staff st ON b."staffId" = st.id
       WHERE b.status IN ('pending', 'in_progress')
       ORDER BY b."appointmentDate" ASC, b."startTime" ASC
       LIMIT :limit
       `,
       {
-        replacements: { limit },
+        replacements: { limit, lang },
         type: QueryTypes.SELECT,
       },
     );

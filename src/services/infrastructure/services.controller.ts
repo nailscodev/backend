@@ -350,7 +350,7 @@ export class ServicesController {
     status: HttpStatus.BAD_REQUEST,
     description: 'Invalid input data'
   })
-  async create(@Body(ValidationPipe) createServiceDto: CreateServiceDto): Promise<ServiceEntity> {
+  async create(@Body() createServiceDto: CreateServiceDto): Promise<ServiceEntity> {
     return this.servicesService.create(createServiceDto);
   }
 
@@ -375,7 +375,7 @@ export class ServicesController {
   })
   async update(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body(ValidationPipe) updateServiceDto: UpdateServiceDto,
+    @Body() updateServiceDto: UpdateServiceDto,
   ): Promise<ServiceEntity> {
     return this.servicesService.update(id, updateServiceDto);
   }
