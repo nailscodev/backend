@@ -857,9 +857,10 @@ export class ReservationsController {
       },
     );
 
-    // Combine and sort by appointment date and time (most recent first)
+    // Combine and sort by appointmentDate + startTime (most recent first)
     const allInvoices = [...bookingsResult, ...adjustmentsResult].sort((a, b) => {
-      // Normalizar appointmentDate a string YYYY-MM-DD
+      // Both bookings and manual adjustments now have appointmentDate and startTime
+      // Convert to comparable timestamps
       const dateStrA = a.appointmentDate instanceof Date 
         ? a.appointmentDate.toISOString().split('T')[0]
         : String(a.appointmentDate);
@@ -867,35 +868,23 @@ export class ReservationsController {
         ? b.appointmentDate.toISOString().split('T')[0]
         : String(b.appointmentDate);
       
-      // Normalizar startTime a HH:MM
-      let timeStrA: string;
-      let timeStrB: string;
+      // Handle startTime - could be "HH:MM:SS" or "HH:MM"
+      let timeStrA = '00:00';
+      let timeStrB = '00:00';
       
-      // Si startTime es un objeto Date (bookings), extraer HH:MM
-      if (a.startTime instanceof Date) {
-        timeStrA = a.startTime.toTimeString().substring(0, 5);
-      } else if (typeof a.startTime === 'string' && a.startTime.includes('T')) {
-        // Si es un string con timestamp ISO, extraer la hora
-        timeStrA = new Date(a.startTime).toTimeString().substring(0, 5);
-      } else {
-        // Si es un string simple como "01:06", usar como está
-        timeStrA = String(a.startTime);
+      if (typeof a.startTime === 'string') {
+        timeStrA = a.startTime.length > 5 ? a.startTime.substring(0, 5) : a.startTime;
+      }
+      if (typeof b.startTime === 'string') {
+        timeStrB = b.startTime.length > 5 ? b.startTime.substring(0, 5) : b.startTime;
       }
       
-      if (b.startTime instanceof Date) {
-        timeStrB = b.startTime.toTimeString().substring(0, 5);
-      } else if (typeof b.startTime === 'string' && b.startTime.includes('T')) {
-        timeStrB = new Date(b.startTime).toTimeString().substring(0, 5);
-      } else {
-        timeStrB = String(b.startTime);
-      }
+      // Create full timestamps for comparison
+      const timestampA = new Date(`${dateStrA}T${timeStrA}:00`).getTime();
+      const timestampB = new Date(`${dateStrB}T${timeStrB}:00`).getTime();
       
-      // Crear timestamps completos para comparación precisa
-      const timestampA = new Date(`${dateStrA}T${timeStrA}:00`);
-      const timestampB = new Date(`${dateStrB}T${timeStrB}:00`);
-      
-      // Ordenar de más reciente a más antiguo
-      return timestampB.getTime() - timestampA.getTime();
+      // Sort from most recent to oldest
+      return timestampB - timestampA;
     });
 
     // Apply pagination
@@ -931,6 +920,7 @@ export class ReservationsController {
         description: { type: 'string', description: 'Description of the adjustment' },
         amount: { type: 'number', description: 'Amount of the adjustment' },
         paymentMethod: { type: 'string', enum: ['CASH', 'CARD'], description: 'Payment method' },
+        adjustmentDate: { type: 'string', format: 'date', description: 'Date of adjustment (YYYY-MM-DD), defaults to current date' },
         createdBy: { type: 'string', format: 'uuid', description: 'User ID who created the adjustment (optional)' },
       },
       required: ['type', 'description', 'amount', 'paymentMethod'],
@@ -946,6 +936,7 @@ export class ReservationsController {
       description: string;
       amount: number;
       paymentMethod: 'CASH' | 'CARD';
+      adjustmentDate?: string; // Optional adjustment date in YYYY-MM-DD format
       createdBy?: string;
     },
   ): Promise<{ success: boolean; data: ManualAdjustment }> {
@@ -957,12 +948,42 @@ export class ReservationsController {
       throw new BadRequestException('amount must be greater than 0');
     }
 
+    // Parse adjustmentDate if provided, or use current timestamp
+    let adjustmentTimestamp: Date = new Date();
+    
+    if (createDto.adjustmentDate) {
+      try {
+        // Parse date string (YYYY-MM-DD) without timezone issues
+        const [year, month, day] = createDto.adjustmentDate.split('-').map(Number);
+        
+        if (!year || !month || !day) {
+          throw new BadRequestException('Invalid adjustmentDate format. Use YYYY-MM-DD');
+        }
+        
+        // Create date with current time but using the selected date
+        const now = new Date();
+        adjustmentTimestamp = new Date(
+          year,
+          month - 1, // Month is 0-indexed in JavaScript
+          day,
+          now.getHours(),
+          now.getMinutes(),
+          now.getSeconds(),
+          now.getMilliseconds()
+        );
+      } catch (error) {
+        throw new BadRequestException('Invalid adjustmentDate format. Use YYYY-MM-DD');
+      }
+    }
+
     const adjustment = await this.manualAdjustmentModel.create({
       type: createDto.type,
       description: createDto.description,
       amount: createDto.amount,
       paymentMethod: createDto.paymentMethod,
       createdBy: createDto.createdBy || null,
+      createdAt: adjustmentTimestamp, // Override the default createdAt with custom date
+      updatedAt: adjustmentTimestamp,
     });
 
     return {
