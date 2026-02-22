@@ -27,26 +27,28 @@ export class BookingEntity extends Model<BookingEntity> {
 
 
   @ApiProperty({
-    description: 'The ID of the service booked',
+    description: 'The ID of the service booked (null for breaks)',
     example: '123e4567-e89b-12d3-a456-426614174001',
+    required: false,
   })
   @Column({
     type: DataType.UUID,
-    allowNull: false,
+    allowNull: true, // Allow null for breaks
     field: 'serviceId',
   })
-  declare serviceId: string;
+  declare serviceId?: string;
 
   @ApiProperty({
-    description: 'The ID of the customer who made the booking',
+    description: 'The ID of the customer who made the booking (null for breaks)',
     example: '123e4567-e89b-12d3-a456-426614174002',
+    required: false,
   })
   @Column({
     type: DataType.UUID,
-    allowNull: false,
+    allowNull: true, // Allow null for breaks
     field: 'customerId',
   })
-  declare customerId: string;
+  declare customerId?: string;
 
   @ApiProperty({
     description: 'The ID of the staff member assigned to the booking',

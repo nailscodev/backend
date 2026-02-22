@@ -284,10 +284,10 @@ export class ReservationsController {
     if (search) {
       whereConditions.push(`(
         b.id::text ILIKE :search OR
-        CONCAT(c."firstName", ' ', c."lastName") ILIKE :search OR
-        c.email ILIKE :search OR
-        b.notes ILIKE :search OR
-        CONCAT(st."firstName", ' ', st."lastName") ILIKE :search
+        CONCAT(COALESCE(c."firstName", ''), ' ', COALESCE(c."lastName", '')) ILIKE :search OR
+        COALESCE(c.email, '') ILIKE :search OR
+        COALESCE(b.notes, '') ILIKE :search OR
+        CONCAT(COALESCE(st."firstName", ''), ' ', COALESCE(st."lastName", '')) ILIKE :search
       )`);
       replacements.search = `%${search}%`;
     }
@@ -307,7 +307,7 @@ export class ReservationsController {
       `
       SELECT COUNT(*) as total
       FROM bookings b
-      INNER JOIN customers c ON b."customerId" = c.id
+      LEFT JOIN customers c ON b."customerId" = c.id
       LEFT JOIN staff st ON b."staffId" = st.id
       WHERE ${whereClause}
       `,
@@ -324,12 +324,21 @@ export class ReservationsController {
       `
       SELECT 
         b.id,
-        CONCAT(c."firstName", ' ', c."lastName") as "customerName",
+        CASE 
+          WHEN c.id IS NULL THEN '[BREAK]'
+          ELSE CONCAT(c."firstName", ' ', c."lastName")
+        END as "customerName",
         c.email as "customerEmail",
         c.phone as "customerPhone",
-        s.name as "serviceName",
+        CASE 
+          WHEN s.id IS NULL THEN 'Break/Pause'
+          ELSE s.name
+        END as "serviceName",
         cat.id as "categoryId",
-        cat.name as "categoryName",
+        CASE 
+          WHEN cat.id IS NULL THEN 'Break'
+          ELSE cat.name
+        END as "categoryName",
         CONCAT(st."firstName", ' ', st."lastName") as "staffName",
         b."appointmentDate",
         b."startTime",
@@ -342,9 +351,9 @@ export class ReservationsController {
         b."cancellationReason",
         b."createdAt"
       FROM bookings b
-      INNER JOIN customers c ON b."customerId" = c.id
-      INNER JOIN services s ON b."serviceId" = s.id
-      INNER JOIN categories cat ON s.category_id = cat.id
+      LEFT JOIN customers c ON b."customerId" = c.id
+      LEFT JOIN services s ON b."serviceId" = s.id
+      LEFT JOIN categories cat ON s.category_id = cat.id
       LEFT JOIN staff st ON b."staffId" = st.id
       WHERE ${whereClause}
       ORDER BY b."appointmentDate" DESC, b."startTime" DESC
@@ -1204,16 +1213,22 @@ export class ReservationsController {
       `
       SELECT 
         b.id,
-        CONCAT(c."firstName", ' ', c."lastName") as "customerName",
-        COALESCE(sl.title, s.name) as "serviceName",
+        CASE 
+          WHEN c.id IS NULL THEN '[BREAK]'
+          ELSE CONCAT(c."firstName", ' ', c."lastName")
+        END as "customerName",
+        CASE 
+          WHEN s.id IS NULL THEN 'Break/Pause'
+          ELSE COALESCE(sl.title, s.name)
+        END as "serviceName",
         CONCAT(st."firstName", ' ', st."lastName") as "staffName",
         b."appointmentDate",
         b."startTime",
         b.status,
         b."totalPrice"
       FROM bookings b
-      INNER JOIN customers c ON b."customerId" = c.id
-      INNER JOIN services s ON b."serviceId" = s.id
+      LEFT JOIN customers c ON b."customerId" = c.id
+      LEFT JOIN services s ON b."serviceId" = s.id
       LEFT JOIN services_lang sl ON s.id = sl.service_id 
         AND sl.language_id = (SELECT id FROM languages WHERE code = :lang LIMIT 1)
       INNER JOIN staff st ON b."staffId" = st.id

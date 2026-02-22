@@ -4,20 +4,22 @@ import { BookingStatus } from '../../domain/value-objects/booking-status.vo';
 
 export class CreateBookingDto {
   @ApiProperty({
-    description: 'ID of the service to book',
+    description: 'ID of the service to book (optional for breaks)',
     example: '123e4567-e89b-12d3-a456-426614174001',
+    required: false,
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsUUID()
-  serviceId: string;
+  serviceId?: string;
 
   @ApiProperty({
-    description: 'ID of the customer making the booking',
+    description: 'ID of the customer making the booking (optional for breaks)',
     example: '123e4567-e89b-12d3-a456-426614174002',
+    required: false,
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsUUID()
-  customerId: string;
+  customerId?: string;
 
   @ApiProperty({
     description: 'ID of the staff member (optional, can be auto-assigned)',
