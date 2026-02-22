@@ -63,6 +63,7 @@ export class StaffService {
         status: createStaffDto.status || StaffStatus.ACTIVE,
         specialties: createStaffDto.specialties || [],
         workingDays: createStaffDto.workingDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+        shifts: createStaffDto.shifts || [{ shiftStart: '09:00', shiftEnd: '19:00' }],
         startDate: createStaffDto.startDate ? new Date(createStaffDto.startDate) : undefined,
         bio: createStaffDto.bio,
         commissionPercentage: createStaffDto.commissionPercentage,
@@ -545,6 +546,9 @@ export class StaffService {
     if (updateStaffDto.workingDays !== undefined) {
       updateData.workingDays = updateStaffDto.workingDays?.filter(Boolean) || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
     }
+    if (updateStaffDto.shifts !== undefined) {
+      updateData.shifts = updateStaffDto.shifts || [{ shiftStart: '09:00', shiftEnd: '19:00' }];
+    }
 
     if (updateStaffDto.commissionPercentage !== undefined) {
       updateData.commissionPercentage = updateStaffDto.commissionPercentage;
@@ -639,6 +643,7 @@ export class StaffService {
 
       specialties: staff.specialties || [],
       workingDays: staff.workingDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+      shifts: staff.shifts || [{ shiftStart: '09:00', shiftEnd: '19:00' }],
       commissionPercentage: staff.commissionPercentage,
       hourlyRate: staff.hourlyRate,
       startDate: staff.startDate,

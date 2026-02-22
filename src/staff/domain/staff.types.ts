@@ -14,6 +14,11 @@ export enum StaffStatus {
   SICK_LEAVE = 'SICK_LEAVE'
 }
 
+export interface ShiftSchedule {
+  readonly shiftStart: string;
+  readonly shiftEnd: string;
+}
+
 export interface StaffDomain {
   readonly id: string;
   readonly firstName: string;
@@ -24,6 +29,7 @@ export interface StaffDomain {
   readonly status: StaffStatus;
   readonly serviceIds?: string[];
   readonly specialties?: string[];
+  readonly shifts?: ShiftSchedule[];
   readonly commissionPercentage?: number;
   readonly hourlyRate?: number;
   readonly startDate?: Date;

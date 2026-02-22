@@ -109,6 +109,16 @@ export class CreateStaffDto {
   workingDays?: string[];
 
   @ApiProperty({
+    description: 'Shift schedules. Each shift has shiftStart and shiftEnd in HH:MM format.',
+    example: [{ shiftStart: '09:00', shiftEnd: '12:00' }, { shiftStart: '13:00', shiftEnd: '19:00' }],
+    required: false,
+    type: 'array',
+  })
+  @IsOptional()
+  @IsArray()
+  shifts?: Array<{ shiftStart: string; shiftEnd: string }>;
+
+  @ApiProperty({
     description: 'Commission percentage (0-100)',
     example: 30,
     minimum: 0,

@@ -84,6 +84,13 @@ export class StaffResponseDto {
   workingDays?: string[];
 
   @ApiProperty({
+    description: 'Shift schedules for the staff member',
+    example: [{ shiftStart: '09:00', shiftEnd: '12:00' }, { shiftStart: '13:00', shiftEnd: '19:00' }],
+    required: false,
+  })
+  shifts?: Array<{ shiftStart: string; shiftEnd: string }>;
+
+  @ApiProperty({
     description: 'Commission percentage',
     example: 30,
     required: false,

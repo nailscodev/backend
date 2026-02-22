@@ -149,6 +149,18 @@ export class StaffEntity extends Model<StaffEntity> {
   declare workingDays?: string[];
 
   @ApiProperty({
+    description: 'Shift schedules for the staff member. Each shift has a start and end time (HH:MM).',
+    example: [{ shiftStart: '09:00', shiftEnd: '12:00' }, { shiftStart: '13:00', shiftEnd: '19:00' }],
+    required: false,
+  })
+  @Column({
+    type: DataType.JSONB,
+    allowNull: false,
+    defaultValue: [{ shiftStart: '09:00', shiftEnd: '19:00' }],
+  })
+  declare shifts: Array<{ shiftStart: string; shiftEnd: string }>;
+
+  @ApiProperty({
     description: 'Commission percentage (0-100)',
     example: 30,
     required: false,

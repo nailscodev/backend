@@ -23,6 +23,8 @@ interface Service {
 interface Staff {
   id: string;
   name: string;
+  workingDays?: string[];
+  shifts?: Array<{ shiftStart: string; shiftEnd: string }>;
 }
 
 interface Booking {
@@ -365,8 +367,10 @@ export class MultiServiceAvailabilityService {
         id: string;
         firstName: string;
         lastName: string;
+        workingDays: string[];
+        shifts: Array<{ shiftStart: string; shiftEnd: string }>;
       }>(
-        `SELECT s.id, s."firstName", s."lastName"
+        `SELECT s.id, s."firstName", s."lastName", s."workingDays", s.shifts
          FROM staff s
          INNER JOIN staff_services ss ON s.id = ss.staff_id
          WHERE ss.service_id = $1
@@ -409,8 +413,10 @@ export class MultiServiceAvailabilityService {
               id: string;
               firstName: string;
               lastName: string;
+              workingDays: string[];
+              shifts: Array<{ shiftStart: string; shiftEnd: string }>;
             }>(
-              `SELECT DISTINCT s.id, s."firstName", s."lastName"
+              `SELECT DISTINCT s.id, s."firstName", s."lastName", s."workingDays", s.shifts
                FROM staff s
                INNER JOIN staff_services ss ON s.id = ss.staff_id
                INNER JOIN services srv ON ss.service_id = srv.id
@@ -424,7 +430,12 @@ export class MultiServiceAvailabilityService {
               }
             );
 
-            const staffList = addonStaff.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` }));
+            const staffList = addonStaff.map(s => ({
+              id: s.id,
+              name: `${s.firstName} ${s.lastName}`,
+              workingDays: s.workingDays,
+              shifts: s.shifts,
+            }));
             map.set(serviceId, staffList);
           } else {
             map.set(serviceId, []);
@@ -433,7 +444,12 @@ export class MultiServiceAvailabilityService {
           map.set(serviceId, []);
         }
       } else {
-        const staffList = serviceStaff.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` }));
+        const staffList = serviceStaff.map(s => ({
+          id: s.id,
+          name: `${s.firstName} ${s.lastName}`,
+          workingDays: s.workingDays,
+          shifts: s.shifts,
+        }));
         map.set(serviceId, staffList);
       }
     }
@@ -505,6 +521,55 @@ export class MultiServiceAvailabilityService {
   // ============================================================================
 
   /**
+   * Gets the day abbreviation (Mon, Tue, ...) from a date string (YYYY-MM-DD)
+   */
+  private getDayAbbreviation(date: string): string {
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dateObj = new Date(date + 'T12:00:00'); // noon to avoid timezone issues
+    return dayNames[dateObj.getDay()];
+  }
+
+  /**
+   * Checks if a staff member works on a given day
+   */
+  private isStaffWorkingOnDay(staff: Staff, date: string): boolean {
+    if (!staff.workingDays || staff.workingDays.length === 0) return true; // no restriction
+    const dayAbbr = this.getDayAbbreviation(date);
+    return staff.workingDays.includes(dayAbbr);
+  }
+
+  /**
+   * Checks if a time range (in minutes of day) falls entirely within a staff member's shifts.
+   * Returns true if the ENTIRE range [startMin, endMin] is covered by at least one shift.
+   */
+  private isWithinShifts(shifts: Array<{ shiftStart: string; shiftEnd: string }> | undefined, startMin: number, endMin: number): boolean {
+    if (!shifts || shifts.length === 0) return true; // no shifts defined = always available
+    
+    const parseTime = (t: string): number => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    };
+
+    // The entire slot must fit within a single shift
+    return shifts.some(shift => {
+      const shiftStartMin = parseTime(shift.shiftStart);
+      const shiftEndMin = parseTime(shift.shiftEnd);
+      return startMin >= shiftStartMin && endMin <= shiftEndMin;
+    });
+  }
+
+  /**
+   * Filters a staff-by-service map to only include staff working on the given date
+   */
+  private filterStaffByWorkingDay(staffByService: Map<string, Staff[]>, date: string): Map<string, Staff[]> {
+    const filtered = new Map<string, Staff[]>();
+    staffByService.forEach((staffList, serviceId) => {
+      filtered.set(serviceId, staffList.filter(s => this.isStaffWorkingOnDay(s, date)));
+    });
+    return filtered;
+  }
+
+  /**
    * Genera slots de tiempo base (business hours: 07:30 - 21:30)
    */
   private generateTimeSlots(): Array<{ time: string }> {
@@ -546,6 +611,9 @@ export class MultiServiceAvailabilityService {
     const slots: MultiServiceSlot[] = [];
     const allTimeSlots = this.generateTimeSlots();
 
+    // Filter staff by working day
+    const filteredStaffByService = this.filterStaffByWorkingDay(staffByService, date);
+
     this.logger.log(`   Checking ${allTimeSlots.length} possible time slots...`);
     let slotsChecked = 0;
     let slotsTooLate = 0;
@@ -572,7 +640,7 @@ export class MultiServiceAvailabilityService {
       // Intentar asignar staff para este slot
       let assignments = this.tryAssignStaffForSlot(
         services,
-        staffByService,
+        filteredStaffByService,
         bookings,
         slotStart,
         selectedTechnicianId
@@ -1236,6 +1304,16 @@ export class MultiServiceAvailabilityService {
         continue; // Este técnico está ocupado en este horario
       }
 
+      // Check shift schedule: the entire slot must fit within one of the staff's shifts
+      const slotStartMin = start.getHours() * 60 + start.getMinutes();
+      const slotEndMin = end.getHours() * 60 + end.getMinutes();
+      if (!this.isWithinShifts(staff.shifts, slotStartMin, slotEndMin)) {
+        if (debugSlot) {
+          this.logger.log(`    ${staff.name}: ❌ Outside shift hours`);
+        }
+        continue;
+      }
+
       // Calcular carga de trabajo total del día
       let workload = bookings
         .filter(b => b.staffId === staff.id)
@@ -1415,6 +1493,9 @@ export class MultiServiceAvailabilityService {
     const slots: MultiServiceSlot[] = [];
     const allTimeSlots = this.generateTimeSlots();
 
+    // Filter staff by working day
+    const filteredStaffByService = this.filterStaffByWorkingDay(staffByService, date);
+
     this.logger.log(`   Checking ${allTimeSlots.length} possible time slots for VIP Combo...`);
     this.logger.log(`   Selected technician: ${selectedTechnicianId || 'none'} for service ${selectedServiceId || 'none'}`);
     this.logger.log(`   Existing bookings: ${bookings.length}`);
@@ -1452,7 +1533,7 @@ export class MultiServiceAvailabilityService {
       // Si hay técnico seleccionado, debe estar en todos los slots
       const assignments = this.tryAssignTwoStaffSimultaneously(
         services,
-        staffByService,
+        filteredStaffByService,
         bookings,
         slotStart,
         slotEnd,
@@ -1536,8 +1617,13 @@ export class MultiServiceAvailabilityService {
     
     // Si hay técnico seleccionado, usar lógica especial
     if (selectedTechnicianId) {
+      // Find selected technician's shifts from candidates
+      const allCandidates = [...staff1Candidates, ...staff2Candidates];
+      const selectedTechData = allCandidates.find(s => s.id === selectedTechnicianId);
+      const selectedShifts = selectedTechData?.shifts;
+
       // Verificar que el técnico seleccionado esté disponible
-      const selectedIsAvailable = this.isStaffAvailable(selectedTechnicianId, bookings, slotStart, slotEnd);
+      const selectedIsAvailable = this.isStaffAvailable(selectedTechnicianId, bookings, slotStart, slotEnd, selectedShifts);
       
       if (!selectedIsAvailable) {
         // El técnico seleccionado está ocupado - slot NO disponible
@@ -1601,7 +1687,7 @@ export class MultiServiceAvailabilityService {
       // Buscar técnico disponible para el otro servicio (que sea DIFERENTE)
       const otherAvailable = otherCandidates.filter(staff => 
         staff.id !== selectedTechnicianId && 
-        this.isStaffAvailable(staff.id, bookings, slotStart, slotEnd)
+        this.isStaffAvailable(staff.id, bookings, slotStart, slotEnd, staff.shifts)
       );
       
       if (otherAvailable.length === 0) {
@@ -1669,12 +1755,12 @@ export class MultiServiceAvailabilityService {
 
     // Encontrar todos los técnicos disponibles para servicio 1
     const availableStaff1 = staff1Candidates.filter(staff => 
-      this.isStaffAvailable(staff.id, bookings, slotStart, slotEnd)
+      this.isStaffAvailable(staff.id, bookings, slotStart, slotEnd, staff.shifts)
     );
 
     // Encontrar todos los técnicos disponibles para servicio 2
     const availableStaff2 = staff2Candidates.filter(staff => 
-      this.isStaffAvailable(staff.id, bookings, slotStart, slotEnd)
+      this.isStaffAvailable(staff.id, bookings, slotStart, slotEnd, staff.shifts)
     );
 
     if (slotStart.getHours() <= 8) {
@@ -1727,7 +1813,8 @@ export class MultiServiceAvailabilityService {
     staffId: string,
     bookings: Booking[],
     start: Date,
-    end: Date
+    end: Date,
+    shifts?: Array<{ shiftStart: string; shiftEnd: string }>
   ): boolean {
     // Usar hora local para consistencia con slots generados en hora local
     const getMinutesOfDay = (date: Date): number => {
@@ -1736,6 +1823,13 @@ export class MultiServiceAvailabilityService {
 
     const slotStartMin = getMinutesOfDay(start);
     const slotEndMin = getMinutesOfDay(end);
+
+    // Check shifts if provided
+    if (shifts && shifts.length > 0) {
+      if (!this.isWithinShifts(shifts, slotStartMin, slotEndMin)) {
+        return false;
+      }
+    }
 
     // Debug para el primer booking
     if (bookings.length > 0) {

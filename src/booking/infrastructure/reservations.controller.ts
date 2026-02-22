@@ -1302,15 +1302,26 @@ export class ReservationsController {
     });
 
     // Get all active staff members to know total available staff
-    const allActiveStaff: Array<{ id: string }> = await this.sequelize.query(
-      `SELECT id FROM staff WHERE status = 'ACTIVE' AND "isBookable" = true`,
+    const allActiveStaff: Array<{ id: string; workingDays: string[]; shifts: Array<{ shiftStart: string; shiftEnd: string }> }> = await this.sequelize.query(
+      `SELECT id, "workingDays", shifts FROM staff WHERE status = 'ACTIVE' AND "isBookable" = true`,
       {
         type: QueryTypes.SELECT,
         raw: true
       }
     );
 
-    const allActiveStaffIds: string[] = allActiveStaff.map(staff => staff.id);
+    // Filter staff by working day
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayAbbreviations: Record<string, string> = { 'Sunday': 'Sun', 'Monday': 'Mon', 'Tuesday': 'Tue', 'Wednesday': 'Wed', 'Thursday': 'Thu', 'Friday': 'Fri', 'Saturday': 'Sat' };
+    const requestedDate = new Date(`${date}T12:00:00`);
+    const dayOfWeek = dayNames[requestedDate.getDay()];
+    const dayAbbr = dayAbbreviations[dayOfWeek];
+    const filteredStaff = allActiveStaff.filter(staff => {
+      const wd = staff.workingDays || [];
+      return wd.includes(dayOfWeek) || wd.includes(dayAbbr);
+    });
+
+    const allActiveStaffIds: string[] = filteredStaff.map(staff => staff.id);
 
     // Generate all possible time slots (business hours: 07:30 - 21:30)
     const allTimeSlots = this.generateTimeSlots();
@@ -1376,18 +1387,38 @@ export class ReservationsController {
       });
     });
 
+    // Helper: check if a time slot falls within staff shifts
+    const isSlotWithinShifts = (slotTime: string, shifts: Array<{ shiftStart: string; shiftEnd: string }>) => {
+      if (!shifts || shifts.length === 0) return true; // no shifts defined = always available
+      const [h, m] = slotTime.split(':').map(Number);
+      const slotMin = h * 60 + m;
+      const slotEndMin = slotMin + 60; // 1-hour intervals
+      return shifts.some(shift => {
+        const [sh, sm] = shift.shiftStart.split(':').map(Number);
+        const [eh, em] = shift.shiftEnd.split(':').map(Number);
+        return slotMin >= sh * 60 + sm && slotEndMin <= eh * 60 + em;
+      });
+    };
+
     // Filter available slots
     const availableSlots = allTimeSlots.map(slot => {
       let isAvailable = true;
 
       if (staffId) {
-        // If specific staff requested, check only their bookings
-        const staffBookedSlots = bookedSlotsByStaff.get(staffId) || new Set();
-        isAvailable = !staffBookedSlots.has(slot.time);
+        // If specific staff requested, check only their bookings + shifts
+        const staffData = filteredStaff.find(s => s.id === staffId);
+        if (!staffData) {
+          isAvailable = false; // staff doesn't work this day
+        } else {
+          const staffBookedSlots = bookedSlotsByStaff.get(staffId) || new Set();
+          isAvailable = !staffBookedSlots.has(slot.time) && isSlotWithinShifts(slot.time, staffData.shifts);
+        }
       } else {
-        // If no staff filter ("Any artist"), slot is available if at least one staff member is free
-        const freeStaffCount = Array.from(bookedSlotsByStaff.entries())
-          .filter(([, staffSlots]) => !staffSlots.has(slot.time)).length;
+        // If no staff filter ("Any artist"), slot is available if at least one staff member is free and within shifts
+        const freeStaffCount = filteredStaff.filter(staff => {
+          const staffBookedSlots = bookedSlotsByStaff.get(staff.id) || new Set();
+          return !staffBookedSlots.has(slot.time) && isSlotWithinShifts(slot.time, staff.shifts);
+        }).length;
 
         // Slot is available if at least one staff member is free
         isAvailable = freeStaffCount > 0;
@@ -1538,15 +1569,28 @@ export class ReservationsController {
         id: string;
         firstName: string;
         lastName: string;
+        workingDays?: string[];
+        shifts?: Array<{ shiftStart: string; shiftEnd: string }>;
       }
 
       const allActiveStaff = await this.sequelize.query<StaffRecord>(
-        `SELECT id, "firstName", "lastName" FROM staff WHERE status = 'ACTIVE' AND "isBookable" = true`,
+        `SELECT id, "firstName", "lastName", "workingDays", shifts FROM staff WHERE status = 'ACTIVE' AND "isBookable" = true`,
         {
           type: QueryTypes.SELECT,
           raw: true
         }
       );
+
+      // Filter staff by working day
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayAbbreviations: Record<string, string> = { 'Sunday': 'Sun', 'Monday': 'Mon', 'Tuesday': 'Tue', 'Wednesday': 'Wed', 'Thursday': 'Thu', 'Friday': 'Fri', 'Saturday': 'Sat' };
+      const requestedDate = new Date(`${date}T12:00:00`);
+      const dayOfWeek = dayNames[requestedDate.getDay()];
+      const dayAbbr = dayAbbreviations[dayOfWeek];
+      const filteredActiveStaff = allActiveStaff.filter(staff => {
+        const wd = (staff as any).workingDays || [];
+        return wd.includes(dayOfWeek) || wd.includes(dayAbbr);
+      });
 
       // Get existing bookings for the date
       const existingBookings = await this.bookingModel.findAll({
@@ -1603,6 +1647,19 @@ export class ReservationsController {
         const slotStart = parseTime(startTime);
         const slotEnd = parseTime(endTime);
 
+        // Check shifts
+        const staffData = filteredActiveStaff.find(s => s.id === staffId);
+        if (!staffData) return false; // staff doesn't work this day
+        const staffShifts = (staffData as any).shifts as Array<{ shiftStart: string; shiftEnd: string }> | undefined;
+        if (staffShifts && staffShifts.length > 0) {
+          const withinShift = staffShifts.some(shift => {
+            const shiftStartMin = parseTime(shift.shiftStart);
+            const shiftEndMin = parseTime(shift.shiftEnd);
+            return slotStart >= shiftStartMin && slotEnd <= shiftEndMin;
+          });
+          if (!withinShift) return false;
+        }
+
         console.log(`\n🔍 Checking availability for staff ${staffId}:`, {
           requestedSlot: `${startTime} - ${endTime}`,
           existingBookingsForStaff: existingBookings.filter(b => b.staffId === staffId).length
@@ -1654,7 +1711,7 @@ export class ReservationsController {
             if (service.staffId && service.staffId !== 'any') {
               // Specific staff requested
               if (isStaffAvailable(service.staffId, startTime, serviceEndTime)) {
-                const staffInfo = allActiveStaff.find(s => s.id === service.staffId);
+                const staffInfo = filteredActiveStaff.find(s => s.id === service.staffId);
                 staffAssignments.push({
                   serviceId: service.serviceId,
                   staffId: service.staffId,
@@ -1666,7 +1723,7 @@ export class ReservationsController {
               }
             } else {
               // Any staff - find first available
-              const availableStaff = allActiveStaff.find(s => 
+              const availableStaff = filteredActiveStaff.find(s => 
                 isStaffAvailable(s.id, startTime, serviceEndTime)
               );
               
@@ -1703,7 +1760,7 @@ export class ReservationsController {
             if (service.staffId && service.staffId !== 'any') {
               // Specific staff requested
               if (isStaffAvailable(service.staffId, currentStartTime, serviceEndTime)) {
-                const staffInfo = allActiveStaff.find(s => s.id === service.staffId);
+                const staffInfo = filteredActiveStaff.find(s => s.id === service.staffId);
                 staffAssignments.push({
                   serviceId: service.serviceId,
                   staffId: service.staffId,
@@ -1717,7 +1774,7 @@ export class ReservationsController {
               }
             } else {
               // Any staff - find first available
-              const availableStaff = allActiveStaff.find(s => 
+              const availableStaff = filteredActiveStaff.find(s => 
                 isStaffAvailable(s.id, currentStartTime, serviceEndTime)
               );
               
