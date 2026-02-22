@@ -122,6 +122,20 @@ export class ServicesController {
     return this.servicesService.getCategories();
   }
 
+  @Get('categories/incompatibilities/all')
+  @SkipResponseWrapper(true)
+  @ApiOperation({
+    summary: 'Get all incompatibilities as a map',
+    description: 'Returns { categoryId: [incompatibleCategoryIds] } for ALL categories — used to pre-load at startup'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'All incompatibility pairs as a category map',
+  })
+  async getAllIncompatibilities(): Promise<Record<string, string[]>> {
+    return this.servicesService.getAllIncompatibilities();
+  }
+
   @Get('categories/incompatibilities')
   @SkipResponseWrapper(true)
   @ApiOperation({

@@ -398,6 +398,23 @@ export class ServicesService {
     }
   }
 
+  async getAllIncompatibilities(): Promise<Record<string, string[]>> {
+    try {
+      const all = await this.serviceIncompatibilityModel.findAll({
+        attributes: ['categoryId', 'incompatibleCategoryId'],
+      });
+      const map: Record<string, string[]> = {};
+      for (const row of all) {
+        if (!map[row.categoryId]) map[row.categoryId] = [];
+        map[row.categoryId].push(row.incompatibleCategoryId);
+      }
+      return map;
+    } catch (error) {
+      this.logger.error('Error fetching all incompatibilities:', error);
+      throw error;
+    }
+  }
+
   async getIncompatibleCategories(categoryIds: string[]): Promise<string[]> {
 
     if (!categoryIds || categoryIds.length === 0) {
