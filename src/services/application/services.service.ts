@@ -7,6 +7,7 @@ import { ComboEligibleEntity } from '../infrastructure/persistence/entities/comb
 import { CategoryEntity } from '../../categories/infrastructure/persistence/entities/category.entity';
 import { ServiceLangEntity } from '../infrastructure/persistence/entities/service-lang.entity';
 import { LanguageEntity } from '../../shared/domain/entities/language.entity';
+import { AddOnLangEntity } from '../../addons/infrastructure/persistence/entities/addon-lang.entity';
 import { CreateServiceDto, UpdateServiceDto } from './dto';
 import { Op, QueryTypes } from 'sequelize';
 import { AddOnEntity } from '../../addons/infrastructure/persistence/entities/addon.entity';
@@ -52,6 +53,8 @@ export class ServicesService {
     private readonly serviceLangModel: typeof ServiceLangEntity,
     @InjectModel(LanguageEntity)
     private readonly languageModel: typeof LanguageEntity,
+    @InjectModel(AddOnLangEntity)
+    private readonly addOnLangModel: typeof AddOnLangEntity,
     private readonly sequelize: Sequelize,
   ) { }
 
@@ -96,6 +99,47 @@ export class ServicesService {
     }
 
     return service;
+  }
+
+  /**
+   * Apply translations to an addon entity based on language code
+   */
+  private async applyAddonTranslations(
+    addon: AddOnEntity,
+    languageCode?: string,
+    language?: LanguageEntity,
+  ): Promise<AddOnEntity> {
+    if (!languageCode || languageCode.toUpperCase() === 'EN') {
+      return addon;
+    }
+    try {
+      const lang = language || await this.languageModel.findOne({
+        where: { code: languageCode.toUpperCase(), isActive: true },
+      });
+      if (!lang) return addon;
+      const translation = await this.addOnLangModel.findOne({
+        where: { addonId: addon.id, languageId: lang.id },
+      });
+      if (translation) {
+        addon.name = translation.title;
+        if (translation.description) addon.description = translation.description;
+      }
+    } catch (error) {
+      this.logger.error(`Error applying addon translations: ${error.message}`);
+    }
+    return addon;
+  }
+
+  private async applyAddonsTranslations(
+    addons: AddOnEntity[],
+    languageCode?: string,
+  ): Promise<AddOnEntity[]> {
+    if (!languageCode || languageCode.toUpperCase() === 'EN') return addons;
+    const language = await this.languageModel.findOne({
+      where: { code: languageCode.toUpperCase(), isActive: true },
+    });
+    if (!language) return addons;
+    return Promise.all(addons.map(a => this.applyAddonTranslations(a, languageCode, language)));
   }
 
   /**
@@ -328,7 +372,7 @@ export class ServicesService {
     return { message: `Service with ID ${id} has been deleted` };
   }
 
-  async getAddonsByServiceIds(serviceIds: string[]): Promise<AddOnEntity[]> {
+  async getAddonsByServiceIds(serviceIds: string[], languageCode?: string): Promise<AddOnEntity[]> {
 
     if (!serviceIds || serviceIds.length === 0) {
       return [];
@@ -356,14 +400,14 @@ export class ServicesService {
         model: AddOnEntity,
         mapToModel: true
       });
-      return addOns;
+      return await this.applyAddonsTranslations(addOns, languageCode);
     } catch (error) {
       this.logger.error('Error fetching add-ons by service IDs:', error);
       throw error;
     }
   }
 
-  async getRemovalAddonsByServiceIds(serviceIds: string[]): Promise<AddOnEntity[]> {
+  async getRemovalAddonsByServiceIds(serviceIds: string[], languageCode?: string): Promise<AddOnEntity[]> {
 
     if (!serviceIds || serviceIds.length === 0) {
       return [];
@@ -391,7 +435,7 @@ export class ServicesService {
         model: AddOnEntity,
         mapToModel: true
       });
-      return addOns;
+      return await this.applyAddonsTranslations(addOns, languageCode);
     } catch (error) {
       this.logger.error('Error fetching removal add-ons by service IDs:', error);
       throw error;

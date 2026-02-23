@@ -223,19 +223,22 @@ export class ServicesController {
     description: 'Comma-separated list of service UUIDs',
     example: 'uuid1,uuid2,uuid3'
   })
+  @ApiQuery({ name: 'lang', required: false, type: String, description: 'Language code (EN or ES)' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Add-ons retrieved successfully'
   })
   async getAddonsByServices(
     @Query('serviceIds') serviceIds: string,
+    @Query('lang') lang?: string,
+    @Headers('accept-language') acceptLanguage?: string,
   ) {
     if (!serviceIds) {
       return [];
     }
-
+    const languageCode = lang || acceptLanguage?.split(',')[0]?.split('-')[0];
     const serviceIdArray = serviceIds.split(',').map(id => id.trim());
-    return await this.servicesService.getAddonsByServiceIds(serviceIdArray);
+    return await this.servicesService.getAddonsByServiceIds(serviceIdArray, languageCode);
   }
 
   @Get('removal-addons/by-services')
@@ -251,19 +254,22 @@ export class ServicesController {
     description: 'Comma-separated list of service UUIDs',
     example: 'uuid1,uuid2,uuid3'
   })
+  @ApiQuery({ name: 'lang', required: false, type: String, description: 'Language code (EN or ES)' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Removal add-ons retrieved successfully'
   })
   async getRemovalAddonsByServices(
     @Query('serviceIds') serviceIds: string,
+    @Query('lang') lang?: string,
+    @Headers('accept-language') acceptLanguage?: string,
   ) {
     if (!serviceIds) {
       return [];
     }
-
+    const languageCode = lang || acceptLanguage?.split(',')[0]?.split('-')[0];
     const serviceIdArray = serviceIds.split(',').map(id => id.trim());
-    return await this.servicesService.getRemovalAddonsByServiceIds(serviceIdArray);
+    return await this.servicesService.getRemovalAddonsByServiceIds(serviceIdArray, languageCode);
   }
 
   @Get('combo-eligible/check')
