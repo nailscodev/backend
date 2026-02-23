@@ -11,9 +11,58 @@ import {
   IsDateString,
   IsArray,
   IsBoolean,
+  ValidateNested,
+  Matches,
+  ValidationArguments,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
+  Validate,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { StaffRole, StaffStatus } from '../../domain/staff.types';
+
+// Validador personalizado para verificar que shiftEnd sea posterior a shiftStart
+@ValidatorConstraint({ name: 'isTimeAfter', async: false })
+class IsTimeAfterConstraint implements ValidatorConstraintInterface {
+  validate(shiftEnd: string, args: ValidationArguments): boolean {
+    const obj = args.object as { shiftStart: string; shiftEnd: string };
+    if (!obj.shiftStart || !shiftEnd) return true;
+    
+    const startTime = new Date(`1970-01-01 ${obj.shiftStart}`);
+    const endTime = new Date(`1970-01-01 ${shiftEnd}`);
+    return endTime > startTime;
+  }
+
+  defaultMessage(): string {
+    return 'shiftEnd must be after shiftStart';
+  }
+}
+
+// DTO para validar cada shift individual
+export class ShiftDto {
+  @ApiProperty({
+    description: 'Shift start time in HH:MM format (24-hour)',
+    example: '09:00',
+    pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$',
+  })
+  @IsString()
+  @Matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: 'shiftStart must be in HH:MM format (e.g., 09:00)',
+  })
+  shiftStart: string;
+
+  @ApiProperty({
+    description: 'Shift end time in HH:MM format (24-hour)',
+    example: '17:00',
+    pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$',
+  })
+  @IsString()
+  @Matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: 'shiftEnd must be in HH:MM format (e.g., 17:00)',
+  })
+  @Validate(IsTimeAfterConstraint)
+  shiftEnd: string;
+}
 
 export class CreateStaffDto {
   @ApiProperty({
@@ -112,11 +161,13 @@ export class CreateStaffDto {
     description: 'Shift schedules. Each shift has shiftStart and shiftEnd in HH:MM format.',
     example: [{ shiftStart: '09:00', shiftEnd: '12:00' }, { shiftStart: '13:00', shiftEnd: '19:00' }],
     required: false,
-    type: 'array',
+    type: [ShiftDto],
   })
   @IsOptional()
   @IsArray()
-  shifts?: Array<{ shiftStart: string; shiftEnd: string }>;
+  @ValidateNested({ each: true })
+  @Type(() => ShiftDto)
+  shifts?: ShiftDto[];
 
   @ApiProperty({
     description: 'Commission percentage (0-100)',

@@ -54,6 +54,22 @@ export class StaffService {
     }
 
     try {
+      // Log incoming data for debugging
+      this.logger.debug('Creating staff with data:', JSON.stringify({
+        ...createStaffDto,
+        shifts: createStaffDto.shifts
+      }, null, 2));
+
+      // Filter out invalid shifts and ensure proper structure
+      const validShifts = createStaffDto.shifts?.filter(shift => 
+        shift && 
+        typeof shift === 'object' && 
+        typeof shift.shiftStart === 'string' && 
+        typeof shift.shiftEnd === 'string' &&
+        shift.shiftStart.trim() !== '' &&
+        shift.shiftEnd.trim() !== ''
+      ) || [];
+
       const staffData = {
         firstName: createStaffDto.firstName,
         lastName: createStaffDto.lastName,
@@ -63,7 +79,7 @@ export class StaffService {
         status: createStaffDto.status || StaffStatus.ACTIVE,
         specialties: createStaffDto.specialties || [],
         workingDays: createStaffDto.workingDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-        shifts: createStaffDto.shifts || [{ shiftStart: '09:00', shiftEnd: '19:00' }],
+        shifts: validShifts.length > 0 ? validShifts : [{ shiftStart: '09:00', shiftEnd: '19:00' }],
         startDate: createStaffDto.startDate ? new Date(createStaffDto.startDate) : undefined,
         bio: createStaffDto.bio,
         commissionPercentage: createStaffDto.commissionPercentage,
@@ -104,6 +120,7 @@ export class StaffService {
         where: whereClause,
         offset: (validatedPagination.page - 1) * validatedPagination.limit,
         limit: validatedPagination.limit,
+        include: [ServiceEntity],
         order: [['lastName', 'ASC'], ['firstName', 'ASC']]
       });
 
@@ -161,6 +178,7 @@ export class StaffService {
           status: StaffStatus.ACTIVE,
           isBookable: true
         },
+        include: [ServiceEntity],
         order: [['lastName', 'ASC'], ['firstName', 'ASC']]
       });
 
@@ -280,6 +298,11 @@ export class StaffService {
    * Updates an existing staff member
    */
   async updateStaff(id: string, updateStaffDto: UpdateStaffDto): Promise<StaffResponseDto> {
+    // Log incoming data for debugging
+    this.logger.debug('Updating staff with data:', JSON.stringify({
+      ...updateStaffDto,
+      shifts: updateStaffDto.shifts
+    }, null, 2));
 
     const existingStaff = await this.findStaffEntityById(id);
 
@@ -520,7 +543,17 @@ export class StaffService {
       updateData.workingDays = updateStaffDto.workingDays?.filter(Boolean) || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
     }
     if (updateStaffDto.shifts !== undefined) {
-      updateData.shifts = updateStaffDto.shifts || [{ shiftStart: '09:00', shiftEnd: '19:00' }];
+      // Filter out invalid shifts and ensure proper structure
+      const validShifts = updateStaffDto.shifts?.filter(shift => 
+        shift && 
+        typeof shift === 'object' && 
+        typeof shift.shiftStart === 'string' && 
+        typeof shift.shiftEnd === 'string' &&
+        shift.shiftStart.trim() !== '' &&
+        shift.shiftEnd.trim() !== ''
+      ) || [];
+      
+      updateData.shifts = validShifts.length > 0 ? validShifts : [{ shiftStart: '09:00', shiftEnd: '19:00' }];
     }
 
     if (updateStaffDto.commissionPercentage !== undefined) {

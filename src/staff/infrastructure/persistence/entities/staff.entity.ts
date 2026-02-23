@@ -1,7 +1,8 @@
-import { Table, Column, Model, DataType, Index } from 'sequelize-typescript';
+import { Table, Column, Model, DataType, Index, BelongsToMany } from 'sequelize-typescript';
 import { ApiProperty } from '@nestjs/swagger';
 
 import { ServiceEntity } from '../../../../services/infrastructure/persistence/entities/service.entity';
+import { StaffServiceEntity } from './staff-service.entity';
 
 export enum StaffRole {
   OWNER = 'OWNER',
@@ -302,7 +303,7 @@ export class StaffEntity extends Model<StaffEntity> {
     return this.isActive && this.isBookable;
   }
 
-  // Associations (defined in associations.ts)
+  @BelongsToMany(() => ServiceEntity, () => StaffServiceEntity)
   declare services?: ServiceEntity[];
 }
 

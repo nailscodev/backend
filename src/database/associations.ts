@@ -23,20 +23,7 @@ export function defineAssociations() {
     as: 'services'
   });
 
-  // Staff and Service many-to-many relationship through StaffService
-  StaffEntity.belongsToMany(ServiceEntity, {
-    through: 'staff_services',
-    foreignKey: 'staff_id',
-    otherKey: 'service_id',
-    as: 'services'
-  });
-
-  ServiceEntity.belongsToMany(StaffEntity, {
-    through: 'staff_services',
-    foreignKey: 'service_id',
-    otherKey: 'staff_id',
-    as: 'staff'
-  });
+  // Staff and Service many-to-many relationship handled by decorators in models
 
   // Direct associations for ServiceAddon
   ServiceAddon.belongsTo(ServiceEntity, {

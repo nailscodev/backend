@@ -1,8 +1,9 @@
-import { Table, Column, Model, DataType, ForeignKey, BelongsTo } from 'sequelize-typescript';
+import { Table, Column, Model, DataType, ForeignKey, BelongsTo, BelongsToMany } from 'sequelize-typescript';
 import { ApiProperty } from '@nestjs/swagger';
 import { AddOnEntity } from '../../../../addons/infrastructure/persistence/entities/addon.entity';
 import { CategoryEntity } from '../../../../categories/infrastructure/persistence/entities/category.entity';
 import { StaffEntity } from '../../../../staff/infrastructure/persistence/entities/staff.entity';
+import { StaffServiceEntity } from '../../../../staff/infrastructure/persistence/entities/staff-service.entity';
 
 export enum ServiceCategory {
   NAILS = 'NAILS',
@@ -221,6 +222,7 @@ export class ServiceEntity extends Model<ServiceEntity> {
 
   // Associations (defined in associations.ts)
   addOns?: AddOnEntity[];
+  @BelongsToMany(() => StaffEntity, () => StaffServiceEntity)
   staff?: StaffEntity[];
 
   @BelongsTo(() => CategoryEntity, 'categoryId')
