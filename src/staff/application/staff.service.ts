@@ -104,15 +104,7 @@ export class StaffService {
         where: whereClause,
         offset: (validatedPagination.page - 1) * validatedPagination.limit,
         limit: validatedPagination.limit,
-        order: [['lastName', 'ASC'], ['firstName', 'ASC']],
-        include: [
-          {
-            model: this.serviceModel,
-            as: 'services',
-            attributes: ['id', 'name', 'duration', 'price'],
-            through: { attributes: [] }
-          }
-        ]
+        order: [['lastName', 'ASC'], ['firstName', 'ASC']]
       });
 
       const staffDtos = await Promise.all(staff.map(s => this.mapToResponseDto(s)));
@@ -137,16 +129,7 @@ export class StaffService {
    */
   async findStaffById(id: string): Promise<StaffResponseDto> {
 
-    const staff = await this.staffModel.findByPk(id, {
-      include: [
-        {
-          model: this.serviceModel,
-          as: 'services',
-          attributes: ['id', 'name', 'duration', 'price'],
-          through: { attributes: [] }
-        }
-      ]
-    });
+    const staff = await this.staffModel.findByPk(id);
 
     if (!staff) {
       throw new NotFoundException(`Staff member with ID ${id} not found`);
@@ -178,15 +161,7 @@ export class StaffService {
           status: StaffStatus.ACTIVE,
           isBookable: true
         },
-        order: [['lastName', 'ASC'], ['firstName', 'ASC']],
-        include: [
-          {
-            model: this.serviceModel,
-            as: 'services',
-            attributes: ['id', 'name', 'duration', 'price'],
-            through: { attributes: [] }
-          }
-        ]
+        order: [['lastName', 'ASC'], ['firstName', 'ASC']]
       });
 
       return await Promise.all(staff.map(s => this.mapToResponseDto(s)));
@@ -203,14 +178,12 @@ export class StaffService {
 
     try {
       const staff = await this.staffModel.findAll({
-        include: [{
-          model: ServiceEntity,
-          where: { id: serviceId },
-          attributes: [],
-          through: { attributes: [] }
-        }],
         where: {
-          status: StaffStatus.ACTIVE
+          status: StaffStatus.ACTIVE,
+          isBookable: true,
+          id: {
+            [Op.in]: literal(`(SELECT staff_id FROM staff_services WHERE service_id = '${serviceId}')`)
+          }
         },
         order: [['lastName', 'ASC'], ['firstName', 'ASC']]
       });
