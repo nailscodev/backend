@@ -62,6 +62,13 @@ function parseDatabaseUrl(url: string) {
               logging: !isProduction,
               autoLoadModels: true,
               models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity, CategoryLangEntity],
+              pool: {
+                max: 5,
+                min: 0,
+                acquire: 30000,
+                idle: 10000,
+              },
+              retry: { max: 3 },
               dialectOptions: (isProduction && !disableSSL) ? {
                 ssl: {
                   require: true,
@@ -84,6 +91,13 @@ function parseDatabaseUrl(url: string) {
           logging: !isProduction,
           autoLoadModels: true,
           models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity, CategoryLangEntity],
+          pool: {
+            max: 5,
+            min: 0,
+            acquire: 30000,
+            idle: 10000,
+          },
+          retry: { max: 3 },
         };
       },
     }),
