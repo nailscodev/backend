@@ -65,8 +65,8 @@ export class ServicesService {
     service: ServiceEntity,
     languageCode?: string,
   ): Promise<ServiceEntity> {
-    if (!languageCode || languageCode.toUpperCase() === 'EN') {
-      // No translation needed for English or if no language specified
+    if (!languageCode) {
+      // No language specified, return original
       return service;
     }
 
@@ -109,7 +109,7 @@ export class ServicesService {
     languageCode?: string,
     language?: LanguageEntity,
   ): Promise<AddOnEntity> {
-    if (!languageCode || languageCode.toUpperCase() === 'EN') {
+    if (!languageCode) {
       return addon;
     }
     try {
@@ -134,7 +134,7 @@ export class ServicesService {
     addons: AddOnEntity[],
     languageCode?: string,
   ): Promise<AddOnEntity[]> {
-    if (!languageCode || languageCode.toUpperCase() === 'EN') return addons;
+    if (!languageCode) return addons;
     const language = await this.languageModel.findOne({
       where: { code: languageCode.toUpperCase(), isActive: true },
     });
@@ -149,7 +149,7 @@ export class ServicesService {
     services: ServiceEntity[],
     languageCode?: string,
   ): Promise<ServiceEntity[]> {
-    if (!languageCode || languageCode.toUpperCase() === 'EN') {
+    if (!languageCode) {
       return services;
     }
 
