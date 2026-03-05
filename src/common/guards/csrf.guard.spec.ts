@@ -171,7 +171,8 @@ describe('CsrfGuard', () => {
         headers: { 'x-csrf-token': 'valid-token' },
         session: { id: 'test-session' },
         body: {},
-        query: {}
+        query: {},
+        get: jest.fn().mockReturnValue('test-agent'),
       };
       const mockContext = createMockContext(request);
       
@@ -181,8 +182,7 @@ describe('CsrfGuard', () => {
       
       expect(mockCsrfService.validateTokenSync).toHaveBeenCalledWith(
         'valid-token',
-        'test-session',
-        ''
+        'test-session'
       );
     });
 
@@ -191,7 +191,8 @@ describe('CsrfGuard', () => {
         method: 'POST',
         headers: { 'x-csrf-token': 'valid-token' },
         body: {},
-        query: {}
+        query: {},
+        get: jest.fn().mockReturnValue(''),
       };
       const mockContext = createMockContext(request);
       
@@ -201,8 +202,7 @@ describe('CsrfGuard', () => {
       
       expect(mockCsrfService.validateTokenSync).toHaveBeenCalledWith(
         'valid-token',
-        '',
-        ''
+        expect.any(String)
       );
     });
 

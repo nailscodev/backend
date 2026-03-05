@@ -92,7 +92,7 @@ jobs:
         continue-on-error: true
 
       - name: Run E2E tests
-        run: npm run test:e2e -- --testPathPattern=booking
+        run: npm run test:e2e -- --testPathPatterns=booking
         env:
           NODE_ENV: test
           DATABASE_URL: postgres://testuser:testpass@localhost:5432/nails_and_beauty_test

@@ -1,11 +1,9 @@
 ﻿import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/sequelize';
 import { StaffService } from './staff.service';
-// Update the import path below to the correct location of staff.entity.ts
 import { StaffEntity } from '../../staff/infrastructure/persistence/entities/staff.entity';
-// If the path is incorrect, update it to the correct relative path where staff.entity.ts exists.
-// Example (uncomment and adjust as needed):
-// import { StaffEntity } from '../../correct/path/to/staff.entity';
+import { ServiceEntity } from '../../services/infrastructure/persistence/entities/service.entity';
+import { BookingEntity } from '../../booking/infrastructure/persistence/entities/booking.entity';
 
 describe('StaffService', () => {
   let service: StaffService;
@@ -19,6 +17,17 @@ describe('StaffService', () => {
     count: jest.fn(),
   };
 
+  const mockServiceModel = {
+    findOne: jest.fn(),
+    findAll: jest.fn(),
+  };
+
+  const mockBookingModel = {
+    findOne: jest.fn(),
+    findAll: jest.fn(),
+    count: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -26,6 +35,14 @@ describe('StaffService', () => {
         {
           provide: getModelToken(StaffEntity),
           useValue: mockStaffModel,
+        },
+        {
+          provide: getModelToken(ServiceEntity),
+          useValue: mockServiceModel,
+        },
+        {
+          provide: getModelToken(BookingEntity),
+          useValue: mockBookingModel,
         },
       ],
     }).compile();
