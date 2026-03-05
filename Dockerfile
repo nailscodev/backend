@@ -5,8 +5,16 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-COPY . .
-RUN npm run build
+# Copy configs first (changes often, small)
+COPY tsconfig*.json nest-cli.json ./
+# Copy source separately so its cache key is independent
+COPY src/ ./src/
+# Copy any other needed files
+COPY Procfile* ./
+
+RUN node node_modules/typescript/bin/tsc -p tsconfig.build.json \
+    && echo "BUILD OK — dist has $(find dist -name '*.js' | wc -l) JS files" \
+    && test -f dist/main.js
 
 FROM node:20-alpine AS runner
 

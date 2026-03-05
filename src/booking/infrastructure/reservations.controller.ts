@@ -24,7 +24,7 @@ import {
   ApiParam,
   ApiBody,
 } from '@nestjs/swagger';
-import { Op, QueryTypes } from 'sequelize';
+import { Op, QueryTypes, Transaction } from 'sequelize';
 import { InjectModel } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
 import { BookingEntity } from './persistence/entities/booking.entity';
@@ -2123,45 +2123,63 @@ export class ReservationsController {
         status: createBookingDto.status || 'in_progress',
       };
 
-      // Check for conflicting bookings before creating
-      const conflictingBookings = await this.bookingModel.findAll({
-        where: {
-          staffId: assignedStaffId,
-          appointmentDate: createBookingDto.appointmentDate,
-          status: {
-            [Op.notIn]: ['cancelled', 'completed']
-          }
-        }
-      });
-
-      // Check if there's any time overlap
-      // Times are stored as "HH:MM:SS" strings - compare them directly
-      const parseTimeToMinutes = (timeStr: string) => {
-        const [h, m] = timeStr.split(':').map(Number);
-        return h * 60 + m;
-      };
-
-      const requestStartMinutes = parseTimeToMinutes(createBookingDto.startTime);
-      const requestEndMinutes = parseTimeToMinutes(createBookingDto.endTime);
-
-      for (const booking of conflictingBookings) {
-        const existingStartMinutes = parseTimeToMinutes(String(booking.startTime).slice(0, 5));
-        const existingEndMinutes = parseTimeToMinutes(String(booking.endTime).slice(0, 5));
-
-        // Check for overlap: new booking overlaps if:
-        // new start < existing end AND new end > existing start
-        const hasOverlap = requestStartMinutes < existingEndMinutes && requestEndMinutes > existingStartMinutes;
-
-        if (hasOverlap) {
-          const formatMinutes = (m: number) => `${Math.floor(m/60).toString().padStart(2,'0')}:${(m%60).toString().padStart(2,'0')}`;
-          throw new BadRequestException(
-            `This time slot is no longer available. The staff member already has a booking from ${formatMinutes(existingStartMinutes)} to ${formatMinutes(existingEndMinutes)}.`
+      // Atomic check-and-create: PostgreSQL advisory lock + SERIALIZABLE transaction.
+      // Advisory lock is keyed on staffId:date:startTime — concurrent requests for the
+      // SAME slot wait here instead of racing through the availability check. This
+      // solves the phantom-read issue that SERIALIZABLE alone can't prevent on an
+      // initially-empty result set.
+      const createdBooking = await this.sequelize.transaction(
+        { isolationLevel: Transaction.ISOLATION_LEVELS.SERIALIZABLE },
+        async (t) => {
+          // Acquire per-slot advisory lock — serialises concurrent inserts for the same slot
+          const lockKey = `${assignedStaffId}:${createBookingDto.appointmentDate}:${createBookingDto.startTime}`;
+          await this.sequelize.query(
+            'SELECT pg_advisory_xact_lock(hashtext(:lockKey))',
+            { replacements: { lockKey }, transaction: t },
           );
-        }
-      }
 
-       
-      const createdBooking = await this.bookingModel.create(bookingData as any);
+          // Check for conflicting bookings before creating
+          const conflictingBookings = await this.bookingModel.findAll({
+            where: {
+              staffId: assignedStaffId,
+              appointmentDate: createBookingDto.appointmentDate,
+              status: {
+                [Op.notIn]: ['cancelled', 'completed']
+              }
+            },
+            lock: t.LOCK.UPDATE,
+            transaction: t,
+          });
+
+          // Check if there's any time overlap
+          // Times are stored as "HH:MM:SS" strings - compare them directly
+          const parseTimeToMinutes = (timeStr: string) => {
+            const [h, m] = timeStr.split(':').map(Number);
+            return h * 60 + m;
+          };
+
+          const requestStartMinutes = parseTimeToMinutes(createBookingDto.startTime);
+          const requestEndMinutes = parseTimeToMinutes(createBookingDto.endTime);
+
+          for (const booking of conflictingBookings) {
+            const existingStartMinutes = parseTimeToMinutes(String(booking.startTime).slice(0, 5));
+            const existingEndMinutes = parseTimeToMinutes(String(booking.endTime).slice(0, 5));
+
+            // Check for overlap: new booking overlaps if:
+            // new start < existing end AND new end > existing start
+            const hasOverlap = requestStartMinutes < existingEndMinutes && requestEndMinutes > existingStartMinutes;
+
+            if (hasOverlap) {
+              const formatMinutes = (m: number) => `${Math.floor(m/60).toString().padStart(2,'0')}:${(m%60).toString().padStart(2,'0')}`;
+              throw new BadRequestException(
+                `This time slot is no longer available. The staff member already has a booking from ${formatMinutes(existingStartMinutes)} to ${formatMinutes(existingEndMinutes)}.`
+              );
+            }
+          }
+
+          return await this.bookingModel.create(bookingData as any, { transaction: t });
+        }
+      );
 
       return createdBooking;
     } catch (error: unknown) {

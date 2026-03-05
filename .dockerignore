@@ -9,5 +9,6 @@ README.md
 .vscode
 coverage
 test
-*.test.ts
-*.spec.ts
+tests
+**/*.test.ts
+**/*.spec.ts

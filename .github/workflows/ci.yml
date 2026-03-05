@@ -124,14 +124,19 @@ jobs:
       - name: Build
         run: npm run build
 
-  # Deploy to Render on main branch push (optional - Render auto-deploys)
-  # Uncomment if you want GitHub Actions to trigger deploy
-  # deploy:
-  #   name: Deploy to Render
-  #   needs: [lint, unit-tests, e2e-tests, build]
-  #   runs-on: ubuntu-latest
-  #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-  #   steps:
-  #     - name: Trigger Render Deploy
-  #       run: |
-  #         curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
+  deploy:
+    name: Deploy to Fly.io
+    needs: [lint, unit-tests, build]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Fly.io
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Run deploy
+        run: flyctl deploy --remote-only --strategy=immediate
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

@@ -1,0 +1,141 @@
+# Nails & Co — Artillery Load Test Configuration
+#
+# Usage:
+#   npx artillery run tests/stress/artillery-config.yml
+#   npx artillery run tests/stress/artillery-config.yml --output tests/stress/artillery-report.json
+#   npx artillery report tests/stress/artillery-report.json
+#
+# Environment variable for target:
+#   ARTILLERY_TARGET=https://nails-backend.fly.dev npx artillery run tests/stress/artillery-config.yml
+
+config:
+  target: "{{ $env.ARTILLERY_TARGET || 'https://nailsco-backend.fly.dev' }}"
+  environments:
+    production:
+      target: "https://nails-backend.fly.dev"
+    local:
+      target: "http://localhost:3001"
+  http:
+    timeout: 10
+    pool: 10
+  defaults:
+    headers:
+      Content-Type: "application/json"
+      Accept: "application/json"
+  phases:
+    # Phase 1: Warm-up — gentle ramp-up
+    - name: "warm-up"
+      duration: 30
+      arrivalRate: 5
+      rampTo: 10
+
+    # Phase 2: Steady load — simulate a normal busy day
+    - name: "normal-load"
+      duration: 60
+      arrivalRate: 20
+
+    # Phase 3: Peak load — simulate 50 rps burst (high demand)
+    - name: "peak-load"
+      duration: 60
+      arrivalRate: 50
+
+    # Phase 4: Cool down
+    - name: "cool-down"
+      duration: 30
+      arrivalRate: 5
+
+  ensure:
+    # Acceptance criteria
+    p95: 1500        # 95th percentile must be < 1500ms
+    maxErrorRate: 1  # Error rate must be < 1%
+
+  plugins:
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+
+scenarios:
+  # -------------------------------------------------------------------------
+  # Scenario 1: Browse availability (most common flow — 60% of traffic)
+  # -------------------------------------------------------------------------
+  - name: "Check availability"
+    weight: 60
+    flow:
+      - get:
+          url: "/api/v1/services"
+          name: "GET services"
+          expect:
+            - statusCode: 200
+
+      - get:
+          url: "/api/v1/staff"
+          name: "GET staff"
+          expect:
+            - statusCode: 200
+
+      - get:
+          url: "/api/v1/availability"
+          name: "GET availability"
+          qs:
+            date: "2026-04-15"
+            staffId: "any"
+          expect:
+            - statusCode: 200
+
+  # -------------------------------------------------------------------------
+  # Scenario 2: Full booking flow end-to-end (30% of traffic)
+  # -------------------------------------------------------------------------
+  - name: "Complete booking flow"
+    weight: 30
+    flow:
+      - get:
+          url: "/api/v1/services"
+          name: "GET services"
+
+      - get:
+          url: "/api/v1/staff"
+          name: "GET staff"
+
+      - get:
+          url: "/api/v1/availability"
+          name: "GET availability before booking"
+          qs:
+            date: "2026-04-15"
+
+      - post:
+          url: "/api/v1/bookings"
+          name: "POST create booking"
+          json:
+            serviceId: "a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b501"
+            staffId: "20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b301"
+            customerId: "40d1e2f3-a4b5-48c6-d7e8-f9a0b1c2d301"
+            appointmentDate: "2026-04-15"
+            startTime: "10:00:00"
+            endTime: "10:30:00"
+          expect:
+            - statusCode:
+                - 201
+                - 400  # Conflict (slot taken) is acceptable under high concurrent load
+
+  # -------------------------------------------------------------------------
+  # Scenario 3: Admin backoffice burst — catalog reads (10% of traffic)
+  # -------------------------------------------------------------------------
+  - name: "Admin catalog burst"
+    weight: 10
+    flow:
+      - get:
+          url: "/api/v1/customers"
+          name: "GET customers"
+          expect:
+            - statusCode: 200
+
+      - get:
+          url: "/api/v1/categories"
+          name: "GET categories"
+          expect:
+            - statusCode: 200
+
+      - get:
+          url: "/api/v1/services"
+          name: "GET services (admin)"
+          expect:
+            - statusCode: 200

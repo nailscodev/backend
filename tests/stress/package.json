@@ -1,0 +1,56 @@
+{
+  "name": "nails-and-beauty-co-stress-tests",
+  "version": "1.0.0",
+  "description": "Stress tests, load tests, and concurrent-booking race condition tests for Nails & Co.",
+  "private": true,
+  "scripts": {
+    "test:concurrent": "jest concurrent-bookings.test.ts --runInBand --no-coverage --forceExit",
+    "test:concurrent:local": "BASE_URL=http://localhost:3001 jest concurrent-bookings.test.ts --runInBand --no-coverage --forceExit",
+
+    "k6:run": "k6 run booking-stress.js",
+    "k6:run:local": "k6 run booking-stress.js --env BASE_URL=http://localhost:3001",
+    "k6:ci": "k6 run booking-stress.js --out json=k6-results.json",
+
+    "artillery:run": "npx artillery run artillery-config.yml",
+    "artillery:run:local": "ARTILLERY_TARGET=http://localhost:3001 npx artillery run artillery-config.yml",
+    "artillery:report": "npx artillery report artillery-report.json",
+
+    "stress:all": "npm run k6:run && npm run artillery:run && npm run test:concurrent"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/*.test.ts"
+    ],
+    "globals": {
+      "ts-jest": {
+        "tsconfig": {
+          "esModuleInterop": true,
+          "resolveJsonModule": true
+        }
+      }
+    }
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.12.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.4",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "axios": "^1.7.2"
+  },
+  "notes": {
+    "k6": "k6 must be installed separately at the system level. See https://grafana.com/docs/k6/latest/get-started/installation/",
+    "k6:windows": "winget install k6  or  choco install k6",
+    "k6:mac": "brew install k6",
+    "k6:docker": "docker run --rm -i grafana/k6 run - <booking-stress.js",
+    "artillery": "Install globally: npm install -g artillery  (not a local dep to avoid AWS SDK version conflicts)",
+    "env:BASE_URL": "Set BASE_URL env var to point at your backend (default: https://nails-backend.fly.dev)",
+    "env:AUTH_TOKEN": "If your /api/bookings endpoint requires auth, set AUTH_TOKEN=Bearer <token>",
+    "env:TEST_SERVICE_ID": "Set TEST_SERVICE_ID to a real service UUID from your DB for concurrent tests",
+    "env:TEST_STAFF_ID": "Set TEST_STAFF_ID to a real staff member UUID for concurrent tests"
+  }
+}
