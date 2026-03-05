@@ -44,6 +44,7 @@ function parseDatabaseUrl(url: string) {
       useFactory: (configService: ConfigService) => {
         const databaseUrl = configService.get('DATABASE_URL');
         const isProduction = configService.get('NODE_ENV') === 'production';
+        const isTest = configService.get('NODE_ENV') === 'test';
         const disableSSL = configService.get('DB_SSL') === 'false' || databaseUrl?.includes('sslmode=disable');
         
         // If DATABASE_URL is provided (Render, Heroku, Fly.io, etc.), parse it
@@ -58,7 +59,7 @@ function parseDatabaseUrl(url: string) {
               username: dbConfig.username,
               password: dbConfig.password,
               database: dbConfig.database,
-              synchronize: false,
+              synchronize: isTest,
               logging: !isProduction,
               autoLoadModels: true,
               models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity, CategoryLangEntity],
@@ -87,7 +88,7 @@ function parseDatabaseUrl(url: string) {
           username: configService.get('DB_USERNAME', 'postgres'),
           password: configService.get('DB_PASSWORD') || undefined,
           database: configService.get('DB_NAME', 'nailsandco'),
-          synchronize: false,
+          synchronize: isTest,
           logging: !isProduction,
           autoLoadModels: true,
           models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity, CategoryLangEntity],
