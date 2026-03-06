@@ -12,7 +12,7 @@ Sentry.init({
   enabled: process.env.NODE_ENV === 'production' || process.env.SENTRY_DEBUG === '1',
 
   integrations: [
-    Sentry.httpIntegration({ tracing: true }),
+    Sentry.httpIntegration(),
   ],
 
   initialScope: {
