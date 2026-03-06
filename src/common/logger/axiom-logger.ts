@@ -14,9 +14,9 @@ const transports: winston.transport[] = [
           winston.format.colorize(),
           winston.format.timestamp({ format: 'HH:mm:ss' }),
           winston.format.printf(({ level, message, timestamp, context, ...meta }) => {
-            const ctx = context ? ` [${context}]` : '';
+            const ctx = context ? ` [${context as string}]` : '';
             const extra = Object.keys(meta).length ? ' ' + JSON.stringify(meta) : '';
-            return `${timestamp} ${level}${ctx}: ${message}${extra}`;
+            return `${timestamp as string} ${level}${ctx}: ${message as string}${extra}`;
           }),
         ),
   }),
