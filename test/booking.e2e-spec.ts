@@ -63,11 +63,11 @@ describe('Booking System E2E Tests', () => {
     await app.init();
     
     sequelize = moduleFixture.get<Sequelize>(Sequelize);
-  });
+  }, 60000); // 60 second timeout for app initialization
 
   afterAll(async () => {
     await app.close();
-  });
+  }, 30000);
 
   describe('Health Check', () => {
     it('should return health status', async () => {

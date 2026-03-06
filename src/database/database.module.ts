@@ -44,7 +44,9 @@ function parseDatabaseUrl(url: string) {
       useFactory: (configService: ConfigService) => {
         const databaseUrl = configService.get('DATABASE_URL');
         const isProduction = configService.get('NODE_ENV') === 'production';
-        const isTest = configService.get('NODE_ENV') === 'test';
+        // synchronize: false — schema is created by SQL migration files (create-tables.sql).
+        // Setting synchronize: true when the schema already exists causes Sequelize to attempt
+        // CREATE INDEX without IF NOT EXISTS, which fails on an already-seeded database.
         const disableSSL = configService.get('DB_SSL') === 'false' || databaseUrl?.includes('sslmode=disable');
         
         // If DATABASE_URL is provided (Render, Heroku, Fly.io, etc.), parse it
@@ -59,7 +61,7 @@ function parseDatabaseUrl(url: string) {
               username: dbConfig.username,
               password: dbConfig.password,
               database: dbConfig.database,
-              synchronize: isTest,
+              synchronize: false,
               logging: !isProduction,
               autoLoadModels: true,
               models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity, CategoryLangEntity],
@@ -87,8 +89,8 @@ function parseDatabaseUrl(url: string) {
           port: configService.get('DB_PORT', 5432),
           username: configService.get('DB_USERNAME', 'postgres'),
           password: configService.get('DB_PASSWORD') || undefined,
-          database: configService.get('DB_NAME', 'nailsandco'),
-          synchronize: isTest,
+          database: configService.get('DB_DATABASE') || configService.get('DB_NAME', 'nailsandco'),
+          synchronize: false,
           logging: !isProduction,
           autoLoadModels: true,
           models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity, CategoryLangEntity],
