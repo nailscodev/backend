@@ -28,9 +28,10 @@ describe('Booking System E2E Tests', () => {
       gelBasicPedicure: 'c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d702',
     },
     staff: {
-      isabella: '20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b301', // Does Manicure
-      sofia: '20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b303',    // Does Pedicure
-      camila: '20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b302',   // Does both
+      isabella: '20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b301', // Does Manicure (Mon-Sun)
+      sofia: '20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b303',    // Does Pedicure (Mon-Sun)
+      camila: '20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b302',   // Does Manicure (Mon-Sun)
+      luna: '20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b305',     // Does Manicure + Pedicure (Mon-Sun)
     },
     customers: {
       testCustomer: '40d1e2f3-a4b5-48c6-d7e8-f9a0b1c2d301',
@@ -172,7 +173,7 @@ describe('Booking System E2E Tests', () => {
             { id: testData.services.basicSpaPedicure, duration: 45 },
           ],
           date: testDate,
-          selectedTechnicianId: testData.staff.camila, // Camila can do both
+          selectedTechnicianId: testData.staff.luna, // Luna can do both Manicure and Pedicure
         })
         .expect(200);
 
@@ -197,7 +198,7 @@ describe('Booking System E2E Tests', () => {
           ],
           date: testDate,
           startTime: '11:30',
-          selectedTechnicianId: testData.staff.camila,
+          selectedTechnicianId: testData.staff.luna,
         })
         .expect(200);
 
@@ -218,7 +219,7 @@ describe('Booking System E2E Tests', () => {
             { id: testData.services.basicSpaPedicure, duration: 45 },
           ],
           date: testDate,
-          selectedTechnicianId: testData.staff.camila,
+          selectedTechnicianId: testData.staff.luna,
         });
 
       // Use first available slot (avoid hardcoded time dependency)

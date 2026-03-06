@@ -176,11 +176,11 @@ INSERT INTO addons (id, name, description, price, "additionalTime", "isActive", 
 -- =====================================================
 
 INSERT INTO staff (id, "firstName", "lastName", email, phone, role, status, "isBookable", "workingDays", shifts) VALUES
-('20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b301', 'Isabella', 'Martinez', 'isabella.martinez@nailsandco.com', '+1-555-0101', 'TECHNICIAN', 'ACTIVE', true, ARRAY['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], '[{"shiftStart": "09:00", "shiftEnd": "12:00"}, {"shiftStart": "13:00", "shiftEnd": "19:00"}]'),
-('20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b302', 'Camila', 'Rodriguez', 'camila.rodriguez@nailsandco.com', '+1-555-0102', 'TECHNICIAN', 'ACTIVE', true, ARRAY['Tue', 'Wed', 'Thu', 'Fri', 'Sat'], '[{"shiftStart": "09:00", "shiftEnd": "12:00"}, {"shiftStart": "13:00", "shiftEnd": "19:00"}]'),
-('20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b303', 'Sofia', 'Hernandez', 'sofia.hernandez@nailsandco.com', '+1-555-0103', 'TECHNICIAN', 'ACTIVE', true, ARRAY['Mon', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], '[{"shiftStart": "09:00", "shiftEnd": "12:00"}, {"shiftStart": "13:00", "shiftEnd": "19:00"}]'),
-('20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b304', 'Valentina', 'Garcia', 'valentina.garcia@nailsandco.com', '+1-555-0104', 'TECHNICIAN', 'ACTIVE', true, ARRAY['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], '[{"shiftStart": "10:00", "shiftEnd": "18:00"}]'),
-('20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b305', 'Luna', 'Torres', 'luna.torres@nailsandco.com', '+1-555-0105', 'TECHNICIAN', 'ACTIVE', true, ARRAY['Wed', 'Thu', 'Fri', 'Sat', 'Sun'], '[{"shiftStart": "09:00", "shiftEnd": "13:00"}, {"shiftStart": "14:00", "shiftEnd": "19:00"}]');
+('20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b301', 'Isabella', 'Martinez', 'isabella.martinez@nailsandco.com', '+1-555-0101', 'TECHNICIAN', 'ACTIVE', true, ARRAY['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], '[{"shiftStart": "09:00", "shiftEnd": "12:00"}, {"shiftStart": "13:00", "shiftEnd": "19:00"}]'),
+('20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b302', 'Camila', 'Rodriguez', 'camila.rodriguez@nailsandco.com', '+1-555-0102', 'TECHNICIAN', 'ACTIVE', true, ARRAY['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], '[{"shiftStart": "09:00", "shiftEnd": "12:00"}, {"shiftStart": "13:00", "shiftEnd": "19:00"}]'),
+('20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b303', 'Sofia', 'Hernandez', 'sofia.hernandez@nailsandco.com', '+1-555-0103', 'TECHNICIAN', 'ACTIVE', true, ARRAY['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], '[{"shiftStart": "09:00", "shiftEnd": "12:00"}, {"shiftStart": "13:00", "shiftEnd": "19:00"}]'),
+('20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b304', 'Valentina', 'Garcia', 'valentina.garcia@nailsandco.com', '+1-555-0104', 'TECHNICIAN', 'ACTIVE', true, ARRAY['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], '[{"shiftStart": "10:00", "shiftEnd": "18:00"}]'),
+('20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b305', 'Luna', 'Torres', 'luna.torres@nailsandco.com', '+1-555-0105', 'TECHNICIAN', 'ACTIVE', true, ARRAY['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], '[{"shiftStart": "09:00", "shiftEnd": "13:00"}, {"shiftStart": "14:00", "shiftEnd": "19:00"}]');
 
 -- =====================================================
 -- INSERT USERS - Admin and staff users
