@@ -63,6 +63,12 @@ describe('Booking System E2E Tests', () => {
     await app.init();
     
     sequelize = moduleFixture.get<Sequelize>(Sequelize);
+
+    // Clean up any bookings created in previous test runs for the test customer
+    // This ensures tests are idempotent when run against the same DB
+    await sequelize.query(
+      `DELETE FROM bookings WHERE "customerId" = '40d1e2f3-a4b5-48c6-d7e8-f9a0b1c2d301'`
+    );
   }, 60000); // 60 second timeout for app initialization
 
   afterAll(async () => {
@@ -195,6 +201,25 @@ describe('Booking System E2E Tests', () => {
     });
 
     it('should verify slot availability with permutations', async () => {
+      // First get available slots to find a valid start time (avoids hardcoded time that may already be booked)
+      const slotsResp = await request(app.getHttpServer())
+        .post('/api/v1/bookings/multi-service-slots')
+        .send({
+          servicesWithAddons: [
+            { id: testData.services.basicManicure, duration: 30 },
+            { id: testData.services.basicSpaPedicure, duration: 45 },
+          ],
+          date: testDate,
+          selectedTechnicianId: testData.staff.luna,
+        });
+
+      expect(slotsResp.body.data.data.length).toBeGreaterThan(0);
+      const availableSlot = slotsResp.body.data.data[0];
+      // Extract HH:MM from the startTime (may be "2026-03-07T09:00:00" or "09:00:00")
+      const startTime = availableSlot.startTime.includes('T')
+        ? availableSlot.startTime.split('T')[1].substring(0, 5)
+        : availableSlot.startTime.substring(0, 5);
+
       const response = await request(app.getHttpServer())
         .post('/api/v1/bookings/verify-slot-with-permutations')
         .send({
@@ -203,10 +228,10 @@ describe('Booking System E2E Tests', () => {
             testData.services.basicSpaPedicure,
           ],
           date: testDate,
-          startTime: '11:30',
+          startTime,
           selectedTechnicianId: testData.staff.luna,
         })
-        .expect(200);
+        .expect(201); // POST endpoints return 201 by default in NestJS
 
       expect(response.body.success).toBe(true);
       // Data is wrapped inside response.body.data
@@ -394,14 +419,17 @@ describe('Booking System E2E Tests', () => {
     const createdBookingIds: string[] = [];
 
     it('should get combo/package services', async () => {
+      // Filter by Combos category UUID (c5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b) from seed data
       const response = await request(app.getHttpServer())
         .get('/api/v1/services')
-        .query({ category: 'Combos' })
+        .query({ category: 'c5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b' })
         .expect(200);
 
       // Services endpoint returns paginated response - check data array exists
       expect(response.body.data).toBeDefined();
-      // Combos category should exist
+      // Combos category should have 3 services (Regular Pack, Perfect Pair, Gel Glam)
+      // Paginated response is NOT wrapped by ResponseInterceptor - fields are at root
+      expect(response.body.total).toBeGreaterThanOrEqual(1);
     });
 
     it('should get slots for combo with multiple services', async () => {
