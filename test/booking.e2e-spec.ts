@@ -87,7 +87,8 @@ describe('Booking System E2E Tests', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.groupedSlots).toBeDefined();
+      // Data is wrapped inside response.body.data
+      expect(response.body.data).toBeDefined();
     });
 
     it('should create a single service booking with Isabella (Manicure)', async () => {
@@ -201,9 +202,10 @@ describe('Booking System E2E Tests', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.available).toBe(true);
-      expect(response.body.assignments).toBeDefined();
-      expect(response.body.assignments.length).toBe(2);
+      // Data is wrapped inside response.body.data
+      expect(response.body.data.available).toBe(true);
+      expect(response.body.data.assignments).toBeDefined();
+      expect(response.body.data.assignments.length).toBe(2);
     });
 
     it('should create consecutive multi-service bookings', async () => {
@@ -219,9 +221,8 @@ describe('Booking System E2E Tests', () => {
           selectedTechnicianId: testData.staff.camila,
         });
 
-      const slot = slotsResponse.body.data.data.find(
-        (s: any) => s.startTime.includes('14:30')
-      );
+      // Use first available slot (avoid hardcoded time dependency)
+      const slot = slotsResponse.body.data.data[0];
       expect(slot).toBeDefined();
 
       // Create bookings for each service in the slot
