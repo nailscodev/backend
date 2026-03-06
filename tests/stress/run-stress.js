@@ -59,6 +59,9 @@ const REQUESTS = [
 
 // ─── Stats accumulator ──────────────────────────────────────────────────────
 const stats = {};
+let testStartTime = 0;
+let testEndTime   = 0;
+
 function initStat(label) {
   if (!stats[label]) stats[label] = { ok: 0, error: 0, latencies: [] };
 }
@@ -151,7 +154,16 @@ function buildSummary() {
   const overallErrPct = totalReqs > 0 ? parseFloat(((totalErr / totalReqs) * 100).toFixed(1)) : 0;
   const passed = sloErrors.length === 0;
 
-  return { timestamp, target: BASE_URL, phase: PHASE_ARG, passed, endpoints, totalRequests: totalReqs, totalOk, totalErrors: totalErr, overallErrorPct: overallErrPct, sloErrors };
+  // Throughput: actual measured req/s over the whole test wall-clock time
+  const durationSec  = testEndTime > testStartTime ? (testEndTime - testStartTime) / 1000 : 1;
+  const throughputRps = parseFloat((totalReqs / durationSec).toFixed(2));
+
+  // Attach per-endpoint throughput (rough: endpoint_reqs / total_duration)
+  for (const ep of endpoints) {
+    ep.rps = parseFloat((ep.requests / durationSec).toFixed(2));
+  }
+
+  return { timestamp, target: BASE_URL, phase: PHASE_ARG, passed, durationSec: parseFloat(durationSec.toFixed(1)), throughputRps, endpoints, totalRequests: totalReqs, totalOk, totalErrors: totalErr, overallErrorPct: overallErrPct, sloErrors };
 }
 
 // ─── Console report ──────────────────────────────────────────────────────────
@@ -164,13 +176,14 @@ function printReport(summary) {
   for (const e of summary.endpoints) {
     const icon = e.errors === 0 ? '✅' : e.errorPct < 5 ? '⚠️ ' : '❌';
     console.log(`  ${icon}  ${e.label}`);
-    console.log(`       requests: ${e.requests}  ok: ${e.ok}  errors: ${e.errors} (${e.errorPct}%)`);
-    console.log(`       latency — avg: ${e.avg}ms  p50: ${e.p50}ms  p95: ${e.p95}ms  p99: ${e.p99}ms`);
+    console.log(`       requests: ${e.requests}  ok: ${e.ok}  errors: ${e.errors} (${e.errorPct}%)  throughput: ${e.rps} req/s`);
+    console.log(`       latency  — min: ${e.min}ms  avg: ${e.avg}ms  p50: ${e.p50}ms  p95: ${e.p95}ms  p99: ${e.p99}ms  max: ${e.max}ms`);
     console.log();
   }
 
   console.log('──────────────────────────────────────────────────');
   console.log(`  TOTAL: ${summary.totalRequests} requests  errors: ${summary.totalErrors} (${summary.overallErrorPct}%)`);
+  console.log(`  SPEED: ${summary.throughputRps} req/s  (${summary.durationSec}s test duration)`);
 
   if (summary.passed) {
     console.log('\n  ✅  All SLOs passed (p95 < 1500ms, error rate < 5%)');
@@ -210,11 +223,14 @@ function saveHtmlReport(summary) {
     return `<tr>
       <td style="font-weight:600">${e.label}</td>
       <td>${e.requests}</td>
+      <td style="color:#0369a1">${e.rps} req/s</td>
       <td style="color:${color}">${e.ok} / ${e.errors} (${e.errorPct}%)</td>
+      <td>${e.min}ms</td>
       <td>${e.avg}ms</td>
       <td>${e.p50}ms</td>
       <td style="${p95Color}">${e.p95}ms</td>
       <td>${e.p99}ms</td>
+      <td>${e.max}ms</td>
     </tr>`;
   }).join('\n');
 
@@ -250,10 +266,12 @@ function saveHtmlReport(summary) {
   <div class="summary">
     <div class="card"><h3>Total Requests</h3><p>${summary.totalRequests}</p></div>
     <div class="card"><h3>Errors</h3><p style="color:${summary.totalErrors === 0 ? '#16a34a' : '#dc2626'}">${summary.totalErrors} (${summary.overallErrorPct}%)</p></div>
+    <div class="card"><h3>Throughput</h3><p style="color:#0369a1">${summary.throughputRps} req/s</p></div>
+    <div class="card"><h3>Duration</h3><p>${summary.durationSec}s</p></div>
     <div class="card"><h3>SLO Violations</h3><p style="color:${summary.sloErrors.length === 0 ? '#16a34a' : '#dc2626'}">${summary.sloErrors.length}</p></div>
   </div>
   <table>
-    <thead><tr><th>Endpoint</th><th>Requests</th><th>Ok / Errors</th><th>Avg</th><th>p50</th><th>p95 (SLO&lt;1500ms)</th><th>p99</th></tr></thead>
+    <thead><tr><th>Endpoint</th><th>Requests</th><th>Throughput</th><th>Ok / Errors</th><th>Min</th><th>Avg</th><th>p50</th><th>p95 (SLO&lt;1500ms)</th><th>p99</th><th>Max</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
   <h2 style="margin-top:32px">SLO Check</h2>
@@ -313,9 +331,13 @@ async function main() {
 
   const selected = phases[PHASE_ARG] || phases.all;
 
+  testStartTime = Date.now();
+
   for (const { name, rps, dur } of selected) {
     await runPhase(name, rps, dur);
   }
+
+  testEndTime = Date.now();
 
   generateReport();
 }
