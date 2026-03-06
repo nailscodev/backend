@@ -4,10 +4,10 @@ import {
   ArgumentsHost,
   HttpException,
   HttpStatus,
-  Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
 import * as Sentry from '@sentry/node';
+import { logger } from '../logger/axiom-logger';
 
 /**
  * Interface defining the structure of error responses
@@ -43,7 +43,6 @@ export interface ErrorResponse {
  */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
-  private readonly logger = new Logger(AllExceptionsFilter.name);
 
   /**
    * Catches and processes all exceptions in the application
@@ -78,10 +77,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message = 'Internal server error';
       error = 'InternalServerError';
 
-      // Log unexpected errors
-      this.logger.error('Unexpected error:', exception);
-
-      // Send 5xx errors to Sentry
+      // Structured log to Axiom + Sentry for 5xx errors
+      logger.error('Unhandled exception', {
+        error: exception instanceof Error ? exception.message : String(exception),
+        stack: exception instanceof Error ? exception.stack : undefined,
+        path: request.url,
+        method: (request as any).method,
+        context: 'AllExceptionsFilter',
+      });
       Sentry.captureException(exception);
     }
 

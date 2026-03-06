@@ -35,13 +35,12 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { AxiomLogger, logger } from './common/logger/axiom-logger';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    logger: process.env.NODE_ENV === 'production'
-      ? ['error', 'warn']
-      : ['error', 'warn', 'log', 'debug'],
-  });
+  const axiomLogger = new AxiomLogger();
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.useLogger(axiomLogger);
 
   // Set content-type header with UTF-8 charset
   app.use((req: any, res: any, next: any) => {
@@ -68,7 +67,6 @@ async function bootstrap() {
   app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
 
   // CORS mejorado
-  console.log('DEBUG: ALLOWED_ORIGINS env var:', process.env.ALLOWED_ORIGINS);
   const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [
     'http://localhost:3002',
     'http://localhost:3001',
@@ -78,7 +76,6 @@ async function bootstrap() {
     'https://frontend-web-wt6y.onrender.com',
     'https://backoffice-web-so8xwa.fly.dev/'
   ];
-  console.log('DEBUG: Allowed origins configured:', allowedOrigins);
 
   app.enableCors({
     origin: allowedOrigins,
@@ -126,12 +123,11 @@ async function bootstrap() {
   const port = process.env.PORT || 3001;
   await app.listen(port, '0.0.0.0');
 
-  console.log(`Application is running on: http://localhost:${port}`);
-  console.log(`API Documentation: http://localhost:${port}/api/docs`);
-  console.log(`CORS enabled for origins: ${allowedOrigins.join(', ')}`);
+  logger.info(`Application running on port ${port}`, { context: 'Bootstrap' });
+  logger.info(`CORS origins: ${allowedOrigins.join(', ')}`, { context: 'Bootstrap' });
 }
 
 bootstrap().catch((error) => {
-  console.error('Error starting application:', error);
+  logger.error('Error starting application', String(error), 'Bootstrap');
   process.exit(1);
 });
