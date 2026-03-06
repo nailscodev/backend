@@ -1,3 +1,34 @@
+// ⚠️  Sentry MUST be imported before everything else
+import * as Sentry from '@sentry/node';
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN || 'https://d21e2ba1c0ed7c5a7bcd51081bc77c97@o4510999499440128.ingest.us.sentry.io/4510999519887360',
+
+  environment: process.env.NODE_ENV || 'development',
+
+  // 10% of requests traced in prod
+  tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+
+  enabled: process.env.NODE_ENV === 'production' || process.env.SENTRY_DEBUG === '1',
+
+  integrations: [
+    Sentry.httpIntegration({ tracing: true }),
+  ],
+
+  initialScope: {
+    tags: { app: 'nailsco-backend' },
+  },
+
+  beforeSend(event) {
+    // Tag booking endpoint errors as critical
+    const url = event.request?.url ?? '';
+    if (url.includes('/bookings')) {
+      event.tags = { ...event.tags, flow: 'booking', critical: true };
+    }
+    return event;
+  },
+});
+
 import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';

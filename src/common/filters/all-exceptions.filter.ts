@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
+import * as Sentry from '@sentry/node';
 
 /**
  * Interface defining the structure of error responses
@@ -76,9 +77,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
       status = HttpStatus.INTERNAL_SERVER_ERROR;
       message = 'Internal server error';
       error = 'InternalServerError';
-      
+
       // Log unexpected errors
       this.logger.error('Unexpected error:', exception);
+
+      // Send 5xx errors to Sentry
+      Sentry.captureException(exception);
     }
 
     const errorResponse: ErrorResponse = {
