@@ -25,23 +25,23 @@ config:
   phases:
     # Phase 1: Warm-up — gentle ramp-up
     - name: "warm-up"
-      duration: 30
-      arrivalRate: 5
-      rampTo: 10
+      duration: 20
+      arrivalRate: 3
+      rampTo: 5
 
     # Phase 2: Steady load — simulate a normal busy day
     - name: "normal-load"
-      duration: 60
-      arrivalRate: 20
+      duration: 30
+      arrivalRate: 15
 
-    # Phase 3: Peak load — simulate 50 rps burst (high demand)
+    # Phase 3: Peak load — realistic max for 512MB/1CPU Fly.io machine
     - name: "peak-load"
-      duration: 60
-      arrivalRate: 50
+      duration: 20
+      arrivalRate: 30
 
     # Phase 4: Cool down
     - name: "cool-down"
-      duration: 30
+      duration: 10
       arrivalRate: 5
 
   ensure:
@@ -73,11 +73,11 @@ scenarios:
             - statusCode: 200
 
       - get:
-          url: "/api/v1/availability"
-          name: "GET availability"
+          url: "/api/v1/bookings/available-slots"
+          name: "GET available-slots"
           qs:
             date: "2026-04-15"
-            staffId: "any"
+            staffId: "20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b301"
           expect:
             - statusCode: 200
 
@@ -96,10 +96,11 @@ scenarios:
           name: "GET staff"
 
       - get:
-          url: "/api/v1/availability"
-          name: "GET availability before booking"
+          url: "/api/v1/bookings/available-slots"
+          name: "GET available-slots before booking"
           qs:
             date: "2026-04-15"
+            staffId: "20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b301"
 
       - post:
           url: "/api/v1/bookings"

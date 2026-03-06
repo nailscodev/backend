@@ -1,4 +1,6 @@
 node_modules/
+reports/
+*.json.tmp
 package-lock.json
 *.tsbuildinfo
 dist/

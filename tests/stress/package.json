@@ -4,6 +4,9 @@
   "description": "Stress tests, load tests, and concurrent-booking race condition tests for Nails & Co.",
   "private": true,
   "scripts": {
+    "stress": "node run-stress.js",
+    "stress:local": "BASE_URL=http://localhost:3001 node run-stress.js",
+    "stress:phase": "node run-stress.js --phase",
     "test:concurrent": "jest concurrent-bookings.test.ts --runInBand --no-coverage --forceExit",
     "test:concurrent:local": "BASE_URL=http://localhost:3001 jest concurrent-bookings.test.ts --runInBand --no-coverage --forceExit",
 

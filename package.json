@@ -26,7 +26,13 @@
     "test:stress": "cd tests/stress && npm run test:concurrent",
     "test:stress:local": "cd tests/stress && npm run test:concurrent:local",
     "test:k6": "cd tests/stress && npm run k6:run",
-    "test:artillery": "cd tests/stress && npm run artillery:run"
+      "test:artillery": "cd tests/stress && npm run artillery:run",
+      "stress": "node tests/stress/run-stress.js",
+      "stress:local": "cross-env BASE_URL=http://localhost:3001 node tests/stress/run-stress.js",
+      "stress:peak": "node tests/stress/run-stress.js --phase peak",
+      "stress:warmup": "node tests/stress/run-stress.js --phase warmup",
+      "stress:report": "node tests/stress/run-stress.js --report",
+      "stress:report:peak": "node tests/stress/run-stress.js --phase peak --report"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",
