@@ -10,6 +10,13 @@ if (!(Test-Path "package.json")) {
 Write-Host "Instalando dependencias..." -ForegroundColor Yellow
 npm install
 
+Write-Host "Compilando proyecto (build inicial)..." -ForegroundColor Yellow
+npm run build
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Error en el build. Revisa los errores de TypeScript arriba." -ForegroundColor Red
+    exit 1
+}
+
 Write-Host "Iniciando servidor..." -ForegroundColor Green
 Write-Host "Backend: http://localhost:3001" -ForegroundColor Cyan
 Write-Host "API Docs: http://localhost:3001/api/docs" -ForegroundColor Cyan
