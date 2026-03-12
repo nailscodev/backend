@@ -87,8 +87,8 @@ jobs:
 
       - name: Seed test data
         run: |
-          PGPASSWORD=testpass psql -h localhost -U testuser -d nails_and_beauty_test -f ./test/create-tables.sql || true
-          PGPASSWORD=testpass psql -h localhost -U testuser -d nails_and_beauty_test -f ./test/seed.sql || true
+          PGPASSWORD=testpass psql -h localhost -U testuser -d nails_and_beauty_test -f ./database/create-tables.sql
+          PGPASSWORD=testpass psql -h localhost -U testuser -d nails_and_beauty_test -f ./database/load-sample-data.sql
         continue-on-error: true
 
       - name: Run E2E tests
