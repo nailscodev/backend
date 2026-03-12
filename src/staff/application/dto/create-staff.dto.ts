@@ -242,4 +242,13 @@ export class CreateStaffDto {
   @IsOptional()
   @IsBoolean()
   isBookable?: boolean = true;
+
+  @ApiProperty({
+    description: 'Whether staff member is visible on the web frontend',
+    example: true,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isWebVisible?: boolean = true;
 }

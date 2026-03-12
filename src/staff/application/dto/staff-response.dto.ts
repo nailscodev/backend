@@ -146,6 +146,12 @@ export class StaffResponseDto {
   isBookable: boolean;
 
   @ApiProperty({
+    description: 'Whether staff member is visible on the web frontend',
+    example: true,
+  })
+  isWebVisible: boolean;
+
+  @ApiProperty({
     description: 'Date when record was created',
     example: '2025-01-15T10:30:00.000Z',
   })

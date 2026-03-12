@@ -86,7 +86,8 @@ export class StaffService {
         hourlyRate: createStaffDto.hourlyRate,
         profilePictureUrl: createStaffDto.profilePictureUrl,
         notes: createStaffDto.notes,
-        isBookable: createStaffDto.isBookable ?? true
+        isBookable: createStaffDto.isBookable ?? true,
+        isWebVisible: createStaffDto.isWebVisible ?? true
       };
 
        
@@ -530,6 +531,9 @@ export class StaffService {
     if (updateStaffDto.isBookable !== undefined) {
       updateData.isBookable = updateStaffDto.isBookable;
     }
+    if (updateStaffDto.isWebVisible !== undefined) {
+      updateData.isWebVisible = updateStaffDto.isWebVisible;
+    }
     if (updateStaffDto.startDate !== undefined) {
       updateData.startDate = updateStaffDto.startDate ? new Date(updateStaffDto.startDate) : undefined;
     }
@@ -658,6 +662,7 @@ export class StaffService {
       profilePictureUrl: staff.profilePictureUrl,
       notes: staff.notes,
       isBookable: staff.isBookable,
+      isWebVisible: staff.isWebVisible,
       isActive: staff.status === StaffStatus.ACTIVE,
       isAvailable: staff.status === StaffStatus.ACTIVE && staff.isBookable,
       createdAt: staff.createdAt,

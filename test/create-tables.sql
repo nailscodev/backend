@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS staff (
     "profilePictureUrl" VARCHAR(500),
     notes TEXT,
     "isBookable" BOOLEAN NOT NULL DEFAULT true,
+    "isWebVisible" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     "deletedAt" TIMESTAMP WITH TIME ZONE

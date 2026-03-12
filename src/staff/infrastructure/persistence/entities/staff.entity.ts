@@ -260,6 +260,17 @@ export class StaffEntity extends Model<StaffEntity> {
   declare isBookable: boolean;
 
   @ApiProperty({
+    description: 'Whether staff member is visible on the web frontend',
+    example: true,
+  })
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: true,
+  })
+  declare isWebVisible: boolean;
+
+  @ApiProperty({
     description: 'When the staff member was created',
     example: '2025-09-21T13:00:00Z',
   })
