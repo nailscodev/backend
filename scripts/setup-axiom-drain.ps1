@@ -1,7 +1,24 @@
-$FLY_TOKEN = "FlyV1 fm2_lJPECAAAAAAAESOixBApDj4jUC1ExUMRMpC7WTU4wrVodHRwczovL2FwaS5mbHkuaW8vdjGWAJLOABYdbh8Lk7lodHRwczovL2FwaS5mbHkuaW8vYWFhL3YxxDzI3OW+2V89qFqUY60ZhNpKYsZc71bn3fxr7ZIep1AZbzGY3MwnNab8Edbkg/W7knMCBErBlxpcarTWEODETrbsmFSPko+A2dLIOp0xivAL0+zNFgZSUq3l21eoykmqDT3vKu8QxPC6D3cVEHca1A6BOl+6Ke3qLAQV9lPDFH05M6x6JzROUwW4M6PFqA2SlAORgc4AzMCjHwWRgqdidWlsZGVyH6J3Zx8BxCAnML8gsB110d6pwzlMspbFpGi2GWO9PtupsC0mkpCZAA=="
+# Setup Axiom Log Drains for Fly.io apps
+#
+# Required environment variables (set before running this script):
+#   $env:FLY_API_TOKEN   - Fly.io API token  (run: flyctl auth token)
+#   $env:AXIOM_TOKEN     - Axiom ingest token (Axiom > Settings > API Tokens)
+#   $env:AXIOM_DATASET   - Axiom dataset name (default: nailsco-logs)
+#
+# Usage:
+#   $env:FLY_API_TOKEN = "FlyV1 ..."
+#   $env:AXIOM_TOKEN   = "xaat-..."
+#   .\setup-axiom-drain.ps1
 
-$AXIOM_TOKEN = "xaat-ca8aea5e-2270-4622-826b-c88ba5cab6fe"
-$AXIOM_DATASET = "nailsco-logs"
+param(
+    [string]$FLY_TOKEN    = $env:FLY_API_TOKEN,
+    [string]$AXIOM_TOKEN  = $env:AXIOM_TOKEN,
+    [string]$AXIOM_DATASET = if ($env:AXIOM_DATASET) { $env:AXIOM_DATASET } else { "nailsco-logs" }
+)
+
+if (-not $FLY_TOKEN)   { Write-Error "FLY_API_TOKEN is not set. Run: flyctl auth token"; exit 1 }
+if (-not $AXIOM_TOKEN) { Write-Error "AXIOM_TOKEN is not set. Get it from Axiom > Settings > API Tokens"; exit 1 }
+
 $AXIOM_URL = "https://api.axiom.co/v1/datasets/$AXIOM_DATASET/ingest"
 
 $headers = @{
