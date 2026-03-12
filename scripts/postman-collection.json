@@ -1,0 +1,3244 @@
+{
+  "info": {
+    "name": "Nails & Beauty Co API",
+    "description": "Colección completa de endpoints para la API de Nails & Beauty Co\n\n🔐 AUTENTICACIÓN:\n- Contraseña actualizada: Hola1234! (para todos los usuarios)\n- CSRF Token requerido para operaciones de escritura\n- Bearer Token será implementado en futuras versiones\n\n👤 USUARIOS DE PRUEBA:\n- admin@nailsco.com / Hola1234! (admin)\n- manager@nailsco.com / Hola1234! (manager)\n- recepcion@nailsco.com / Hola1234! (reception)\n- [staff users] / Hola1234! (staff)\n\n📋 FLUJO RECOMENDADO:\n1. Get CSRF Token\n2. Login User\n3. Usar endpoints con X-CSRF-Token header\n\n📲 MÓDULOS DISPONIBLES:\n- Authentication & CSRF\n- Customers\n- Staff\n- Services\n- Bookings\n- Notifications (con gestión de estado completa)\n- Reports",
+    "version": "2.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "csrfToken",
+      "value": ""
+    },
+    {
+      "key": "lastCustomerId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "lastUserId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "lastBookingId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "lastNotificationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "lastAddOnId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testAddOnId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "frenchTipsId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🏥 Health & Status",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "health"
+              ]
+            }
+          }
+        },
+        {
+          "name": "App Welcome",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "App Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "status"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔒 Security (CSRF)",
+      "item": [
+        {
+          "name": "Get CSRF Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    console.log('Full response:', JSON.stringify(response, null, 2));",
+                  "    if (response.success && response.data && response.data.token) {",
+                  "        const token = response.data.token;",
+                  "        pm.collectionVariables.set('csrfToken', token);",
+                  "        console.log('CSRF Token updated:', token);",
+                  "        console.log('Session ID:', response.data.sessionId);",
+                  "        console.log('Expires In:', response.data.expiresIn, 'ms');",
+                  "        // Test: log token length and first/last chars",
+                  "        console.log('Token length:', token.length);",
+                  "        console.log('Token starts with:', token.substring(0, 20));",
+                  "        console.log('Token ends with:', token.substring(token.length - 20));",
+                  "        // Check if token is Base64 encoded",
+                  "        console.log('Looks like Base64?', /^[A-Za-z0-9+/]+=*$/.test(token));",
+                  "        // Try to see if it contains encrypted prefix",
+                  "        console.log('Contains U2FsdGVkX1?', token.includes('U2FsdGVkX1'));",
+                  "    } else {",
+                  "        console.log('ERROR: Failed to extract token from response');",
+                  "    }",
+                  "} else {",
+                  "    console.log('ERROR: Failed to get CSRF token, status:', pm.response.code);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/csrf/token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "csrf",
+                "token"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Validate CSRF Token",
+          "event": [
+            {
+              "listen": "pre-request",
+              "script": {
+                "exec": [
+                  "const token = pm.collectionVariables.get('csrfToken');",
+                  "console.log('About to validate token:', token);",
+                  "console.log('Token length:', token ? token.length : 'undefined');",
+                  "if (!token) {",
+                  "    console.log('WARNING: csrfToken variable is not set!');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const response = pm.response.json();",
+                  "console.log('Validation response:', JSON.stringify(response, null, 2));",
+                  "if (response.success) {",
+                  "    console.log('Validation result:', response.data);",
+                  "} else {",
+                  "    console.log('Validation failed:', response.error);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/csrf/validate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "csrf",
+                "validate"
+              ]
+            }
+          }
+        },
+        {
+          "name": "CSRF Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/csrf/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "csrf",
+                "health"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "💅 Services",
+      "item": [
+        {
+          "name": "Get All Services",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/services?page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "services"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "category",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "isActive",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Service Categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/services/categories/list",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "services",
+                "categories",
+                "list"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Service by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/services/11111111-1111-1111-1111-111111111111",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "services",
+                "11111111-1111-1111-1111-111111111111"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Service",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Manicura Francesa\",\n  \"description\": \"Manicura clásica francesa con acabado brillante\",\n  \"duration\": 45,\n  \"price\": 2500,\n  \"category\": \"NAILS\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/services",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "services"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Service",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Manicura Francesa Premium\",\n  \"description\": \"Manicura clásica francesa con acabado brillante y tratamiento hidratante\",\n  \"duration\": 60,\n  \"price\": 3000,\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/services/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "services",
+                "11111111-1111-1111-1111-111111111111"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Service",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/services/11111111-1111-1111-1111-111111111111",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "services",
+                "11111111-1111-1111-1111-111111111111"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "� Customers",
+      "item": [
+        {
+          "name": "Get All Customers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Customers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers/search?query=María",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "María",
+                  "description": "Search by name, email, or phone"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Customer by Email",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers/email/laura.perez@email.com",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers",
+                "email",
+                "laura.perez@email.com"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Customer by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers/f0000000-0000-0000-0000-000000000001",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers",
+                "f0000000-0000-0000-0000-000000000001"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    console.log('Customer created:', response);",
+                  "    if (response.id) {",
+                  "        pm.collectionVariables.set('lastCustomerId', response.id);",
+                  "        console.log('Saved customer ID:', response.id);",
+                  "    }",
+                  "} else {",
+                  "    console.log('Error creating customer:', pm.response.text());",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Valentina\",\n  \"lastName\": \"Rodriguez\",\n  \"email\": \"valentina.rodriguez@email.com\",\n  \"phone\": \"+54 9 11 9876-5432\",\n  \"birthDate\": \"1993-08-25\",\n  \"notes\": \"Nueva cliente, prefiere servicios de manicura y nail art\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Customer",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Laura Patricia\",\n  \"lastName\": \"Pérez García\",\n  \"phone\": \"+1234567897\",\n  \"notes\": \"Cliente frecuente y VIP, prefiere colores suaves y diseños elegantes\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers/f0000000-0000-0000-0000-000000000001",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers",
+                "f0000000-0000-0000-0000-000000000001"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Customer",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers/{{lastCustomerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers",
+                "{{lastCustomerId}}"
+              ],
+              "description": "Delete the customer that was just created (uses variable from Create Customer test)"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🎨 AddOns",
+      "item": [
+        {
+          "name": "Get All AddOns",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has pagination info', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData).to.have.property('pagination');",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addons?page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page"
+                },
+                {
+                  "key": "category",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by category"
+                },
+                {
+                  "key": "isActive",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by active status"
+                },
+                {
+                  "key": "serviceId",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by compatible service"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Search in name/description"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get AddOn Categories",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Categories are returned', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "    pm.expect(jsonData.data).to.include('NAIL_ART');",
+                  "    pm.expect(jsonData.data).to.include('NAIL_CARE');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addons/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons",
+                "categories"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Compatible AddOns for Service",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Compatible AddOns returned', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "    // All returned addons should be active",
+                  "    jsonData.data.forEach(addon => {",
+                  "        pm.expect(addon.isActive).to.be.true;",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addons/compatible/11111111-1111-1111-1111-111111111111",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons",
+                "compatible",
+                "11111111-1111-1111-1111-111111111111"
+              ],
+              "description": "Get addons compatible with Manicure Básica service (use real service UUID)"
+            }
+          }
+        },
+        {
+          "name": "Get AddOn by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 && pm.response.json().success) {",
+                  "    const responseData = pm.response.json().data;",
+                  "    pm.collectionVariables.set('testAddOnId', responseData.id);",
+                  "    console.log('Retrieved AddOn ID:', responseData.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addons/{{lastAddOnId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons",
+                "{{lastAddOnId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create AddOn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201 && pm.response.json().success) {",
+                  "    const responseData = pm.response.json().data;",
+                  "    pm.collectionVariables.set('lastAddOnId', responseData.id);",
+                  "    console.log('Created AddOn ID:', responseData.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Glitter Finish\",\n  \"description\": \"Sparkling glitter overlay for nails\",\n  \"category\": \"NAIL_ART\",\n  \"price\": 1000,\n  \"additionalTime\": 12,\n  \"isActive\": true,\n  \"displayOrder\": 10,\n  \"compatibleServiceIds\": [\"11111111-1111-1111-1111-111111111111\", \"66666666-6666-6666-6666-666666666666\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addons",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update AddOn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has success flag', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('AddOn was updated', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.name).to.eql('Updated Glitter Finish');",
+                  "    pm.expect(jsonData.data.price).to.eql(1200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Glitter Finish\",\n  \"description\": \"Enhanced sparkling glitter overlay with premium finish\",\n  \"price\": 1200,\n  \"additionalTime\": 15,\n  \"displayOrder\": 5\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addons/{{lastAddOnId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons",
+                "{{lastAddOnId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Activate AddOn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('AddOn is activated', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.isActive).to.be.true;",
+                  "    pm.expect(jsonData.message).to.include('activated');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addons/{{lastAddOnId}}/activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons",
+                "{{lastAddOnId}}",
+                "activate"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Deactivate AddOn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('AddOn is deactivated', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.isActive).to.be.false;",
+                  "    pm.expect(jsonData.message).to.include('deactivated');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addons/{{lastAddOnId}}/deactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons",
+                "{{lastAddOnId}}",
+                "deactivate"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search AddOns",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addons?search=nail art&category=NAIL_ART&isActive=true&page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "nail art",
+                  "description": "Search in name and description"
+                },
+                {
+                  "key": "category",
+                  "value": "NAIL_ART",
+                  "description": "Filter by add-on category"
+                },
+                {
+                  "key": "isActive",
+                  "value": "true",
+                  "description": "Filter by active status"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page"
+                },
+                {
+                  "key": "serviceId",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by compatible service ID"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Existing AddOn (French Tips)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('French Tips AddOn retrieved', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.name).to.eql('French Tips');",
+                  "    pm.expect(jsonData.data.category).to.eql('NAIL_ART');",
+                  "    pm.expect(jsonData.data.price).to.eql(800);",
+                  "});",
+                  "",
+                  "// Set this ID for testing updates/operations",
+                  "pm.collectionVariables.set('frenchTipsId', pm.response.json().data.id);",
+                  "console.log('French Tips ID set for testing:', pm.response.json().data.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addons/a1111111-1111-1111-1111-111111111111",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons",
+                "a1111111-1111-1111-1111-111111111111"
+              ],
+              "description": "Get the French Tips AddOn from sample data - great for testing existing data"
+            }
+          }
+        },
+        {
+          "name": "Delete AddOn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('AddOn deleted successfully', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.include('deleted');",
+                  "});",
+                  "",
+                  "// Clear the variable since addon is deleted",
+                  "pm.collectionVariables.unset('lastAddOnId');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addons/{{lastAddOnId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons",
+                "{{lastAddOnId}}"
+              ],
+              "description": "Delete the addon that was just created (uses variable from Create AddOn test)"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "� Service-AddOns",
+      "item": [
+        {
+          "name": "Get AddOns by Service IDs",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has success flag', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('AddOns are returned', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "    console.log('Found', jsonData.data.length, 'compatible addons');",
+                  "});",
+                  "",
+                  "pm.test('Each addon has required fields', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.data.length > 0) {",
+                  "        const addon = jsonData.data[0];",
+                  "        pm.expect(addon).to.have.property('id');",
+                  "        pm.expect(addon).to.have.property('name');",
+                  "        pm.expect(addon).to.have.property('price');",
+                  "        pm.expect(addon).to.have.property('category');",
+                  "        pm.expect(addon).to.have.property('additionalTime');",
+                  "        pm.expect(addon.isActive).to.be.true;",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/services/addons/by-services?serviceIds=11111111-1111-1111-1111-111111111111,66666666-6666-6666-6666-666666666666",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "services",
+                "addons",
+                "by-services"
+              ],
+              "query": [
+                {
+                  "key": "serviceIds",
+                  "value": "11111111-1111-1111-1111-111111111111,66666666-6666-6666-6666-666666666666",
+                  "description": "Comma-separated list of service UUIDs to get compatible addons for"
+                }
+              ],
+              "description": "Get all addons that are compatible with the specified services (Manicure Clasica + Manicure Premium)"
+            }
+          }
+        },
+        {
+          "name": "Get AddOns for Manicure Services",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Manicure-compatible addons returned', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "    ",
+                  "    // Should include French Tips, Nail Art, Hand Massage, etc.",
+                  "    const addonNames = jsonData.data.map(addon => addon.name);",
+                  "    console.log('Available addons for manicure:', addonNames);",
+                  "    ",
+                  "    // Check for expected addon categories",
+                  "    const categories = [...new Set(jsonData.data.map(addon => addon.category))];",
+                  "    console.log('Addon categories:', categories);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/services/addons/by-services?serviceIds=11111111-1111-1111-1111-111111111111",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "services",
+                "addons",
+                "by-services"
+              ],
+              "query": [
+                {
+                  "key": "serviceIds",
+                  "value": "11111111-1111-1111-1111-111111111111",
+                  "description": "Manicure Clasica service ID"
+                }
+              ],
+              "description": "Get all addons compatible with Manicure Clasica service"
+            }
+          }
+        },
+        {
+          "name": "Get AddOns for Pedicure Services",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Pedicure-compatible addons returned', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "    ",
+                  "    // Should include Foot Massage, Cuticle Treatment, Paraffin Treatment",
+                  "    const addonNames = jsonData.data.map(addon => addon.name);",
+                  "    console.log('Available addons for pedicure:', addonNames);",
+                  "    ",
+                  "    // Should have foot-related addons",
+                  "    const hasFootMassage = addonNames.some(name => name.toLowerCase().includes('foot'));",
+                  "    if (hasFootMassage) {",
+                  "        console.log('✅ Foot-related addons found');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/services/addons/by-services?serviceIds=22222222-2222-2222-2222-222222222222,77777777-7777-7777-7777-777777777777",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "services",
+                "addons",
+                "by-services"
+              ],
+              "query": [
+                {
+                  "key": "serviceIds",
+                  "value": "22222222-2222-2222-2222-222222222222,77777777-7777-7777-7777-777777777777",
+                  "description": "Pedicure Spa + Pedicure Express service IDs"
+                }
+              ],
+              "description": "Get all addons compatible with Pedicure services"
+            }
+          }
+        },
+        {
+          "name": "Get AddOns for Gel Nails",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Gel nails addons returned', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "    ",
+                  "    // Should include Gel Removal and Chrome Finish",
+                  "    const addonNames = jsonData.data.map(addon => addon.name);",
+                  "    console.log('Available addons for gel nails:', addonNames);",
+                  "    ",
+                  "    // Check for gel-specific addons",
+                  "    const hasGelRemoval = addonNames.some(name => name.toLowerCase().includes('gel removal'));",
+                  "    const hasChromeFinish = addonNames.some(name => name.toLowerCase().includes('chrome'));",
+                  "    ",
+                  "    if (hasGelRemoval) console.log('✅ Gel Removal addon found');",
+                  "    if (hasChromeFinish) console.log('✅ Chrome Finish addon found');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/services/addons/by-services?serviceIds=33333333-3333-3333-3333-333333333333",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "services",
+                "addons",
+                "by-services"
+              ],
+              "query": [
+                {
+                  "key": "serviceIds",
+                  "value": "33333333-3333-3333-3333-333333333333",
+                  "description": "Unas de Gel service ID"
+                }
+              ],
+              "description": "Get all addons compatible with Gel Nails service"
+            }
+          }
+        },
+        {
+          "name": "Get AddOns for Multiple Services (Complex)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Complex service query works', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "    ",
+                  "    // Group addons by category for better understanding",
+                  "    const categories = {};",
+                  "    jsonData.data.forEach(addon => {",
+                  "        if (!categories[addon.category]) {",
+                  "            categories[addon.category] = [];",
+                  "        }",
+                  "        categories[addon.category].push(addon.name);",
+                  "    });",
+                  "    ",
+                  "    console.log('Addons by category:');",
+                  "    Object.keys(categories).forEach(category => {",
+                  "        console.log(`  ${category}: ${categories[category].join(', ')}`);",
+                  "    });",
+                  "    ",
+                  "    // Should have variety since multiple services are queried",
+                  "    pm.expect(Object.keys(categories).length).to.be.greaterThan(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/services/addons/by-services?serviceIds=11111111-1111-1111-1111-111111111111,22222222-2222-2222-2222-222222222222,33333333-3333-3333-3333-333333333333,66666666-6666-6666-6666-666666666666",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "services",
+                "addons",
+                "by-services"
+              ],
+              "query": [
+                {
+                  "key": "serviceIds",
+                  "value": "11111111-1111-1111-1111-111111111111,22222222-2222-2222-2222-222222222222,33333333-3333-3333-3333-333333333333,66666666-6666-6666-6666-666666666666",
+                  "description": "Multiple services: Manicure Clasica, Pedicure Spa, Unas de Gel, Manicure Premium"
+                }
+              ],
+              "description": "Get all addons compatible with multiple different services - demonstrates the filtering power"
+            }
+          }
+        },
+        {
+          "name": "Empty Service IDs Test",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400 for empty serviceIds', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Error message is appropriate', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.error).to.include('serviceIds');",
+                  "    console.log('Error message:', jsonData.error);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/services/addons/by-services",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "services",
+                "addons",
+                "by-services"
+              ],
+              "description": "Test error handling when no serviceIds parameter is provided"
+            }
+          }
+        },
+        {
+          "name": "Invalid Service ID Test",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 (empty results for invalid IDs)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Empty array returned for invalid service IDs', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "    pm.expect(jsonData.data).to.have.lengthOf(0);",
+                  "    console.log('No addons found for invalid service ID (expected behavior)');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/services/addons/by-services?serviceIds=99999999-9999-9999-9999-999999999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "services",
+                "addons",
+                "by-services"
+              ],
+              "query": [
+                {
+                  "key": "serviceIds",
+                  "value": "99999999-9999-9999-9999-999999999999",
+                  "description": "Non-existent service ID"
+                }
+              ],
+              "description": "Test behavior with invalid/non-existent service IDs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "�👩‍💼 Staff",
+      "item": [
+        {
+          "name": "Get All Staff",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/staff?page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "staff"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "role",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Available Staff",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/staff/available",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "staff",
+                "available"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Staff Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/staff/statistics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "staff",
+                "statistics"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Staff by Service",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/staff/by-service/22222222-2222-2222-2222-222222222222",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "staff",
+                "by-service",
+                "22222222-2222-2222-2222-222222222222"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Staff by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/staff/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "staff",
+                "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Staff",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Martínez\",\n  \"email\": \"ana.martinez@nailsco.com\",\n  \"phone\": \"+34987654321\",\n  \"role\": \"TECHNICIAN\",\n  \"status\": \"ACTIVE\",\n  \"specialties\": [\"Manicura\", \"Nail Art\"],\n  \"commissionPercentage\": 30,\n  \"hourlyRate\": 1500,\n  \"isBookable\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/staff",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "staff"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Staff",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"specialties\": [\"Manicura\", \"Pedicura\", \"Nail Art\", \"Gel\"],\n  \"commissionPercentage\": 35,\n  \"bio\": \"Especialista en nail art con 5 años de experiencia\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/staff/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "staff",
+                "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Activate Staff",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/staff/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "staff",
+                "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                "activate"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Deactivate Staff",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/staff/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/deactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "staff",
+                "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                "deactivate"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Service to Staff",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/staff/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/services/22222222-2222-2222-2222-222222222222",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "staff",
+                "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                "services",
+                "22222222-2222-2222-2222-222222222222"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Remove Service from Staff",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/staff/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/services/22222222-2222-2222-2222-222222222222",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "staff",
+                "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                "services",
+                "22222222-2222-2222-2222-222222222222"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Staff",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/staff/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "staff",
+                "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "� Bookings",
+      "item": [
+        {
+          "name": "Get All Bookings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings?page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by status: PENDING, CONFIRMED, CANCELLED, COMPLETED"
+                },
+                {
+                  "key": "customerId",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by customer ID (UUID)"
+                },
+                {
+                  "key": "staffId",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by staff ID (UUID)"
+                },
+                {
+                  "key": "serviceId",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by service ID (UUID)"
+                },
+                {
+                  "key": "date",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Filter by date (YYYY-MM-DD format)"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Search in notes"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Booking by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/b0000000-0000-0000-0000-000000000001",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "b0000000-0000-0000-0000-000000000001"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    console.log('Booking created:', response);",
+                  "    if (response.id) {",
+                  "        pm.collectionVariables.set('lastBookingId', response.id);",
+                  "        console.log('Saved booking ID:', response.id);",
+                  "    }",
+                  "} else {",
+                  "    console.log('Error creating booking:', pm.response.text());",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceId\": \"11111111-1111-1111-1111-111111111111\",\n  \"customerId\": \"f0000000-0000-0000-0000-000000000001\",\n  \"staffId\": \"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\n  \"appointmentDate\": \"2025-10-15\",\n  \"startTime\": \"14:00:00\",\n  \"endTime\": \"14:45:00\",\n  \"totalPrice\": 25.00,\n  \"notes\": \"Cliente prefiere técnica francesa clásica\",\n  \"status\": \"pending\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Booking",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"appointmentDate\": \"2025-10-15\",\n  \"startTime\": \"15:00:00\",\n  \"endTime\": \"15:45:00\",\n  \"notes\": \"Horario modificado por solicitud del cliente\",\n  \"totalPrice\": 30.00\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/{{lastBookingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{lastBookingId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Confirm Booking",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/{{lastBookingId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{lastBookingId}}",
+                "confirm"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cancel Booking",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Cliente canceló por enfermedad\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/{{lastBookingId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{lastBookingId}}",
+                "cancel"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filter by Status - Pending",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings?status=PENDING&page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PENDING"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filter by Customer",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings?customerId=f0000000-0000-0000-0000-000000000001",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings"
+              ],
+              "query": [
+                {
+                  "key": "customerId",
+                  "value": "f0000000-0000-0000-0000-000000000001",
+                  "description": "Bookings for specific customer"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filter by Date",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings?date=2025-10-15",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings"
+              ],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "2025-10-15",
+                  "description": "All bookings for specific date"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Booking",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/{{lastBookingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{lastBookingId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔔 Notifications",
+      "item": [
+        {
+          "name": "Get All Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications?page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page"
+                },
+                {
+                  "key": "status",
+                  "value": "PENDING",
+                  "disabled": true,
+                  "description": "Filter by status: PENDING, SENT, DELIVERED, FAILED"
+                },
+                {
+                  "key": "type",
+                  "value": "BOOKING_CONFIRMATION",
+                  "disabled": true,
+                  "description": "Filter by type"
+                },
+                {
+                  "key": "channel",
+                  "value": "EMAIL",
+                  "disabled": true,
+                  "description": "Filter by channel: EMAIL, SMS, PUSH, IN_APP"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Search in title and message"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Notification by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/eefb6ede-eb09-49ed-9b30-3d874ee0c938",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "eefb6ede-eb09-49ed-9b30-3d874ee0c938"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Notification",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    console.log('Notification created:', response);",
+                  "    if (response.id) {",
+                  "        pm.collectionVariables.set('lastNotificationId', response.id);",
+                  "        console.log('Last notification ID saved:', response.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"BOOKING_CONFIRMATION\",\n  \"channel\": \"EMAIL\",\n  \"customerId\": \"f0000000-0000-0000-0000-000000000001\",\n  \"bookingId\": \"b0000000-0000-0000-0000-000000000001\",\n  \"title\": \"Confirmación de Cita\",\n  \"message\": \"Su cita ha sido confirmada para el día 15/10/2025 a las 10:00 AM\",\n  \"recipientEmail\": \"maria.garcia@email.com\",\n  \"scheduledAt\": \"2025-10-15T09:30:00Z\",\n  \"metadata\": {\n    \"appointmentDate\": \"2025-10-15T10:00:00Z\",\n    \"serviceName\": \"Manicure Tradicional\",\n    \"customerName\": \"María García\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Notification",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Recordatorio de Cita - ACTUALIZADO\",\n  \"message\": \"Recordatorio: Su cita es mañana a las 10:00 AM. Por favor confirme su asistencia.\",\n  \"scheduledAt\": \"2025-10-14T18:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/{{lastNotificationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "{{lastNotificationId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Mark as Sent",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/{{lastNotificationId}}/mark-sent",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "{{lastNotificationId}}",
+                "mark-sent"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Mark as Delivered",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/{{lastNotificationId}}/mark-delivered",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "{{lastNotificationId}}",
+                "mark-delivered"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Mark as Failed",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"errorMessage\": \"Email delivery failed: Invalid email address\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/{{lastNotificationId}}/mark-failed",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "{{lastNotificationId}}",
+                "mark-failed"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Retry Notification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/{{lastNotificationId}}/retry",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "{{lastNotificationId}}",
+                "retry"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filter by Status (Pending)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications?status=PENDING&page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PENDING",
+                  "description": "Pending notifications"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filter by Customer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications?customerId=f0000000-0000-0000-0000-000000000001",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "customerId",
+                  "value": "f0000000-0000-0000-0000-000000000001",
+                  "description": "Notifications for specific customer"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filter by Type & Channel",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications?type=BOOKING_REMINDER&channel=EMAIL",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "BOOKING_REMINDER",
+                  "description": "Filter by notification type"
+                },
+                {
+                  "key": "channel",
+                  "value": "EMAIL",
+                  "description": "Filter by delivery channel"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search in Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications?search=confirmación&limit=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "confirmación",
+                  "description": "Search in title and message"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Notification",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/{{lastNotificationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "{{lastNotificationId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "�👤 Users & Authentication",
+      "item": [
+        {
+          "name": "User Authentication",
+          "item": [
+            {
+              "name": "Login User",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    const response = pm.response.json();",
+                      "    console.log('Login successful:', response);",
+                      "    console.log('Full response:', JSON.stringify(response, null, 2));",
+                      "    ",
+                      "    // Store auth token if present (for future JWT implementation)",
+                      "    if (response.token) {",
+                      "        pm.collectionVariables.set('authToken', response.token);",
+                      "        console.log('Auth token saved:', response.token);",
+                      "    }",
+                      "    ",
+                      "    // Store user data",
+                      "    if (response.user && response.user.id) {",
+                      "        pm.collectionVariables.set('lastUserId', response.user.id);",
+                      "        console.log('User ID saved:', response.user.id);",
+                      "        console.log('User role:', response.user.role);",
+                      "        console.log('User name:', response.user.name);",
+                      "    }",
+                      "    ",
+                      "    // Success message",
+                      "    console.log('✅ Login successful for user:', response.user?.email || 'Unknown');",
+                      "} else {",
+                      "    console.log('❌ Login failed:', pm.response.text());",
+                      "    console.log('Status code:', pm.response.code);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "X-CSRF-Token",
+                    "value": "{{csrfToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"usernameOrEmail\": \"admin@nailsco.com\",\n  \"password\": \"Hola1234!\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users/login",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "users",
+                    "login"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Change Password",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "X-CSRF-Token",
+                    "value": "{{csrfToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"currentPassword\": \"Hola1234!\",\n  \"newPassword\": \"newPassword123\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users/{{lastUserId}}/change-password",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "users",
+                    "{{lastUserId}}",
+                    "change-password"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "User Management",
+          "item": [
+            {
+              "name": "Get All Users",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-CSRF-Token",
+                    "value": "{{csrfToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users?page=1&limit=10&sortBy=createdAt&sortOrder=desc",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "users"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    },
+                    {
+                      "key": "sortBy",
+                      "value": "createdAt"
+                    },
+                    {
+                      "key": "sortOrder",
+                      "value": "desc"
+                    },
+                    {
+                      "key": "search",
+                      "value": "",
+                      "disabled": true
+                    },
+                    {
+                      "key": "role",
+                      "value": "",
+                      "disabled": true
+                    },
+                    {
+                      "key": "isActive",
+                      "value": "",
+                      "disabled": true
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Search Users",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-CSRF-Token",
+                    "value": "{{csrfToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users?search=admin&page=1&limit=10",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "users"
+                  ],
+                  "query": [
+                    {
+                      "key": "search",
+                      "value": "admin",
+                      "description": "Search in name, email, or username"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    },
+                    {
+                      "key": "role",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Filter by role: admin, manager, reception, staff"
+                    },
+                    {
+                      "key": "isActive",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Filter by active status: true/false"
+                    },
+                    {
+                      "key": "createdAfter",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Filter by creation date (ISO string)"
+                    },
+                    {
+                      "key": "createdBefore",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Filter by creation date (ISO string)"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get User by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-CSRF-Token",
+                    "value": "{{csrfToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users/{{lastUserId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "users",
+                    "{{lastUserId}}"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Create User",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    const response = pm.response.json();",
+                      "    console.log('User created:', response);",
+                      "    if (response.id) {",
+                      "        pm.collectionVariables.set('lastUserId', response.id);",
+                      "        console.log('Saved user ID:', response.id);",
+                      "    }",
+                      "} else {",
+                      "    console.log('Error creating user:', pm.response.text());",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "X-CSRF-Token",
+                    "value": "{{csrfToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"newstaff\",\n  \"email\": \"newstaff@nailsco.com\",\n  \"password\": \"Hola1234!\",\n  \"role\": \"staff\",\n  \"name\": \"Nuevo Staff Member\",\n  \"avatar\": \"https://ui-avatars.com/api/?name=Nuevo+Staff&background=6c757d&color=fff\",\n  \"isActive\": true\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "users"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Update User",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "X-CSRF-Token",
+                    "value": "{{csrfToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Staff Member Actualizado\",\n  \"avatar\": \"https://example.com/new-avatar.jpg\",\n  \"isActive\": true\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users/{{lastUserId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "users",
+                    "{{lastUserId}}"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Activate User",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "X-CSRF-Token",
+                    "value": "{{csrfToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users/{{lastUserId}}/activate",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "users",
+                    "{{lastUserId}}",
+                    "activate"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Deactivate User",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "X-CSRF-Token",
+                    "value": "{{csrfToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users/{{lastUserId}}/deactivate",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "users",
+                    "{{lastUserId}}",
+                    "deactivate"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Delete User",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "X-CSRF-Token",
+                    "value": "{{csrfToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users/{{lastUserId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "users",
+                    "{{lastUserId}}"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "User Queries & Stats",
+          "item": [
+            {
+              "name": "Get Users by Role",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-CSRF-Token",
+                    "value": "{{csrfToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users/by-role/staff",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "users",
+                    "by-role",
+                    "staff"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Active Users",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-CSRF-Token",
+                    "value": "{{csrfToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users/active",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "users",
+                    "active"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Filter Inactive Users",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-CSRF-Token",
+                    "value": "{{csrfToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users?isActive=false&page=1&limit=10",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "users"
+                  ],
+                  "query": [
+                    {
+                      "key": "isActive",
+                      "value": "false",
+                      "description": "Filter only inactive users"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Filter Users by Role",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-CSRF-Token",
+                    "value": "{{csrfToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users/by-role/admin",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "users",
+                    "by-role",
+                    "admin"
+                  ],
+                  "description": "Use admin, manager, reception, or staff"
+                }
+              }
+            },
+            {
+              "name": "Get User Statistics",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-CSRF-Token",
+                    "value": "{{csrfToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users/statistics",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "users",
+                    "statistics"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get User by Email",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-CSRF-Token",
+                    "value": "{{csrfToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users/email/admin@nailsco.com",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "users",
+                    "email",
+                    "admin@nailsco.com"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get User by Username",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-CSRF-Token",
+                    "value": "{{csrfToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users/username/admin",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "users",
+                    "username",
+                    "admin"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -30,7 +30,7 @@ INSERT INTO categories (id, name, "displayOrder", "isActive") VALUES
 ('c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', 'Manicure', 1, TRUE),
 ('c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', 'Nail Enhancements', 2, TRUE),
 ('c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f', 'Pedicure', 3, TRUE),
-('c4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a', 'Kids', 4, TRUE),
+('c4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a', 'Kids', 4, FALSE),
 ('c5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b', 'Combos', 5, TRUE),
 ('c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c', 'Removals', 6, TRUE);
 
@@ -43,19 +43,19 @@ INSERT INTO services (id, name, description, category, category_id, parent_categ
 -- ============== CATEGORY: MANICURE (7 services) - combo=true ==============
 ('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b501', 'Basic Manicure', 'Nail cutting and shaping, cuticle care, and moisturizing, finished with regular polish of your choice from our color collection.', 'NAILS', 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', NULL, 25, 30, 15, true, true, 1, true),
 ('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b502', 'Gel Basic Manicure', 'Nail cutting and shaping, cuticle care, and moisturizing, finished with a long-lasting gel polish of your choice from our color collection.', 'NAILS', 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', NULL, 40, 30, 15, true, true, 2, true),
-('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b503', 'Premium N&Co. Basic Manicure', 'Indulge in the ultimate manicure experience. Includes everything from our Regular Manicure, plus a gentle hand exfoliation with nourishing oils and warm towels for smooth, hydrated, and rejuvenated skin.', 'NAILS', 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', NULL, 40, 40, 15, true, true, 3, true),
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b503', 'Premium N&Co. Manicure', 'Indulge in the ultimate manicure experience. Includes everything from our Regular Manicure, plus a gentle hand exfoliation with nourishing oils and warm towels for smooth, hydrated, and rejuvenated skin.', 'NAILS', 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', NULL, 40, 40, 15, true, true, 3, true),
 ('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b504', 'Premium N&Co. Gel Manicure', 'Indulge in the ultimate manicure experience. Includes everything from our Gel Manicure, plus a gentle hand exfoliation with nourishing oils and warm towels for smooth, hydrated, and rejuvenated skin.', 'NAILS', 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', NULL, 50, 40, 15, true, true, 4, true),
-('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b505', 'Rubber Base / Capping', 'A strengthening gel layer applied to the natural nail to protect and prevent breakage. Ideal for thin or weak nails needing extra support. Includes gel polish of your choice.', 'NAILS', 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', NULL, 65, 80, 15, true, false, 5, true),
-('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b506', 'Regular Polish Change (Mani)', 'Our express manicure includes a color change with your favorite shade from our collection.', 'NAILS', 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', NULL, 15, 20, 10, true, false, 6, true),
-('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b507', 'Gel Polish Change (Mani)', 'Our express gel manicure includes a long-lasting gel polish color change with your choice from our collection.', 'NAILS', 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', NULL, 30, 30, 10, true, false, 7, true),
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b505', 'Builder Gel / BIAB', 'A strengthening gel layer applied to the natural nail to protect and prevent breakage. Ideal for thin or weak nails needing extra support. Includes gel polish of your choice.', 'NAILS', 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', NULL, 65, 80, 15, true, false, 5, true),
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b506', 'Express Mani - Polish', 'Our express manicure includes a color change with your favorite shade from our collection.', 'NAILS', 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', NULL, 15, 20, 10, true, false, 6, true),
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b507', 'Express Mani - Gel', 'Our express gel manicure includes a long-lasting gel polish color change with your choice from our collection.', 'NAILS', 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', NULL, 30, 30, 10, true, false, 7, true),
 
 -- ============== CATEGORY: NAIL ENHANCEMENTS (6 services) - combo=false ==============
 ('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c601', 'Aprés Gel-X With Gel Polish', 'Add natural-looking length to your nails in less time with pre-formed Gel-X tips — lightweight, strong, and safe for your natural nails. Includes buffing, cuticle care, moisturizing, and nail extensions, finished with a gel polish of your choice from our color collection.', 'NAILS', 'c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, 80, 75, 20, true, true, 8, false),
-('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c602', 'Aprés Gel-X Without Gel Polish', 'Add natural-looking length to your nails in less time with pre-formed Gel-X tips — lightweight, strong, and safe for your natural nails. Includes buffing, cuticle care, moisturizing, and nail extensions, ideal for clients who prefer to keep their nails natural.', 'NAILS', 'c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, 70, 75, 20, true, true, 9, false),
-('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c603', 'Acrylic Full Set', 'Enhance your nails with durable short acrylic extensions. Includes prep, tip application, and acrylic build. *Price does not include gel polish — please add it separately if desired. Medium and long lengths available at an additional cost.', 'NAILS', 'c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, 60, 90, 20, true, true, 10, false),
-('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c604', 'Acrylic Refill', 'Revitalize your nails with an acrylic refill to maintain a flawless, polished look. Includes nail reshaping, cuticle care, and acrylic rebalance. *Default price applies to 2-week refills. For 3- or 4-week sets, please select the corresponding add-on below. Gel polish is not included; add it separately if desired.', 'NAILS', 'c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, 40, 90, 15, true, true, 11, false),
-('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c605', 'Polygel Full Set', 'Lightweight yet strong nail extensions that combine the flexibility of gel with the durability of acrylic. Includes shaping, buffing, cuticle care, and extensions sculpted to a natural length. *Price does not include gel polish — please add it separately if desired. Medium and long lengths available at an additional cost.', 'NAILS', 'c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, 70, 90, 20, true, true, 12, false),
-('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c606', 'Polygel Refill', 'Refresh your Polygel extensions with a precise refill. Includes nail reshaping, cuticle care, and polygel rebalance. Default price applies to 2-week refills. For 3- or 4-week sets, please select the corresponding add-on below. Gel polish is not included; add it separately if desired.', 'NAILS', 'c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, 55, 90, 15, true, true, 13, false),
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c602', 'Aprés Gel-X Without Gel Polish', 'Add natural-looking length to your nails in less time with pre-formed Gel-X tips — lightweight, strong, and safe for your natural nails. Includes buffing, cuticle care, moisturizing, and nail extensions, ideal for clients who prefer to keep their nails natural.', 'NAILS', 'c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, 70, 75, 20, false, true, 9, false),
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c603', 'Full Set Acrylic', 'Enhance your nails with durable short acrylic extensions. Includes prep, tip application, and acrylic build. *Price does not include gel polish — please add it separately if desired. Medium and long lengths available at an additional cost.', 'NAILS', 'c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, 60, 90, 20, true, true, 10, false),
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c604', 'Refill Acrylic', 'Revitalize your nails with an acrylic refill to maintain a flawless, polished look. Includes nail reshaping, cuticle care, and acrylic rebalance. *Default price applies to 2-week refills. For 3- or 4-week sets, please select the corresponding add-on below. Gel polish is not included; add it separately if desired.', 'NAILS', 'c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, 40, 0, 15, true, true, 11, false),
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c605', 'Polygel Full Set', 'Lightweight yet strong nail extensions that combine the flexibility of gel with the durability of acrylic. Includes shaping, buffing, cuticle care, and extensions sculpted to a natural length. *Price does not include gel polish — please add it separately if desired. Medium and long lengths available at an additional cost.', 'NAILS', 'c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, 70, 90, 20, false, true, 12, false),
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c606', 'Polygel Refill', 'Refresh your Polygel extensions with a precise refill. Includes nail reshaping, cuticle care, and polygel rebalance. Default price applies to 2-week refills. For 3- or 4-week sets, please select the corresponding add-on below. Gel polish is not included; add it separately if desired.', 'NAILS', 'c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, 55, 90, 15, false, true, 13, false),
 
 -- ============== CATEGORY: PEDICURE (8 services) - combo=true ==============
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d701', 'Basic Spa Pedicure', 'Nail shaping and buffing, cuticle care, and a relaxing foot massage with lotion, finished with a polish of your choice from our color collection.', 'NAILS', 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f', NULL, 35, 45, 15, true, true, 14, true),
@@ -64,8 +64,8 @@ INSERT INTO services (id, name, description, category, category_id, parent_categ
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d704', 'Premium N&Co. Spa Gel Pedicure', 'A rejuvenating pedicure that includes expert nail shaping, cuticle care, natural exfoliation, gentle callus removal, a relaxing oil massage, and warm towels, finished with your choice of long-lasting gel polish for soft, renewed feet.', 'NAILS', 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f', NULL, 60, 60, 15, true, true, 17, true),
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d705', 'Glam Pedi in a Box Pedicure', 'Treat your feet with our four-step treatment, designed to deeply hydrate and restore. Includes a relaxing salt soak, sugar scrub exfoliation, mud masque, and butter massage. Finished with your choice of regular polish.', 'NAILS', 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f', NULL, 55, 60, 15, true, true, 18, true),
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d706', 'Glam Pedi in a Box Gel Pedicure', 'Treat your feet with our four-step treatment, designed to deeply hydrate and restore. Includes a relaxing salt soak, sugar scrub exfoliation, mud masque, and butter massage. Finished with your choice of long-lasting gel polish.', 'NAILS', 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f', NULL, 70, 60, 15, true, true, 19, true),
-('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d707', 'Regular Polish Change (Pedi)', 'Our express pedicure includes a color change with your favorite shade from our collection.', 'NAILS', 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f', NULL, 20, 20, 10, true, false, 20, true),
-('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d708', 'Gel Polish Change (Pedi)', 'Our express gel pedicure includes a long-lasting gel polish color change with your choice from our collection.', 'NAILS', 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f', NULL, 30, 30, 10, true, false, 21, true),
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d707', 'Express Pedi - Polish', 'Our express pedicure includes a color change with your favorite shade from our collection.', 'NAILS', 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f', NULL, 20, 20, 10, true, false, 20, true),
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d708', 'Express Pedi - Gel', 'Our express gel pedicure includes a long-lasting gel polish color change with your choice from our collection.', 'NAILS', 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f', NULL, 30, 30, 10, true, false, 21, true),
 
 -- ============== CATEGORY: KIDS (Ages 3-13) (3 services) - combo=false ==============
 
@@ -83,9 +83,11 @@ INSERT INTO services (id, name, description, category, category_id, parent_categ
 -- Gel Removal - Mani → parent: Manicure
 -- Gel Removal - Pedi → parent: Pedicure
 -- Extensions Removal → parent: Manicure
-('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a001', 'Gel Removal - Mani (Without Service)', 'Gentle gel polish removal **when no other service is booked**. Leaves nails clean and ready to breathe. Booking a new mani or pedi? Please select the main service and add removal as an add-on instead.', 'ADDON', 'c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c', 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', 20, 15, 10, true, false, 28, false),
-('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a002', 'Gel Removal - Pedi (Without Service)', 'Gentle gel polish removal **when no other service is booked**. Leaves nails clean and ready to breathe. Booking a new mani or pedi? Please select the main service and add removal as an add-on instead.', 'ADDON', 'c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c', 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f', 20, 15, 10, true, false, 29, false),
-('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a003', 'Extensions / Rubber / Acrylic Removal', 'Safe removal of acrylics, rubber base, or extensions **when no other service is booked**. Booking a new mani or pedi? Please select the main service and add removal as an add-on instead.', 'ADDON', 'c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c', 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', 20, 25, 10, true, false, 30, false);
+('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a001', 'Gel Removal - Mani (No Service)', 'Gentle gel polish removal **when no other service is booked**. Leaves nails clean and ready to breathe. Booking a new mani or pedi? Please select the main service and add removal as an add-on instead.', 'ADDON', 'c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c', 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', 20, 15, 10, true, false, 28, false),
+('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a002', 'Gel Removal - Pedi (No Service)', 'Gentle gel polish removal **when no other service is booked**. Leaves nails clean and ready to breathe. Booking a new mani or pedi? Please select the main service and add removal as an add-on instead.', 'ADDON', 'c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c', 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f', 20, 15, 10, true, false, 29, false),
+('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a003', 'Extensions or Acrylics Removal', 'Safe removal of acrylics or nail extensions **when no other service is booked**. Booking a new mani or pedi? Please select the main service and add removal as an add-on instead.', 'ADDON', 'c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c', 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', 20, 25, 10, true, false, 30, false),
+('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a004', 'Builder Gel / BIAB Removal - Mani (No Service)', 'Safe removal of builder gel or BIAB **when no other service is booked**. Leaves nails clean and ready to breathe. Booking a new mani? Please select the main service and add removal as an add-on instead.', 'ADDON', 'c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c', 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', 15, 15, 10, true, false, 31, false),
+('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a005', 'Builder Gel / BIAB Removal - Pedi (No Service)', 'Safe removal of builder gel or BIAB **when no other service is booked**. Leaves nails clean and ready to breathe. Booking a new pedi? Please select the main service and add removal as an add-on instead.', 'ADDON', 'c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c', 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f', 15, 15, 10, true, false, 32, false);
 
 -- =====================================================
 -- UPDATE COMBO SERVICES - Set associatedServiceIds
@@ -148,39 +150,47 @@ INSERT INTO addons (id, name, description, price, "additionalTime", "isActive", 
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a409', 'Fix Nail', 'Repair one damaged or broken nail using the same overlay system (gel, capping).', 5, 15, true, 9, false),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a410', 'Fix Nail Extension', 'Rebuild one broken or lifted nail using matching material and finish (Acrylic, Polygel, Gel-X).', 10, 20, true, 10, false),
 -- Add-ons específicos para combos (Mani/Pedi separados)
-('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a411', 'French Design (Mani)', 'Elevate your look with a classic French tip.', 10, 15, true, 11, false),
-('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a412', 'French Design (Pedi)', 'Elevate your look with a classic French tip.', 10, 15, true, 12, false),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a411', 'French Design - Mani', 'Elevate your look with a classic French tip.', 10, 15, true, 11, false),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a412', 'French Design - Pedi', 'Elevate your look with a classic French tip.', 10, 15, true, 12, false),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a413', 'Nail Art (10 M) - Mani', 'Simple design for a quick, elegant look.', 10, 10, true, 13, false),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a414', 'Nail Art (10 M) - Pedi', 'Simple design for a quick, elegant look.', 10, 10, true, 14, false),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a415', 'Nail Art (15 M) - Mani', 'Medium complexity design with added detail.', 15, 15, true, 15, false),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a416', 'Nail Art (15 M) - Pedi', 'Medium complexity design with added detail.', 15, 15, true, 16, false),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a417', 'Nail Art (20 M) - Mani', 'Elaborate design with extra detail.', 25, 20, true, 17, false),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a418', 'Nail Art (20 M) - Pedi', 'Elaborate design with extra detail.', 25, 20, true, 18, false),
-('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a419', 'Extended Massage (Mani)', 'Extend your treatment with 10 more minutes of relaxing massage.', 15, 10, true, 19, false),
-('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a420', 'Extended Massage (Pedi)', 'Extend your treatment with 10 more minutes of relaxing massage.', 15, 10, true, 20, false),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a419', 'Extended Massage - Mani', 'Extend your treatment with 10 more minutes of relaxing massage.', 15, 10, true, 19, false),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a420', 'Extended Massage - Pedi', 'Extend your treatment with 10 more minutes of relaxing massage.', 15, 10, true, 20, false),
 -- Removal add-ons (removal = true) - Converted from services
-('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421', 'Retiro de Gel - Mani', 'Gentle gel polish removal for manicure. Leaves nails clean and ready.', 10, 15, true, 21, true),
-('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a422', 'Retiro de Gel - Pedi', 'Gentle gel polish removal for pedicure. Leaves nails clean and ready.', 10, 15, true, 22, true),
-('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423', 'Retiro de Acrílico / Capping / Extensiones', 'Safe removal of acrylics, rubber base, or extensions.', 20, 25, true, 23, true),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421', 'Gel Removal - Mani', 'Gentle gel polish removal for manicure. Leaves nails clean and ready.', 10, 15, true, 21, true),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a422', 'Gel Removal - Pedi', 'Gentle gel polish removal for pedicure. Leaves nails clean and ready.', 10, 15, true, 22, true),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423', 'Extensions or Acrylics Removal', 'Safe removal of acrylics or nail extensions.', 20, 25, true, 23, true),
 -- New add-ons for Nail Enhancements
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a424', 'Acrylic With Tips M', 'Medium-length acrylic extension upgrade.', 10, 10, true, 24, false),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a425', 'Acrylic With Tips L', 'Long-length acrylic extension upgrade.', 20, 10, true, 25, false),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a426', '+3 Weeks Refill', 'For moderate regrowth.', 10, 0, true, 26, false),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a427', '+4 Weeks Refill', 'For extended regrowth.', 20, 0, true, 27, false),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a428', 'Polygel With Tips M', 'Medium-length Polygel extension upgrade.', 10, 20, true, 28, false),
-('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a429', 'Polygel With Tips L', 'Long-length Polygel extension upgrade.', 20, 20, true, 29, false);
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a429', 'Polygel With Tips L', 'Long-length Polygel extension upgrade.', 20, 20, true, 29, false),
+-- Combo-specific Cat Eye and Chrome (Mani/Pedi variants)
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a430', 'Cat Eye Finish - Mani', 'Unique magnetic gel polish creates a "cat eye" effect for a stunning, reflective finish.', 25, 20, true, 30, false),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a431', 'Cat Eye Finish - Pedi', 'Unique magnetic gel polish creates a "cat eye" effect for a stunning, reflective finish.', 25, 20, true, 31, false),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a432', 'Chrome Finish - Mani', 'A mirror-like chrome layer for a reflective, metallic look - inspired by the Glazed Donut manicure trend.', 10, 20, true, 32, false),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a433', 'Chrome Finish - Pedi', 'A mirror-like chrome layer for a reflective, metallic look - inspired by the Glazed Donut manicure trend.', 10, 20, true, 33, false),
+-- Builder Gel / BIAB Removal add-ons
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434', 'Builder Gel / BIAB Removal - Mani', 'Safe removal of builder gel or BIAB for manicure. Leaves nails clean and ready.', 15, 15, true, 34, true),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a435', 'Builder Gel / BIAB Removal - Pedi', 'Safe removal of builder gel or BIAB for pedicure. Leaves nails clean and ready.', 15, 15, true, 35, true);
 
 -- =====================================================
 -- INSERT STAFF - 5 technicians
 -- workingDays: Mon, Tue, Wed, Thu, Fri, Sat, Sun
 -- =====================================================
 
-INSERT INTO staff (id, "firstName", "lastName", email, phone, role, status, "isBookable", "isWebVisible", "workingDays", shifts) VALUES
-('20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b301', 'Isabella', 'Martinez', 'isabella.martinez@nailsandco.com', '+1-555-0101', 'TECHNICIAN', 'ACTIVE', true, true, ARRAY['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], '[{"shiftStart": "09:00", "shiftEnd": "12:00"}, {"shiftStart": "13:00", "shiftEnd": "19:00"}]'),
-('20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b302', 'Camila', 'Rodriguez', 'camila.rodriguez@nailsandco.com', '+1-555-0102', 'TECHNICIAN', 'ACTIVE', true, true, ARRAY['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], '[{"shiftStart": "09:00", "shiftEnd": "12:00"}, {"shiftStart": "13:00", "shiftEnd": "19:00"}]'),
-('20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b303', 'Sofia', 'Hernandez', 'sofia.hernandez@nailsandco.com', '+1-555-0103', 'TECHNICIAN', 'ACTIVE', true, true, ARRAY['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], '[{"shiftStart": "09:00", "shiftEnd": "12:00"}, {"shiftStart": "13:00", "shiftEnd": "19:00"}]'),
-('20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b304', 'Valentina', 'Garcia', 'valentina.garcia@nailsandco.com', '+1-555-0104', 'TECHNICIAN', 'ACTIVE', true, true, ARRAY['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], '[{"shiftStart": "10:00", "shiftEnd": "18:00"}]'),
-('20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b305', 'Luna', 'Torres', 'luna.torres@nailsandco.com', '+1-555-0105', 'TECHNICIAN', 'ACTIVE', true, true, ARRAY['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], '[{"shiftStart": "09:00", "shiftEnd": "13:00"}, {"shiftStart": "14:00", "shiftEnd": "19:00"}]');
+INSERT INTO staff (id, "firstName", "lastName", email, phone, role, status, "isBookable", "workingDays", shifts) VALUES
+('20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b301', 'Isabella', 'Martinez', 'isabella.martinez@nailsandco.com', '+1-555-0101', 'TECHNICIAN', 'ACTIVE', true, ARRAY['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], '[{"shiftStart": "09:00", "shiftEnd": "12:00"}, {"shiftStart": "13:00", "shiftEnd": "19:00"}]'),
+('20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b302', 'Camila', 'Rodriguez', 'camila.rodriguez@nailsandco.com', '+1-555-0102', 'TECHNICIAN', 'ACTIVE', true, ARRAY['Tue', 'Wed', 'Thu', 'Fri', 'Sat'], '[{"shiftStart": "09:00", "shiftEnd": "12:00"}, {"shiftStart": "13:00", "shiftEnd": "19:00"}]'),
+('20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b303', 'Sofia', 'Hernandez', 'sofia.hernandez@nailsandco.com', '+1-555-0103', 'TECHNICIAN', 'ACTIVE', true, ARRAY['Mon', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], '[{"shiftStart": "09:00", "shiftEnd": "12:00"}, {"shiftStart": "13:00", "shiftEnd": "19:00"}]'),
+('20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b304', 'Valentina', 'Garcia', 'valentina.garcia@nailsandco.com', '+1-555-0104', 'TECHNICIAN', 'ACTIVE', true, ARRAY['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], '[{"shiftStart": "10:00", "shiftEnd": "18:00"}]'),
+('20b1c2d3-e4f5-47a6-b7c8-d9e0f1a2b305', 'Luna', 'Torres', 'luna.torres@nailsandco.com', '+1-555-0105', 'TECHNICIAN', 'ACTIVE', true, ARRAY['Wed', 'Thu', 'Fri', 'Sat', 'Sun'], '[{"shiftStart": "09:00", "shiftEnd": "13:00"}, {"shiftStart": "14:00", "shiftEnd": "19:00"}]');
 
 -- =====================================================
 -- INSERT USERS - Admin and staff users
@@ -338,6 +348,8 @@ INSERT INTO service_addons (service_id, addon_id) VALUES
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d702', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a406'),  -- Nail Art 15M
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d702', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a407'),  -- Nail Art 20M
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d702', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a408'),  -- Extended Massage
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d702', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a403'),  -- Cat Eye Finish
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d702', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a404'),  -- Chrome Finish
 
 -- 3. PREMIUM N&CO SPA PEDICURE (c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d703)
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d703', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a402'),  -- French Design
@@ -352,6 +364,8 @@ INSERT INTO service_addons (service_id, addon_id) VALUES
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d704', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a406'),  -- Nail Art 15M
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d704', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a407'),  -- Nail Art 20M
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d704', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a408'),  -- Extended Massage
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d704', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a403'),  -- Cat Eye Finish
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d704', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a404'),  -- Chrome Finish
 
 -- 5. GLAM PEDI IN A BOX PEDICURE (c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d705)
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d705', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a402'),  -- French Design
@@ -366,6 +380,8 @@ INSERT INTO service_addons (service_id, addon_id) VALUES
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d706', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a406'),  -- Nail Art 15M
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d706', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a407'),  -- Nail Art 20M
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d706', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a408'),  -- Extended Massage
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d706', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a403'),  -- Cat Eye Finish
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d706', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a404'),  -- Chrome Finish
 
 -- 7. REGULAR POLISH CHANGE (PEDI) (c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d707) - Extended Massage ONLY
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d707', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a408'),  -- Extended Massage
@@ -416,8 +432,8 @@ INSERT INTO service_addons (service_id, addon_id) VALUES
 -- 2. PERFECT PAIR (e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f902) - Gel Basic Mani + Basic Spa Pedi
 ('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f902', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a411'),  -- French Design (Mani)
 ('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f902', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a412'),  -- French Design (Pedi)
-('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f902', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a403'),  -- Cat Eye
-('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f902', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a404'),  -- Chrome
+('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f902', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a430'),  -- Cat Eye Finish - Mani
+('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f902', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a432'),  -- Chrome Finish - Mani
 ('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f902', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a413'),  -- Nail Art (10 M) - Mani
 ('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f902', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a414'),  -- Nail Art (10 M) - Pedi
 ('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f902', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a415'),  -- Nail Art (15 M) - Mani
@@ -431,8 +447,10 @@ INSERT INTO service_addons (service_id, addon_id) VALUES
 -- 3. GEL GLAM (e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f903) - Gel Basic Mani + Gel Basic Pedi
 ('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f903', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a411'),  -- French Design (Mani)
 ('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f903', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a412'),  -- French Design (Pedi)
-('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f903', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a403'),  -- Cat Eye
-('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f903', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a404'),  -- Chrome
+('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f903', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a430'),  -- Cat Eye Finish - Mani
+('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f903', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a431'),  -- Cat Eye Finish - Pedi
+('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f903', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a432'),  -- Chrome Finish - Mani
+('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f903', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a433'),  -- Chrome Finish - Pedi
 ('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f903', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a413'),  -- Nail Art (10 M) - Mani
 ('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f903', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a414'),  -- Nail Art (10 M) - Pedi
 ('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f903', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a415'),  -- Nail Art (15 M) - Mani
@@ -452,57 +470,84 @@ INSERT INTO service_addons (service_id, addon_id) VALUES
 -- All Manicure services get these removal add-ons
 ('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b501', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Basic Manicure → Gel Removal Mani
 ('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b501', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),  -- Basic Manicure → Extensions Removal
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b501', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434'),  -- Basic Manicure → Builder Gel/BIAB Removal
 ('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b502', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Gel Basic Manicure → Gel Removal Mani
 ('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b502', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),  -- Gel Basic Manicure → Extensions Removal
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b502', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434'),  -- Gel Basic Manicure → Builder Gel/BIAB Removal
 ('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b503', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Premium N&Co Basic Manicure → Gel Removal Mani
 ('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b503', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),  -- Premium N&Co Basic Manicure → Extensions Removal
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b503', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434'),  -- Premium N&Co Basic Manicure → Builder Gel/BIAB Removal
 ('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b504', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Premium N&Co Gel Manicure → Gel Removal Mani
 ('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b504', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),  -- Premium N&Co Gel Manicure → Extensions Removal
-('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b505', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Rubber Base Capping → Gel Removal Mani
-('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b505', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),  -- Rubber Base Capping → Extensions Removal
-('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b506', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Regular Polish Change Mani → Gel Removal Mani
-('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b506', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),  -- Regular Polish Change Mani → Extensions Removal
-('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b507', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Gel Polish Change Mani → Gel Removal Mani
-('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b507', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423');  -- Gel Polish Change Mani → Extensions Removal
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b504', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434'),  -- Premium N&Co Gel Manicure → Builder Gel/BIAB Removal
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b505', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Builder Gel/BIAB → Gel Removal Mani
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b505', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),  -- Builder Gel/BIAB → Extensions Removal
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b505', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434'),  -- Builder Gel/BIAB → Builder Gel/BIAB Removal
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b506', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Express Mani - Polish → Gel Removal Mani
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b506', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),  -- Express Mani - Polish → Extensions Removal
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b506', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434'),  -- Express Mani - Polish → Builder Gel/BIAB Removal
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b507', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Express Mani - Gel → Gel Removal Mani
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b507', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),  -- Express Mani - Gel → Extensions Removal
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b507', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434');  -- Express Mani - Gel → Builder Gel/BIAB Removal
 
 -- PEDICURE SERVICES - Add Gel Removal Pedi ONLY (Extensions Removal is Manicure-only)
 INSERT INTO service_addons (service_id, addon_id) VALUES
 -- All Pedicure services get Gel Removal Pedi only
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d701', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a422'),  -- Basic Spa Pedicure → Gel Removal Pedi
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d701', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a435'),  -- Basic Spa Pedicure → Builder Gel/BIAB Removal
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d702', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a422'),  -- Gel Basic Pedicure → Gel Removal Pedi
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d702', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a435'),  -- Gel Basic Pedicure → Builder Gel/BIAB Removal
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d703', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a422'),  -- Premium N&Co Spa Pedicure → Gel Removal Pedi
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d703', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a435'),  -- Premium N&Co Spa Pedicure → Builder Gel/BIAB Removal
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d704', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a422'),  -- Premium N&Co Spa Gel Pedicure → Gel Removal Pedi
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d704', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a435'),  -- Premium N&Co Spa Gel Pedicure → Builder Gel/BIAB Removal
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d705', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a422'),  -- Glam Pedi Box Pedicure → Gel Removal Pedi
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d705', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a435'),  -- Glam Pedi Box Pedicure → Builder Gel/BIAB Removal
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d706', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a422'),  -- Glam Pedi Box Gel Pedicure → Gel Removal Pedi
-('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d707', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a422'),  -- Regular Polish Change Pedi → Gel Removal Pedi
-('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d708', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a422');  -- Gel Polish Change Pedi → Gel Removal Pedi
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d706', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a435'),  -- Glam Pedi Box Gel Pedicure → Builder Gel/BIAB Removal
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d707', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a422'),  -- Express Pedi - Polish → Gel Removal Pedi
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d707', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a435'),  -- Express Pedi - Polish → Builder Gel/BIAB Removal
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d708', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a422'),  -- Express Pedi - Gel → Gel Removal Pedi
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d708', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a435');  -- Express Pedi - Gel → Builder Gel/BIAB Removal
 
 -- NAIL ENHANCEMENT SERVICES - Add Gel Removal Mani + Extensions Removal
 INSERT INTO service_addons (service_id, addon_id) VALUES
 ('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c601', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Aprés Gel-X With Gel Polish → Gel Removal Mani
 ('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c601', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),  -- Aprés Gel-X With Gel Polish → Extensions Removal
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c601', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434'),  -- Aprés Gel-X With Gel Polish → Builder Gel/BIAB Removal
 ('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c602', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Aprés Gel-X Without Gel Polish → Gel Removal Mani
 ('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c602', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),  -- Aprés Gel-X Without Gel Polish → Extensions Removal
-('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c603', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Acrylic Full Set → Gel Removal Mani
-('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c603', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),  -- Acrylic Full Set → Extensions Removal
-('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c604', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Acrylic Refill → Gel Removal Mani
-('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c604', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),  -- Acrylic Refill → Extensions Removal
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c602', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434'),  -- Aprés Gel-X Without Gel Polish → Builder Gel/BIAB Removal
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c603', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Full Set Acrylic → Gel Removal Mani
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c603', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),  -- Full Set Acrylic → Extensions Removal
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c603', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434'),  -- Full Set Acrylic → Builder Gel/BIAB Removal
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c604', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Refill Acrylic → Gel Removal Mani
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c604', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),  -- Refill Acrylic → Extensions Removal
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c604', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434'),  -- Refill Acrylic → Builder Gel/BIAB Removal
 ('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c605', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Polygel Full Set → Gel Removal Mani
 ('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c605', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),  -- Polygel Full Set → Extensions Removal
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c605', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434'),  -- Polygel Full Set → Builder Gel/BIAB Removal
 ('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c606', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Polygel Refill → Gel Removal Mani
-('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c606', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423');  -- Polygel Refill → Extensions Removal
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c606', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),  -- Polygel Refill → Extensions Removal
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c606', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434');  -- Polygel Refill → Builder Gel/BIAB Removal
 
 -- COMBO SERVICES - Add Gel Removal Mani + Gel Removal Pedi + Extensions Removal
 INSERT INTO service_addons (service_id, addon_id) VALUES
 ('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f901', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Regular Pack → Gel Removal Mani
 ('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f901', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a422'),  -- Regular Pack → Gel Removal Pedi
 ('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f901', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),  -- Regular Pack → Extensions Removal
+('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f901', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434'),  -- Regular Pack → Builder Gel/BIAB Removal - Mani
+('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f901', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a435'),  -- Regular Pack → Builder Gel/BIAB Removal - Pedi
 ('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f902', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Perfect Pair → Gel Removal Mani
 ('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f902', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a422'),  -- Perfect Pair → Gel Removal Pedi
 ('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f902', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),  -- Perfect Pair → Extensions Removal
+('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f902', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434'),  -- Perfect Pair → Builder Gel/BIAB Removal - Mani
+('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f902', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a435'),  -- Perfect Pair → Builder Gel/BIAB Removal - Pedi
 ('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f903', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),  -- Gel Glam → Gel Removal Mani
 ('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f903', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a422'),  -- Gel Glam → Gel Removal Pedi
-('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f903', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423');  -- Gel Glam → Extensions Removal
+('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f903', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),  -- Gel Glam → Extensions Removal
+('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f903', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434'),  -- Gel Glam → Builder Gel/BIAB Removal - Mani
+('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f903', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a435');  -- Gel Glam → Builder Gel/BIAB Removal - Pedi
 
 -- =====================================================
 -- INSERT SERVICE INCOMPATIBILITIES
@@ -569,7 +614,16 @@ INSERT INTO addon_incompatibilities (addon_id, incompatible_addon_id) VALUES
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a427', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a426'),
 -- Polygel With Tips M ↔ Polygel With Tips L (bidirectional)
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a428', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a429'),
-('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a429', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a428');
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a429', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a428'),
+-- Builder Gel/BIAB Removal - Mani ↔ Gel Removal - Mani (bidirectional)
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434'),
+-- Builder Gel/BIAB Removal - Mani ↔ Extensions or Acrylics Removal (bidirectional)
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434'),
+-- Builder Gel/BIAB Removal - Pedi ↔ Gel Removal - Pedi (bidirectional)
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a435', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a422'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a422', '10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a435');
 
 -- =====================================================
 -- INSERT CUSTOMERS - Sample customers
@@ -1507,21 +1561,21 @@ INSERT INTO services_lang (service_id, language_id, title, description) VALUES
 -- Gel Basic Manicure
 ('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b502', '00000000-0000-0000-0000-000000000001', 'Gel Basic Manicure', 'Nail cutting and shaping, cuticle care, and moisturizing, finished with a long-lasting gel polish of your choice from our color collection.'),
 ('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b502', '00000000-0000-0000-0000-000000000002', 'Manicura Básica en Gel', 'Corte y limado de uñas, cuidado de cutículas e hidratación, finalizando con un esmalte en gel de larga duración del color de tu preferencia de nuestra colección.'),
--- Premium N&Co. Basic Manicure
-('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b503', '00000000-0000-0000-0000-000000000001', 'Premium N&Co. Basic Manicure', 'Indulge in the ultimate manicure experience. Includes everything from our Regular Manicure, plus a gentle hand exfoliation with nourishing oils and warm towels for smooth, hydrated, and rejuvenated skin.'),
-('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b503', '00000000-0000-0000-0000-000000000002', 'Manicura Básica Premium N&Co.', 'Disfruta de una experiencia de manicura superior. Incluye todo lo de nuestra Manicura Regular, más una suave exfoliación de manos con aceites nutritivos y toallas tibias para una piel suave, hidratada y rejuvenecida.'),
+-- Premium N&Co. Manicure
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b503', '00000000-0000-0000-0000-000000000001', 'Premium N&Co. Manicure', 'Indulge in the ultimate manicure experience. Includes everything from our Regular Manicure, plus a gentle hand exfoliation with nourishing oils and warm towels for smooth, hydrated, and rejuvenated skin.'),
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b503', '00000000-0000-0000-0000-000000000002', 'Manicura Premium N&Co.', 'Disfruta de una experiencia de manicura superior. Incluye todo lo de nuestra Manicura Regular, más una suave exfoliación de manos con aceites nutritivos y toallas tibias para una piel suave, hidratada y rejuvenecida.'),
 -- Premium N&Co. Gel Manicure
 ('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b504', '00000000-0000-0000-0000-000000000001', 'Premium N&Co. Gel Manicure', 'Indulge in the ultimate manicure experience. Includes everything from our Gel Manicure, plus a gentle hand exfoliation with nourishing oils and warm towels for smooth, hydrated, and rejuvenated skin.'),
 ('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b504', '00000000-0000-0000-0000-000000000002', 'Manicura en Gel Premium N&Co.', 'Disfruta de una experiencia de manicura superior. Incluye todo lo de nuestra Manicura en Gel, más una suave exfoliación de manos con aceites nutritivos y toallas tibias para una piel suave, hidratada y rejuvenecida.'),
--- Rubber Base / Capping
-('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b505', '00000000-0000-0000-0000-000000000001', 'Rubber Base / Capping', 'A strengthening gel layer applied to the natural nail to protect and prevent breakage. Ideal for thin or weak nails needing extra support. Includes gel polish of your choice.'),
-('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b505', '00000000-0000-0000-0000-000000000002', 'Rubber Base / Capping', 'Capa de gel fortalecedora aplicada sobre la uña natural para protegerla y evitar quiebres. Ideal para uñas finas o débiles que necesitan soporte adicional. Incluye esmaltado en gel a elección.'),
--- Regular Polish Change (Mani)
-('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b506', '00000000-0000-0000-0000-000000000001', 'Regular Polish Change (Mani)', 'Our express manicure includes a color change with your favorite shade from our collection.'),
-('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b506', '00000000-0000-0000-0000-000000000002', 'Cambio de Esmalte Regular (Mani)', 'Nuestra manicura exprés incluye cambio de color con el tono que elijas de nuestra colección.'),
--- Gel Polish Change (Mani)
-('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b507', '00000000-0000-0000-0000-000000000001', 'Gel Polish Change (Mani)', 'Our express gel manicure includes a long-lasting gel polish color change with your choice from our collection.'),
-('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b507', '00000000-0000-0000-0000-000000000002', 'Cambio de Esmalte en Gel (Mani)', 'Nuestra manicura exprés en gel incluye un cambio de color con esmalte en gel de larga duración, en el tono que elijas de nuestra colección.'),
+-- Builder Gel / BIAB
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b505', '00000000-0000-0000-0000-000000000001', 'Builder Gel / BIAB', 'A strengthening gel layer applied to the natural nail to protect and prevent breakage. Ideal for thin or weak nails needing extra support. Includes gel polish of your choice.'),
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b505', '00000000-0000-0000-0000-000000000002', 'Builder Gel / BIAB', 'Capa de gel fortalecedora aplicada sobre la uña natural para protegerla y evitar quiebres. Ideal para uñas finas o débiles que necesitan soporte adicional. Incluye esmaltado en gel a elección.'),
+-- Express Mani - Polish
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b506', '00000000-0000-0000-0000-000000000001', 'Express Mani - Polish', 'Our express manicure includes a color change with your favorite shade from our collection.'),
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b506', '00000000-0000-0000-0000-000000000002', 'Express Mani - Polish', 'Nuestra manicura exprés incluye cambio de color con el tono que elijas de nuestra colección.'),
+-- Express Mani - Gel
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b507', '00000000-0000-0000-0000-000000000001', 'Express Mani - Gel', 'Our express gel manicure includes a long-lasting gel polish color change with your choice from our collection.'),
+('a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b507', '00000000-0000-0000-0000-000000000002', 'Express Mani - Gel', 'Nuestra manicura exprés en gel incluye un cambio de color con esmalte en gel de larga duración, en el tono que elijas de nuestra colección.'),
 
 -- ===== NAIL ENHANCEMENTS =====
 -- Aprés Gel-X With Gel Polish
@@ -1530,12 +1584,12 @@ INSERT INTO services_lang (service_id, language_id, title, description) VALUES
 -- Aprés Gel-X Without Gel Polish
 ('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c602', '00000000-0000-0000-0000-000000000001', 'Aprés Gel-X Without Gel Polish', 'Add natural-looking length to your nails in less time with pre-formed Gel-X tips — lightweight, strong, and safe for your natural nails. Includes buffing, cuticle care, moisturizing, and nail extensions, ideal for clients who prefer to keep their nails natural.'),
 ('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c602', '00000000-0000-0000-0000-000000000002', 'Aprés Gel-X Sin Esmalte', 'Alarga tus uñas con un look natural en menos tiempo gracias a las puntas Pre-formadas Gel X — ligeras, resistentes y seguras para tus uñas naturales. Incluye limado, cuidado de cutículas, hidratación y extensiones de uñas, ideal para quienes prefieren mantener sus uñas naturales.'),
--- Acrylic Full Set
-('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c603', '00000000-0000-0000-0000-000000000001', 'Acrylic Full Set', 'Enhance your nails with durable short acrylic extensions. Includes prep, tip application, and acrylic build. *Price does not include gel polish — please add it separately if desired. Medium and long lengths available at an additional cost.'),
-('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c603', '00000000-0000-0000-0000-000000000002', 'Set Completo de Acrílico', 'Realza tus uñas con extensiones acrílicas cortas y duraderas. Incluye preparación, aplicación de tips y construcción con acrílico. *El precio no incluye esmaltado en gel — se debe agregar por separado si lo deseas. Los largos medio y largo tienen un costo adicional.'),
--- Acrylic Refill
-('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c604', '00000000-0000-0000-0000-000000000001', 'Acrylic Refill', 'Revitalize your nails with an acrylic refill to maintain a flawless, polished look. Includes nail reshaping, cuticle care, and acrylic rebalance. *Default price applies to 2-week refills. For 3- or 4-week sets, please select the corresponding add-on below. Gel polish is not included; add it separately if desired.'),
-('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c604', '00000000-0000-0000-0000-000000000002', 'Relleno de Acrílico', 'Revitaliza tus uñas con un relleno de acrílico para mantener un aspecto impecable. Incluye limado, cuidado de cutículas y rebalanceo del acrílico. *El precio base corresponde a rellenos de 2 semanas. Si tu último servicio fue hace 3 o 4 semanas, seleccione el complemento correspondiente. Esmaltado en gel no incluido, agregarlo por separado si lo deseas.'),
+-- Full Set Acrylic
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c603', '00000000-0000-0000-0000-000000000001', 'Full Set Acrylic', 'Enhance your nails with durable short acrylic extensions. Includes prep, tip application, and acrylic build. *Price does not include gel polish — please add it separately if desired. Medium and long lengths available at an additional cost.'),
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c603', '00000000-0000-0000-0000-000000000002', 'Full Set Acrílico', 'Realza tus uñas con extensiones acrílicas cortas y duraderas. Incluye preparación, aplicación de tips y construcción con acrílico. *El precio no incluye esmaltado en gel — se debe agregar por separado si lo deseas. Los largos medio y largo tienen un costo adicional.'),
+-- Refill Acrylic
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c604', '00000000-0000-0000-0000-000000000001', 'Refill Acrylic', 'Revitalize your nails with an acrylic refill to maintain a flawless, polished look. Includes nail reshaping, cuticle care, and acrylic rebalance. *Default price applies to 2-week refills. For 3- or 4-week sets, please select the corresponding add-on below. Gel polish is not included; add it separately if desired.'),
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c604', '00000000-0000-0000-0000-000000000002', 'Refill Acrílico', 'Revitaliza tus uñas con un relleno de acrílico para mantener un aspecto impecable. Incluye limado, cuidado de cutículas y rebalanceo del acrílico. *El precio base corresponde a rellenos de 2 semanas. Si tu último servicio fue hace 3 o 4 semanas, seleccione el complemento correspondiente. Esmaltado en gel no incluido, agregarlo por separado si lo deseas.'),
 -- Polygel Full Set
 ('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c605', '00000000-0000-0000-0000-000000000001', 'Polygel Full Set', 'Lightweight yet strong nail extensions that combine the flexibility of gel with the durability of acrylic. Includes shaping, buffing, cuticle care, and extensions sculpted to a natural length. *Price does not include gel polish — please add it separately if desired. Medium and long lengths available at an additional cost.'),
 ('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c605', '00000000-0000-0000-0000-000000000002', 'Set Completo de Polygel', 'Extensiones de uñas livianas pero resistentes que combinan la flexibilidad del gel con la durabilidad del acrílico. Incluye limado, pulido, cuidado de cutículas y extensiones esculpidas en una longitud natural. *El precio no incluye esmaltado en gel — se debe agregar por separado si lo deseas. Tamaños mediano y largo están disponibles por un costo adicional.'),
@@ -1562,12 +1616,12 @@ INSERT INTO services_lang (service_id, language_id, title, description) VALUES
 -- Glam Pedi in a Box Gel Pedicure
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d706', '00000000-0000-0000-0000-000000000001', 'Glam Pedi in a Box Gel Pedicure', 'Treat your feet with our four-step treatment, designed to deeply hydrate and restore. Includes a relaxing salt soak, sugar scrub exfoliation, mud masque, and butter massage. Finished with your choice of long-lasting gel polish.'),
 ('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d706', '00000000-0000-0000-0000-000000000002', 'Pedicura Glam Pedi in a Box en Gel', 'Mima tus pies con nuestro tratamiento de cuatro pasos, diseñado para hidratar y revitalizar profundamente. Incluye baño de sal relajante, exfoliación con scrub de azúcar, mascarilla de barro y masaje con crema nutritiva. Finaliza con esmalte semi de tu elección.'),
--- Regular Polish Change (Pedi)
-('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d707', '00000000-0000-0000-0000-000000000001', 'Regular Polish Change (Pedi)', 'Our express pedicure includes a color change with your favorite shade from our collection.'),
-('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d707', '00000000-0000-0000-0000-000000000002', 'Cambio de Esmalte Regular (Pedi)', 'Nuestra pedicura exprés incluye cambio de color con el tono que elijas de nuestra colección.'),
--- Gel Polish Change (Pedi)
-('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d708', '00000000-0000-0000-0000-000000000001', 'Gel Polish Change (Pedi)', 'Our express gel pedicure includes a long-lasting gel polish color change with your choice from our collection.'),
-('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d708', '00000000-0000-0000-0000-000000000002', 'Cambio de Esmalte en Gel (Pedi)', 'Nuestra pedicura exprés en gel incluye un cambio de color con esmalte en gel de larga duración, en el tono que elijas de nuestra colección.'),
+-- Express Pedi - Polish
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d707', '00000000-0000-0000-0000-000000000001', 'Express Pedi - Polish', 'Our express pedicure includes a color change with your favorite shade from our collection.'),
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d707', '00000000-0000-0000-0000-000000000002', 'Express Pedi - Polish', 'Nuestra pedicura exprés incluye cambio de color con el tono que elijas de nuestra colección.'),
+-- Express Pedi - Gel
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d708', '00000000-0000-0000-0000-000000000001', 'Express Pedi - Gel', 'Our express gel pedicure includes a long-lasting gel polish color change with your choice from our collection.'),
+('c3d4e5f6-a7b8-49c0-d1e2-f3a4b5c6d708', '00000000-0000-0000-0000-000000000002', 'Express Pedi - Gel', 'Nuestra pedicura exprés en gel incluye un cambio de color con esmalte en gel de larga duración, en el tono que elijas de nuestra colección.'),
 
 -- ===== KIDS =====
 -- Basic Manicure (Kids)
@@ -1592,15 +1646,21 @@ INSERT INTO services_lang (service_id, language_id, title, description) VALUES
 ('e5f6a7b8-c9d0-41e2-f3a4-b5c6d7e8f903', '00000000-0000-0000-0000-000000000002', 'GEL GLAM', 'Gel Basic Manicure + Gel Basic Pedicure'),
 
 -- ===== REMOVALS =====
--- Gel Removal - Mani (Without Service)
-('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a001', '00000000-0000-0000-0000-000000000001', 'Gel Removal - Mani (Without Service)', 'Gentle gel polish removal **when no other service is booked**. Leaves nails clean and ready to breathe. Booking a new mani or pedi? Please select the main service and add removal as an add-on instead.'),
-('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a001', '00000000-0000-0000-0000-000000000002', 'Retiro de Gel - Mani (sin servicio adicional)', 'Retiro suave y seguro de esmalte en gel para **cuando no se reserva otro servicio**. Deja las uñas limpias y listas para descansar. ¿Vas a reservar una mani o pedi? Seleccione el servicio principal y agrege el retiro como complemento.'),
--- Gel Removal - Pedi (Without Service)
-('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a002', '00000000-0000-0000-0000-000000000001', 'Gel Removal - Pedi (Without Service)', 'Gentle gel polish removal **when no other service is booked**. Leaves nails clean and ready to breathe. Booking a new mani or pedi? Please select the main service and add removal as an add-on instead.'),
-('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a002', '00000000-0000-0000-0000-000000000002', 'Retiro de Gel - Pedi (sin servicio adicional)', 'Retiro suave y seguro de esmalte en gel para **cuando no se reserva otro servicio**. Deja las uñas limpias y listas para descansar. ¿Vas a reservar una mani o pedi? Seleccione el servicio principal y agrege el retiro como complemento.'),
--- Extensions / Rubber / Acrylic Removal
-('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a003', '00000000-0000-0000-0000-000000000001', 'Extensions / Rubber / Acrylic Removal', 'Safe removal of acrylics, rubber base, or extensions **when no other service is booked**. Booking a new mani or pedi? Please select the main service and add removal as an add-on instead.'),
-('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a003', '00000000-0000-0000-0000-000000000002', 'Retiro de Acrílico / Capping / Extensiones', 'Retiro seguro de acrílico, capping o extensiones para **cuando no se reserva otro servicio**. ¿Vas a reservar una mani o pedi? Seleccione el servicio principal y agrege el retiro como complemento.');
+-- Gel Removal - Mani (No Service)
+('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a001', '00000000-0000-0000-0000-000000000001', 'Gel Removal - Mani (No Service)', 'Gentle gel polish removal **when no other service is booked**. Leaves nails clean and ready to breathe. Booking a new mani or pedi? Please select the main service and add removal as an add-on instead.'),
+('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a001', '00000000-0000-0000-0000-000000000002', 'Retiro de Gel - Mani (sin servicio)', 'Retiro suave y seguro de esmalte en gel para **cuando no se reserva otro servicio**. Deja las uñas limpias y listas para descansar. ¿Vas a reservar una mani o pedi? Seleccione el servicio principal y agrege el retiro como complemento.'),
+-- Gel Removal - Pedi (No Service)
+('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a002', '00000000-0000-0000-0000-000000000001', 'Gel Removal - Pedi (No Service)', 'Gentle gel polish removal **when no other service is booked**. Leaves nails clean and ready to breathe. Booking a new mani or pedi? Please select the main service and add removal as an add-on instead.'),
+('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a002', '00000000-0000-0000-0000-000000000002', 'Retiro de Gel - Pedi (sin servicio)', 'Retiro suave y seguro de esmalte en gel para **cuando no se reserva otro servicio**. Deja las uñas limpias y listas para descansar. ¿Vas a reservar una mani o pedi? Seleccione el servicio principal y agrege el retiro como complemento.'),
+-- Extensions or Acrylics Removal
+('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a003', '00000000-0000-0000-0000-000000000001', 'Extensions or Acrylics Removal', 'Safe removal of acrylics or nail extensions **when no other service is booked**. Booking a new mani or pedi? Please select the main service and add removal as an add-on instead.'),
+('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a003', '00000000-0000-0000-0000-000000000002', 'Retiro de Extensiones o Acrílicos', 'Retiro seguro de acrílico o extensiones para **cuando no se reserva otro servicio**. ¿Vas a reservar una mani o pedi? Seleccione el servicio principal y agrege el retiro como complemento.'),
+-- Builder Gel / BIAB Removal - Mani (No Service)
+('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a004', '00000000-0000-0000-0000-000000000001', 'Builder Gel / BIAB Removal - Mani (No Service)', 'Safe removal of builder gel or BIAB **when no other service is booked**. Leaves nails clean and ready. Booking a new mani? Please select the main service and add removal as an add-on instead.'),
+('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a004', '00000000-0000-0000-0000-000000000002', 'Retiro de Builder Gel / BIAB - Mani (sin servicio)', 'Retiro seguro de builder gel o BIAB para **cuando no se reserva otro servicio**. Deja las uñas limpias y listas. ¿Vas a reservar una mani? Seleccione el servicio principal y agrege el retiro como complemento.'),
+-- Builder Gel / BIAB Removal - Pedi (No Service)
+('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a005', '00000000-0000-0000-0000-000000000001', 'Builder Gel / BIAB Removal - Pedi (No Service)', 'Safe removal of builder gel or BIAB **when no other service is booked**. Leaves nails clean and ready. Booking a new pedi? Please select the main service and add removal as an add-on instead.'),
+('f6a7b8c9-d0e1-42f3-a4b5-c6d7e8f9a005', '00000000-0000-0000-0000-000000000002', 'Retiro de Builder Gel / BIAB - Pedi (sin servicio)', 'Retiro seguro de builder gel o BIAB para **cuando no se reserva otro servicio**. Deja las uñas limpias y listas. ¿Vas a reservar una pedi? Seleccione el servicio principal y agrege el retiro como complemento.');
 
 -- =====================================================
 -- INSERT ADDONS_LANG - Traducciones de add-ons
@@ -1638,10 +1698,10 @@ INSERT INTO addons_lang (addon_id, language_id, title, description) VALUES
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a410', '00000000-0000-0000-0000-000000000001', 'Fix Nail Extension', 'Rebuild one broken or lifted nail using matching material and finish (Acrylic, Polygel, Gel-X).'),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a410', '00000000-0000-0000-0000-000000000002', 'Reparación de Extensión', 'Reconstrucción de una uña rota o desprendida utilizando el mismo material (Acrílico, Polygel, Gel-X).'),
 -- Combo-specific addons (Mani/Pedi variants)
-('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a411', '00000000-0000-0000-0000-000000000001', 'French Design (Mani)', 'Elevate your look with a classic French tip.'),
-('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a411', '00000000-0000-0000-0000-000000000002', 'French Design (Mani)', 'Realza tu estilo con una clásica francesita.'),
-('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a412', '00000000-0000-0000-0000-000000000001', 'French Design (Pedi)', 'Elevate your look with a classic French tip.'),
-('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a412', '00000000-0000-0000-0000-000000000002', 'French Design (Pedi)', 'Realza tu estilo con una clásica francesita.'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a411', '00000000-0000-0000-0000-000000000001', 'French Design - Mani', 'Elevate your look with a classic French tip.'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a411', '00000000-0000-0000-0000-000000000002', 'French Design - Mani', 'Realza tu estilo con una clásica francesita.'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a412', '00000000-0000-0000-0000-000000000001', 'French Design - Pedi', 'Elevate your look with a classic French tip.'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a412', '00000000-0000-0000-0000-000000000002', 'French Design - Pedi', 'Realza tu estilo con una clásica francesita.'),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a413', '00000000-0000-0000-0000-000000000001', 'Nail Art (10 M) - Mani', 'Simple design for a quick, elegant look.'),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a413', '00000000-0000-0000-0000-000000000002', 'Nail Art (10 M) - Mani', 'Diseños simples para un look rápido y elegante.'),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a414', '00000000-0000-0000-0000-000000000001', 'Nail Art (10 M) - Pedi', 'Simple design for a quick, elegant look.'),
@@ -1654,17 +1714,17 @@ INSERT INTO addons_lang (addon_id, language_id, title, description) VALUES
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a417', '00000000-0000-0000-0000-000000000002', 'Nail Art (20 M) - Mani', 'Diseños elaborados con mayor detalle.'),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a418', '00000000-0000-0000-0000-000000000001', 'Nail Art (20 M) - Pedi', 'Elaborate design with extra detail.'),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a418', '00000000-0000-0000-0000-000000000002', 'Nail Art (20 M) - Pedi', 'Diseños elaborados con mayor detalle.'),
-('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a419', '00000000-0000-0000-0000-000000000001', 'Extended Massage (Mani)', 'Extend your treatment with 10 more minutes of relaxing massage.'),
-('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a419', '00000000-0000-0000-0000-000000000002', 'Masajes Extras (Mani)', 'Extiende tu tratamiento con 10 minutos más de masajes relajantes.'),
-('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a420', '00000000-0000-0000-0000-000000000001', 'Extended Massage (Pedi)', 'Extend your treatment with 10 more minutes of relaxing massage.'),
-('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a420', '00000000-0000-0000-0000-000000000002', 'Masajes Extras (Pedi)', 'Extiende tu tratamiento con 10 minutos más de masajes relajantes.'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a419', '00000000-0000-0000-0000-000000000001', 'Extended Massage - Mani', 'Extend your treatment with 10 more minutes of relaxing massage.'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a419', '00000000-0000-0000-0000-000000000002', 'Masajes Extras - Mani', 'Extiende tu tratamiento con 10 minutos más de masajes relajantes.'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a420', '00000000-0000-0000-0000-000000000001', 'Extended Massage - Pedi', 'Extend your treatment with 10 more minutes of relaxing massage.'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a420', '00000000-0000-0000-0000-000000000002', 'Masajes Extras - Pedi', 'Extiende tu tratamiento con 10 minutos más de masajes relajantes.'),
 -- Removal addons
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421', '00000000-0000-0000-0000-000000000001', 'Gel Removal - Mani', 'Gentle gel polish removal for manicure. Leaves nails clean and ready.'),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a421', '00000000-0000-0000-0000-000000000002', 'Retiro de Gel - Mani', 'Retiro suave de esmalte en gel para manicura. Deja las uñas limpias y listas.'),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a422', '00000000-0000-0000-0000-000000000001', 'Gel Removal - Pedi', 'Gentle gel polish removal for pedicure. Leaves nails clean and ready.'),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a422', '00000000-0000-0000-0000-000000000002', 'Retiro de Gel - Pedi', 'Retiro suave de esmalte en gel para pedicura. Deja las uñas limpias y listas.'),
-('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423', '00000000-0000-0000-0000-000000000001', 'Extensions / Rubber / Acrylic Removal', 'Safe removal of acrylics, rubber base, or extensions.'),
-('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423', '00000000-0000-0000-0000-000000000002', 'Retiro de Acrílico / Capping / Extensiones', 'Retiro seguro de acrílico, capping o extensiones.'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423', '00000000-0000-0000-0000-000000000001', 'Extensions or Acrylics Removal', 'Safe removal of acrylics or nail extensions.'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a423', '00000000-0000-0000-0000-000000000002', 'Retiro de Extensiones o Acrílicos', 'Retiro seguro de acrílico o extensiones.'),
 -- Nail Enhancement addons (new)
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a424', '00000000-0000-0000-0000-000000000001', 'Acrylic With Tips M', 'Medium-length acrylic extension upgrade.'),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a424', '00000000-0000-0000-0000-000000000002', 'Acrílico con tips M', 'Upgrade a largo medio.'),
@@ -1677,7 +1737,21 @@ INSERT INTO addons_lang (addon_id, language_id, title, description) VALUES
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a428', '00000000-0000-0000-0000-000000000001', 'Polygel With Tips M', 'Medium-length Polygel extension upgrade.'),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a428', '00000000-0000-0000-0000-000000000002', 'Polygel con tips M', 'Upgrade a largo medio.'),
 ('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a429', '00000000-0000-0000-0000-000000000001', 'Polygel With Tips L', 'Long-length Polygel extension upgrade.'),
-('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a429', '00000000-0000-0000-0000-000000000002', 'Polygel con tips L', 'Upgrade a extra largo.');
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a429', '00000000-0000-0000-0000-000000000002', 'Polygel con tips L', 'Upgrade a extra largo.'),
+-- Combo Cat Eye / Chrome (Mani/Pedi variants)
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a430', '00000000-0000-0000-0000-000000000001', 'Cat Eye Finish - Mani', 'Unique magnetic gel polish creates a "cat eye" effect for a stunning, reflective finish.'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a430', '00000000-0000-0000-0000-000000000002', 'Cat Eye - Mani', 'Esmalte en gel magnético que crea el efecto "ojo de gato" para un terminado brillante y llamativo.'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a431', '00000000-0000-0000-0000-000000000001', 'Cat Eye Finish - Pedi', 'Unique magnetic gel polish creates a "cat eye" effect for a stunning, reflective finish.'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a431', '00000000-0000-0000-0000-000000000002', 'Cat Eye - Pedi', 'Esmalte en gel magnético que crea el efecto "ojo de gato" para un terminado brillante y llamativo.'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a432', '00000000-0000-0000-0000-000000000001', 'Chrome Finish - Mani', 'A mirror-like chrome layer for a reflective, metallic look — inspired by the ''Glazed Donut'' manicure trend.'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a432', '00000000-0000-0000-0000-000000000002', 'Chrome - Mani', 'Capa de cromo con efecto espejo para un terminado metálico y brillante — inspirada en la tendencia de manicura ''Glazed Donut''.'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a433', '00000000-0000-0000-0000-000000000001', 'Chrome Finish - Pedi', 'A mirror-like chrome layer for a reflective, metallic look — inspired by the ''Glazed Donut'' manicure trend.'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a433', '00000000-0000-0000-0000-000000000002', 'Chrome - Pedi', 'Capa de cromo con efecto espejo para un terminado metálico y brillante — inspirada en la tendencia de manicura ''Glazed Donut''.'),
+-- Builder Gel / BIAB Removal addons
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434', '00000000-0000-0000-0000-000000000001', 'Builder Gel / BIAB Removal - Mani', 'Safe removal of builder gel or BIAB for manicure. Leaves nails clean and ready.'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a434', '00000000-0000-0000-0000-000000000002', 'Retiro de Builder Gel / BIAB - Mani', 'Retiro seguro de builder gel o BIAB para manicura. Deja las uñas limpias y listas.'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a435', '00000000-0000-0000-0000-000000000001', 'Builder Gel / BIAB Removal - Pedi', 'Safe removal of builder gel or BIAB for pedicure. Leaves nails clean and ready.'),
+('10a1b2c3-d4e5-46f7-a8b9-c0d1e2f3a435', '00000000-0000-0000-0000-000000000002', 'Retiro de Builder Gel / BIAB - Pedi', 'Retiro seguro de builder gel o BIAB para pedicura. Deja las uñas limpias y listas.');
 
 -- =====================================================
 -- INSERT MANUAL ADJUSTMENTS - Sample data
