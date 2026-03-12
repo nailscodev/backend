@@ -1703,6 +1703,7 @@ export class ReservationsController {
           const endTime = addMinutes(startTime, maxDuration);
 
           const staffAssignments: any[] = [];
+          const assignedStaffIds = new Set<string>(); // Track assigned staff to ensure different technicians
           let allServicesCanBeScheduled = true;
 
           for (const service of servicesWithTotalDuration) {
@@ -1710,6 +1711,13 @@ export class ReservationsController {
             
             if (service.staffId && service.staffId !== 'any') {
               // Specific staff requested
+              if (assignedStaffIds.has(service.staffId)) {
+                // Staff already assigned to another service in this VIP combo
+                console.log(`  ❌ Staff ${service.staffId} already assigned to another service in VIP combo`);
+                allServicesCanBeScheduled = false;
+                break;
+              }
+              
               if (isStaffAvailable(service.staffId, startTime, serviceEndTime)) {
                 const staffInfo = filteredActiveStaff.find(s => s.id === service.staffId);
                 staffAssignments.push({
@@ -1717,14 +1725,15 @@ export class ReservationsController {
                   staffId: service.staffId,
                   staffName: staffInfo ? `${staffInfo.firstName} ${staffInfo.lastName}` : 'Unknown'
                 });
+                assignedStaffIds.add(service.staffId);
               } else {
                 allServicesCanBeScheduled = false;
                 break;
               }
             } else {
-              // Any staff - find first available
+              // Any staff - find first available that hasn't been assigned yet
               const availableStaff = filteredActiveStaff.find(s => 
-                isStaffAvailable(s.id, startTime, serviceEndTime)
+                !assignedStaffIds.has(s.id) && isStaffAvailable(s.id, startTime, serviceEndTime)
               );
               
               if (availableStaff) {
@@ -1733,7 +1742,9 @@ export class ReservationsController {
                   staffId: availableStaff.id,
                   staffName: `${availableStaff.firstName} ${availableStaff.lastName}`
                 });
+                assignedStaffIds.add(availableStaff.id);
               } else {
+                console.log(`  ❌ No available staff found for service ${service.serviceId} at ${startTime} (${assignedStaffIds.size} staff already assigned)`);
                 allServicesCanBeScheduled = false;
                 break;
               }
