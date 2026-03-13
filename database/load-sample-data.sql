@@ -559,6 +559,7 @@ INSERT INTO service_addons (service_id, addon_id) VALUES
 -- Removals ↔ Manicure, Nail Enhancements, Pedicure, Combo
 -- Kids: no cross-category incompatibilities
 -- NOTE: Manicure+Pedicure ARE compatible (hands+feet OK)
+-- NOTE: Nail Enhancements+Pedicure ARE compatible (nails+feet OK)
 -- =====================================================
 INSERT INTO service_incompatibilities (category_id, incompatible_category_id) VALUES
 -- Manicure row
@@ -567,11 +568,9 @@ INSERT INTO service_incompatibilities (category_id, incompatible_category_id) VA
 ('c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', 'c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c'), -- Manicure → Removals
 -- Nail Enhancements row
 ('c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'), -- Nail Enhancements → Manicure
-('c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f'), -- Nail Enhancements → Pedicure
 ('c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', 'c5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b'), -- Nail Enhancements → Combos
 ('c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', 'c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c'), -- Nail Enhancements → Removals
 -- Pedicure row
-('c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f', 'c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e'), -- Pedicure → Nail Enhancements
 ('c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f', 'c5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b'), -- Pedicure → Combos
 ('c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f', 'c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c'), -- Pedicure → Removals
 -- Combos row
