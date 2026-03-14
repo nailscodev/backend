@@ -185,7 +185,7 @@ describe('Booking System E2E Tests', () => {
             { id: testData.services.basicSpaPedicure, duration: 45 },
           ],
           date: testDate,
-          selectedTechnicianId: testData.staff.luna, // Luna can do both Manicure and Pedicure
+          selectedTechnicianId: testData.staff.sofia, // Sofia does Pedicure; other tech handles Manicure
         })
         .expect(200);
 
@@ -210,7 +210,7 @@ describe('Booking System E2E Tests', () => {
             { id: testData.services.basicSpaPedicure, duration: 45 },
           ],
           date: testDate,
-          selectedTechnicianId: testData.staff.luna,
+          selectedTechnicianId: testData.staff.sofia,
         });
 
       expect(slotsResp.body.data.data.length).toBeGreaterThan(0);
@@ -229,7 +229,7 @@ describe('Booking System E2E Tests', () => {
           ],
           date: testDate,
           startTime,
-          selectedTechnicianId: testData.staff.luna,
+          selectedTechnicianId: testData.staff.sofia,
         })
         .expect(201); // POST endpoints return 201 by default in NestJS
 
@@ -250,7 +250,7 @@ describe('Booking System E2E Tests', () => {
             { id: testData.services.basicSpaPedicure, duration: 45 },
           ],
           date: testDate,
-          selectedTechnicianId: testData.staff.luna,
+          selectedTechnicianId: testData.staff.sofia,
         });
 
       // Use first available slot (avoid hardcoded time dependency)
