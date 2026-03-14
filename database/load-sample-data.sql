@@ -53,7 +53,7 @@ INSERT INTO services (id, name, description, category, category_id, parent_categ
 ('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c601', 'Aprés Gel-X With Gel Polish', 'Add natural-looking length to your nails in less time with pre-formed Gel-X tips — lightweight, strong, and safe for your natural nails. Includes buffing, cuticle care, moisturizing, and nail extensions, finished with a gel polish of your choice from our color collection.', 'NAILS', 'c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, 80, 75, 20, true, true, 8, false),
 ('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c602', 'Aprés Gel-X Without Gel Polish', 'Add natural-looking length to your nails in less time with pre-formed Gel-X tips — lightweight, strong, and safe for your natural nails. Includes buffing, cuticle care, moisturizing, and nail extensions, ideal for clients who prefer to keep their nails natural.', 'NAILS', 'c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, 70, 75, 20, false, true, 9, false),
 ('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c603', 'Full Set Acrylic', 'Enhance your nails with durable short acrylic extensions. Includes prep, tip application, and acrylic build. *Price does not include gel polish — please add it separately if desired. Medium and long lengths available at an additional cost.', 'NAILS', 'c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, 60, 90, 20, true, true, 10, false),
-('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c604', 'Refill Acrylic', 'Revitalize your nails with an acrylic refill to maintain a flawless, polished look. Includes nail reshaping, cuticle care, and acrylic rebalance. *Default price applies to 2-week refills. For 3- or 4-week sets, please select the corresponding add-on below. Gel polish is not included; add it separately if desired.', 'NAILS', 'c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, 40, 0, 15, true, true, 11, false),
+('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c604', 'Refill Acrylic', 'Revitalize your nails with an acrylic refill to maintain a flawless, polished look. Includes nail reshaping, cuticle care, and acrylic rebalance. *Default price applies to 2-week refills. For 3- or 4-week sets, please select the corresponding add-on below. Gel polish is not included; add it separately if desired.', 'NAILS', 'c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, 40, 60, 15, true, true, 11, false),
 ('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c605', 'Polygel Full Set', 'Lightweight yet strong nail extensions that combine the flexibility of gel with the durability of acrylic. Includes shaping, buffing, cuticle care, and extensions sculpted to a natural length. *Price does not include gel polish — please add it separately if desired. Medium and long lengths available at an additional cost.', 'NAILS', 'c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, 70, 90, 20, false, true, 12, false),
 ('b2c3d4e5-f6a7-48b9-c0d1-e2f3a4b5c606', 'Polygel Refill', 'Refresh your Polygel extensions with a precise refill. Includes nail reshaping, cuticle care, and polygel rebalance. Default price applies to 2-week refills. For 3- or 4-week sets, please select the corresponding add-on below. Gel polish is not included; add it separately if desired.', 'NAILS', 'c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, 55, 90, 15, false, true, 13, false),
 
@@ -559,6 +559,7 @@ INSERT INTO service_addons (service_id, addon_id) VALUES
 -- Removals ↔ Manicure, Nail Enhancements, Pedicure, Combo
 -- Kids: no cross-category incompatibilities
 -- NOTE: Manicure+Pedicure ARE compatible (hands+feet OK)
+-- NOTE: Nail Enhancements+Pedicure ARE compatible (nails+feet OK)
 -- =====================================================
 INSERT INTO service_incompatibilities (category_id, incompatible_category_id) VALUES
 -- Manicure row
@@ -567,11 +568,9 @@ INSERT INTO service_incompatibilities (category_id, incompatible_category_id) VA
 ('c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', 'c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c'), -- Manicure → Removals
 -- Nail Enhancements row
 ('c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', 'c1a2b3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'), -- Nail Enhancements → Manicure
-('c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f'), -- Nail Enhancements → Pedicure
 ('c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', 'c5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b'), -- Nail Enhancements → Combos
 ('c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', 'c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c'), -- Nail Enhancements → Removals
 -- Pedicure row
-('c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f', 'c2b3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e'), -- Pedicure → Nail Enhancements
 ('c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f', 'c5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b'), -- Pedicure → Combos
 ('c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f', 'c6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c'), -- Pedicure → Removals
 -- Combos row
