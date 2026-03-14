@@ -64,6 +64,94 @@ export class ShiftDto {
   shiftEnd: string;
 }
 
+// DTO para horarios por día específico
+export class DayScheduleDto {
+  @ApiProperty({
+    description: 'Array of shifts for this specific day',
+    example: [{ shiftStart: '09:00', shiftEnd: '12:00' }, { shiftStart: '13:00', shiftEnd: '19:00' }],
+    required: false,
+    type: [ShiftDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ShiftDto)
+  shifts?: ShiftDto[];
+}
+
+// DTO para horarios semanales completos
+export class WeeklyScheduleDto {
+  @ApiProperty({
+    description: 'Monday schedule',
+    required: false,
+    type: DayScheduleDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DayScheduleDto)
+  monday?: DayScheduleDto;
+
+  @ApiProperty({
+    description: 'Tuesday schedule',
+    required: false,
+    type: DayScheduleDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DayScheduleDto)
+  tuesday?: DayScheduleDto;
+
+  @ApiProperty({
+    description: 'Wednesday schedule',
+    required: false,
+    type: DayScheduleDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DayScheduleDto)
+  wednesday?: DayScheduleDto;
+
+  @ApiProperty({
+    description: 'Thursday schedule',
+    required: false,
+    type: DayScheduleDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DayScheduleDto)
+  thursday?: DayScheduleDto;
+
+  @ApiProperty({
+    description: 'Friday schedule',
+    required: false,
+    type: DayScheduleDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DayScheduleDto)
+  friday?: DayScheduleDto;
+
+  @ApiProperty({
+    description: 'Saturday schedule',
+    required: false,
+    type: DayScheduleDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DayScheduleDto)
+  saturday?: DayScheduleDto;
+
+  @ApiProperty({
+    description: 'Sunday schedule',
+    required: false,
+    type: DayScheduleDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DayScheduleDto)
+  sunday?: DayScheduleDto;
+}
+
 export class CreateStaffDto {
   @ApiProperty({
     description: 'Staff member first name',
@@ -158,7 +246,22 @@ export class CreateStaffDto {
   workingDays?: string[];
 
   @ApiProperty({
-    description: 'Shift schedules. Each shift has shiftStart and shiftEnd in HH:MM format.',
+    description: 'Weekly schedule with specific shifts for each day. New format - takes precedence over simple shifts array.',
+    example: {
+      monday: { shifts: [{ shiftStart: '09:00', shiftEnd: '12:00' }, { shiftStart: '13:00', shiftEnd: '19:00' }] },
+      tuesday: { shifts: [{ shiftStart: '10:00', shiftEnd: '18:00' }] },
+      wednesday: { shifts: [{ shiftStart: '09:00', shiftEnd: '17:00' }] }
+    },
+    required: false,
+    type: WeeklyScheduleDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => WeeklyScheduleDto)
+  weeklySchedule?: WeeklyScheduleDto;
+
+  @ApiProperty({
+    description: '[DEPRECATED - Use weeklySchedule for better flexibility] Shift schedules. Each shift has shiftStart and shiftEnd in HH:MM format.',
     example: [{ shiftStart: '09:00', shiftEnd: '12:00' }, { shiftStart: '13:00', shiftEnd: '19:00' }],
     required: false,
     type: [ShiftDto],

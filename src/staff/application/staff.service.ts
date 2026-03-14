@@ -40,6 +40,80 @@ export class StaffService {
   ) { }
 
   /**
+   * Process schedule data - handles both new weeklySchedule format and legacy shifts array
+   */
+  private processScheduleData(weeklySchedule?: any, legacyShifts?: any[]): any {
+    // If weeklySchedule is provided, use new format
+    if (weeklySchedule && Object.keys(weeklySchedule).length > 0) {
+      const processed: any = {};
+      
+      // Map weeklySchedule to days
+      const dayMapping = {
+        monday: 'monday',
+        tuesday: 'tuesday', 
+        wednesday: 'wednesday',
+        thursday: 'thursday',
+        friday: 'friday',
+        saturday: 'saturday',
+        sunday: 'sunday'
+      };
+
+      for (const [day, dayData] of Object.entries(weeklySchedule)) {
+        if (dayData && typeof dayData === 'object' && 'shifts' in dayData) {
+          const validShifts = (dayData as any).shifts?.filter((shift: any) => 
+            shift && 
+            typeof shift === 'object' && 
+            typeof shift.shiftStart === 'string' && 
+            typeof shift.shiftEnd === 'string' &&
+            shift.shiftStart.trim() !== '' &&
+            shift.shiftEnd.trim() !== ''
+          ) || [];
+          
+          processed[day] = validShifts;
+        } else {
+          processed[day] = [];
+        }
+      }
+
+      return processed;
+    }
+
+    // Fallback to legacy format - convert simple shifts array to weeklySchedule format
+    if (legacyShifts && legacyShifts.length > 0) {
+      const validShifts = legacyShifts.filter(shift => 
+        shift && 
+        typeof shift === 'object' && 
+        typeof shift.shiftStart === 'string' && 
+        typeof shift.shiftEnd === 'string' &&
+        shift.shiftStart.trim() !== '' &&
+        shift.shiftEnd.trim() !== ''
+      );
+
+      // Convert to weekly format - assign same shifts to all working days
+      return {
+        monday: validShifts,
+        tuesday: validShifts,
+        wednesday: validShifts,
+        thursday: validShifts,
+        friday: validShifts,
+        saturday: [],
+        sunday: []
+      };
+    }
+
+    // Default schedule if nothing provided
+    return {
+      monday: [{ shiftStart: '09:00', shiftEnd: '19:00' }],
+      tuesday: [{ shiftStart: '09:00', shiftEnd: '19:00' }],
+      wednesday: [{ shiftStart: '09:00', shiftEnd: '19:00' }],
+      thursday: [{ shiftStart: '09:00', shiftEnd: '19:00' }],
+      friday: [{ shiftStart: '09:00', shiftEnd: '19:00' }],
+      saturday: [],
+      sunday: []
+    };
+  }
+
+  /**
    * Creates a new staff member
    */
   async createStaff(createStaffDto: CreateStaffDto): Promise<StaffResponseDto> {
@@ -57,18 +131,12 @@ export class StaffService {
       // Log incoming data for debugging
       this.logger.debug('Creating staff with data:', JSON.stringify({
         ...createStaffDto,
-        shifts: createStaffDto.shifts
+        shifts: createStaffDto.shifts,
+        weeklySchedule: createStaffDto.weeklySchedule
       }, null, 2));
 
-      // Filter out invalid shifts and ensure proper structure
-      const validShifts = createStaffDto.shifts?.filter(shift => 
-        shift && 
-        typeof shift === 'object' && 
-        typeof shift.shiftStart === 'string' && 
-        typeof shift.shiftEnd === 'string' &&
-        shift.shiftStart.trim() !== '' &&
-        shift.shiftEnd.trim() !== ''
-      ) || [];
+      // Process schedule - prefer weeklySchedule over legacy shifts
+      const processedShifts = this.processScheduleData(createStaffDto.weeklySchedule, createStaffDto.shifts);
 
       const staffData = {
         firstName: createStaffDto.firstName,
@@ -79,7 +147,7 @@ export class StaffService {
         status: createStaffDto.status || StaffStatus.ACTIVE,
         specialties: createStaffDto.specialties || [],
         workingDays: createStaffDto.workingDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-        shifts: validShifts.length > 0 ? validShifts : [{ shiftStart: '09:00', shiftEnd: '19:00' }],
+        shifts: processedShifts,
         startDate: createStaffDto.startDate ? new Date(createStaffDto.startDate) : undefined,
         bio: createStaffDto.bio,
         commissionPercentage: createStaffDto.commissionPercentage,
@@ -302,7 +370,8 @@ export class StaffService {
     // Log incoming data for debugging
     this.logger.debug('Updating staff with data:', JSON.stringify({
       ...updateStaffDto,
-      shifts: updateStaffDto.shifts
+      shifts: updateStaffDto.shifts,
+      weeklySchedule: updateStaffDto.weeklySchedule
     }, null, 2));
 
     const existingStaff = await this.findStaffEntityById(id);
@@ -546,18 +615,11 @@ export class StaffService {
     if (updateStaffDto.workingDays !== undefined) {
       updateData.workingDays = updateStaffDto.workingDays?.filter(Boolean) || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
     }
-    if (updateStaffDto.shifts !== undefined) {
-      // Filter out invalid shifts and ensure proper structure
-      const validShifts = updateStaffDto.shifts?.filter(shift => 
-        shift && 
-        typeof shift === 'object' && 
-        typeof shift.shiftStart === 'string' && 
-        typeof shift.shiftEnd === 'string' &&
-        shift.shiftStart.trim() !== '' &&
-        shift.shiftEnd.trim() !== ''
-      ) || [];
-      
-      updateData.shifts = validShifts.length > 0 ? validShifts : [{ shiftStart: '09:00', shiftEnd: '19:00' }];
+
+    // Process schedule data - prefer weeklySchedule over legacy shifts
+    if (updateStaffDto.weeklySchedule !== undefined || updateStaffDto.shifts !== undefined) {
+      const processedShifts = this.processScheduleData(updateStaffDto.weeklySchedule, updateStaffDto.shifts);
+      updateData.shifts = processedShifts;
     }
 
     if (updateStaffDto.commissionPercentage !== undefined) {

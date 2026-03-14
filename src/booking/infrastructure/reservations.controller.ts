@@ -1647,17 +1647,46 @@ export class ReservationsController {
         const slotStart = parseTime(startTime);
         const slotEnd = parseTime(endTime);
 
-        // Check shifts
+        // Get staff working hours for the specific day
         const staffData = filteredActiveStaff.find(s => s.id === staffId);
         if (!staffData) return false; // staff doesn't work this day
-        const staffShifts = (staffData as any).shifts as Array<{ shiftStart: string; shiftEnd: string }> | undefined;
-        if (staffShifts && staffShifts.length > 0) {
-          const withinShift = staffShifts.some(shift => {
+        
+        // Helper to get shifts for current day from new weekly structure or fallback to legacy format
+        const getShiftsForDay = (): Array<{ shiftStart: string; shiftEnd: string }> => {
+          const staffShifts = (staffData as any).shifts;
+          
+          // If shifts is in new format (weekly structure)
+          if (staffShifts && typeof staffShifts === 'object' && !Array.isArray(staffShifts)) {
+            const dayKey = dayOfWeek.toLowerCase();
+            const dayShifts = staffShifts[dayKey];
+            return dayShifts || [];
+          }
+          
+          // Fallback to legacy format (array of shifts for all days)
+          if (staffShifts && Array.isArray(staffShifts)) {
+            return staffShifts.filter(shift => 
+              shift && 
+              typeof shift === 'object' && 
+              shift.shiftStart && 
+              shift.shiftEnd
+            );
+          }
+          
+          return [];
+        };
+
+        const dayShifts = getShiftsForDay();
+        
+        if (dayShifts.length > 0) {
+          const withinShift = dayShifts.some(shift => {
             const shiftStartMin = parseTime(shift.shiftStart);
             const shiftEndMin = parseTime(shift.shiftEnd);
             return slotStart >= shiftStartMin && slotEnd <= shiftEndMin;
           });
           if (!withinShift) return false;
+        } else {
+          // No shifts defined for this day
+          return false;
         }
 
         console.log(`\n🔍 Checking availability for staff ${staffId}:`, {
