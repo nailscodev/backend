@@ -50,6 +50,8 @@ jobs:
   e2e-tests:
     name: E2E Booking Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     services:
       postgres:
         image: postgres:15
@@ -61,9 +63,9 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd pg_isready
-          --health-interval 10s
+          --health-interval 5s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
 
     steps:
       - name: Checkout code
@@ -78,21 +80,34 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Wait for PostgreSQL
+      - name: Wait for PostgreSQL (deep check)
         run: |
-          until pg_isready -h localhost -p 5432 -U testuser; do
-            echo "Waiting for postgres..."
+          echo "Waiting for PostgreSQL to accept connections..."
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U testuser -q; then
+              if PGPASSWORD=testpass psql -h localhost -U testuser -d nails_and_beauty_test -c "SELECT 1" -q > /dev/null 2>&1; then
+                echo "✅ PostgreSQL is ready (attempt $i)"
+                exit 0
+              fi
+            fi
+            echo "Attempt $i/30 — waiting 2s..."
             sleep 2
           done
+          echo "❌ PostgreSQL did not become ready in time"
+          exit 1
 
       - name: Seed test data
         run: |
+          echo "Creating tables..."
           PGPASSWORD=testpass psql -h localhost -U testuser -d nails_and_beauty_test -f ./database/create-tables.sql
+          echo "Loading sample data..."
           PGPASSWORD=testpass psql -h localhost -U testuser -d nails_and_beauty_test -f ./database/load-sample-data.sql
-        continue-on-error: true
+          echo "✅ Seed complete"
 
       - name: Run E2E tests
-        run: npm run test:e2e -- --testPathPatterns=booking
+        id: e2e
+        run: npm run test:e2e -- --testPathPatterns=booking --forceExit --testRetries=2
+        timeout-minutes: 7
         env:
           NODE_ENV: test
           DATABASE_URL: postgres://testuser:testpass@localhost:5432/nails_and_beauty_test
@@ -104,6 +119,17 @@ jobs:
           JWT_SECRET: test-jwt-secret-key-for-ci
           JWT_REFRESH_SECRET: test-jwt-refresh-secret-for-ci
           CORS_ORIGINS: http://localhost:3000
+
+      - name: Upload E2E test results on failure
+        if: failure() && steps.e2e.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-failure-logs-${{ github.run_number }}
+          path: |
+            test-results/
+            *.log
+          retention-days: 7
+          if-no-files-found: ignore
 
   build:
     name: Build Check
