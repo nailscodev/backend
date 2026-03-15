@@ -48,6 +48,24 @@ describe('Booking System E2E Tests', () => {
     return date.toISOString().split('T')[0];
   };
 
+  /**
+   * Gets the next date that is at least `minDaysOffset` days from today,
+   * skipping any day-of-week numbers in `excludeDays` (0=Sun, 1=Mon, ..., 6=Sat).
+   *
+   * Used when a test requires specific staff who don't work all days:
+   *   - Sofia (pedicure): works Mon, Wed, Thu, Fri, Sat, Sun — NOT Tuesday (2)
+   *   - Isabella / Camila (manicure): work Mon–Sat — NOT Sunday (0)
+   * For Case 2 we skip [0, 2] so we always land on Mon/Wed/Thu/Fri/Sat.
+   */
+  const getWorkingDate = (minDaysOffset: number, excludeDays: number[] = []): string => {
+    const date = new Date();
+    date.setDate(date.getDate() + minDaysOffset);
+    while (excludeDays.includes(date.getDay())) {
+      date.setDate(date.getDate() + 1);
+    }
+    return date.toISOString().split('T')[0];
+  };
+
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -173,7 +191,9 @@ describe('Booking System E2E Tests', () => {
   // TEST CASE 2: Multi-Service Booking (Consecutive) WITHOUT VIP Combo
   // ============================================================================
   describe('Case 2: Multi-Service Booking (Consecutive)', () => {
-    const testDate = getTestDate(2);
+    // Sofia doesn't work Tuesdays; Isabella/Camila don't work Sundays.
+    // Skip day 0 (Sun) and day 2 (Tue) so both are always available.
+    const testDate = getWorkingDate(2, [0, 2]);
     const createdBookingIds: string[] = [];
 
     it('should get multi-service slots for consecutive booking', async () => {
