@@ -31,6 +31,7 @@ import { StaffResponseDto } from '../../application/dto/staff-response.dto';
 import { PaginatedStaffResponseDto } from '../../application/dto/paginated-staff-response.dto';
 import { StaffStatisticsResponseDto } from '../../application/dto/staff-statistics-response.dto';
 import { StaffRole, StaffStatus } from '../../domain/staff.types';
+import { AppCacheService } from '../../../shared/cache/cache.service';
 
 // Mock guard - replace with actual JWT guard when authentication is implemented
 class MockJwtGuard {
@@ -44,7 +45,10 @@ class MockJwtGuard {
 @UseGuards(MockJwtGuard)
 @ApiBearerAuth()
 export class StaffController {
-  constructor(private readonly staffService: StaffService) { }
+  constructor(
+    private readonly staffService: StaffService,
+    private readonly cache: AppCacheService,
+  ) { }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -122,19 +126,26 @@ export class StaffController {
   async findAvailableStaff(
     @Query('serviceIds') serviceIds?: string | string[]
   ): Promise<StaffResponseDto[]> {
-    // Handle both single string and array of strings
+    // Cache key based on serviceIds
+    const key = `staff:available:${Array.isArray(serviceIds) ? serviceIds.sort().join(',') : (serviceIds || '')}`;
+    const cached = this.cache.get<StaffResponseDto[]>(key);
+    if (cached) return cached;
+
+    let result: StaffResponseDto[];
     if (serviceIds) {
       let serviceIdArray: string[];
       if (Array.isArray(serviceIds)) {
         serviceIdArray = serviceIds;
       } else {
-        // Split comma-separated string into array
         serviceIdArray = serviceIds.split(',').map(id => id.trim());
       }
-      return await this.staffService.findStaffByServiceIds(serviceIdArray);
+      result = await this.staffService.findStaffByServiceIds(serviceIdArray);
+    } else {
+      result = await this.staffService.findAvailableStaff();
     }
 
-    return await this.staffService.findAvailableStaff();
+    this.cache.set(key, result, 120); // 2 min TTL — working days data changes rarely
+    return result;
   }
 
   @Get('statistics')
@@ -221,7 +232,9 @@ export class StaffController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body(ValidationPipe) updateStaffDto: UpdateStaffDto,
   ): Promise<StaffResponseDto> {
-    return await this.staffService.updateStaff(id, updateStaffDto);
+    const result = await this.staffService.updateStaff(id, updateStaffDto);
+    this.cache.deleteByPrefix('staff:');
+    return result;
   }
 
   @Delete(':id')
@@ -243,6 +256,7 @@ export class StaffController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
     await this.staffService.deleteStaff(id);
+    this.cache.deleteByPrefix('staff:');
   }
 
   @Patch(':id/activate')

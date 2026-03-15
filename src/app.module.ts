@@ -19,6 +19,8 @@ import { CsrfService } from './common/services/csrf.service';
 import { CustomThrottlerGuard } from './common/guards/custom-throttler.guard';
 import { CsrfGuard } from './common/guards/csrf.guard';
 import { JwtAuthInterceptor } from './common/interceptors/jwt-auth.interceptor';
+import { AppCacheModule } from './shared/cache/cache.module';
+import { PerformanceTestsModule } from './performance-tests/performance-tests.module';
 
 /**
  * Main application module with security features
@@ -53,6 +55,8 @@ import { JwtAuthInterceptor } from './common/interceptors/jwt-auth.interceptor';
       },
     ]),
     DatabaseModule,
+    AppCacheModule,
+    PerformanceTestsModule,
     // AuthModule, // TODO: Implementar completamente
     CustomersModule,
     CategoriesModule,

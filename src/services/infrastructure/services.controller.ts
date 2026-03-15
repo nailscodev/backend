@@ -8,7 +8,6 @@ import {
   Param,
   Query,
   Headers,
-  ValidationPipe,
   ParseUUIDPipe,
   ParseIntPipe,
   ParseBoolPipe,
@@ -29,6 +28,7 @@ import { ServiceEntity } from './persistence/entities/service.entity';
 import { CreateServiceDto, UpdateServiceDto } from '../application/dto';
 import { ServicesService } from '../application/services.service';
 import { SkipResponseWrapper } from '../../common/interceptors/response.interceptor';
+import { AppCacheService } from '../../shared/cache/cache.service';
 
 interface PaginatedResponse<T> {
   data: T[];
@@ -43,7 +43,20 @@ interface PaginatedResponse<T> {
 export class ServicesController {
   private readonly logger = new Logger(ServicesController.name);
 
-  constructor(private readonly servicesService: ServicesService) { }
+  constructor(
+    private readonly servicesService: ServicesService,
+    private readonly cache: AppCacheService,
+  ) { }
+
+  /** Build a deterministic cache key from query params */
+  private cacheKey(prefix: string, params: Record<string, string | number | boolean | null | undefined>): string {
+    const sorted = Object.keys(params)
+      .sort()
+      .filter((k) => params[k] !== undefined && params[k] !== null && params[k] !== '')
+      .map((k) => `${k}=${params[k]}`)
+      .join('&');
+    return `${prefix}:${sorted}`;
+  }
 
   @Get()
   @ApiOperation({
@@ -69,14 +82,18 @@ export class ServicesController {
     @Query('lang') lang?: string,
     @Headers('accept-language') acceptLanguage?: string,
   ): Promise<PaginatedResponse<ServiceEntity>> {
-    // Use lang query param, or fall back to accept-language header
     const languageCode = lang || acceptLanguage?.split(',')[0]?.split('-')[0];
+    const key = this.cacheKey('services:findAll', { page, limit, search, category, isActive, lang: languageCode });
+    const cached = this.cache.get<PaginatedResponse<ServiceEntity>>(key);
+    if (cached) return cached;
 
-    return this.servicesService.findAll(
+    const result = await this.servicesService.findAll(
       { search, category, isActive },
       { page: page || 1, limit: Math.min(limit || 10, 100) },
-      languageCode
+      languageCode,
     );
+    this.cache.set(key, result, 300); // 5 min TTL
+    return result;
   }
 
   @Get('list')
@@ -97,14 +114,17 @@ export class ServicesController {
     @Query('lang') lang?: string,
     @Headers('accept-language') acceptLanguage?: string,
   ): Promise<ServiceEntity[]> {
-    // Use lang query param, or fall back to accept-language header
     const languageCode = lang || acceptLanguage?.split(',')[0]?.split('-')[0];
+    const key = this.cacheKey('services:list', { category, lang: languageCode });
+    const cached = this.cache.get<ServiceEntity[]>(key);
+    if (cached) return cached;
 
     const result = await this.servicesService.findAll(
       { category, isActive: true },
-      { page: 1, limit: 1000 }, // Get all services
-      languageCode
+      { page: 1, limit: 1000 },
+      languageCode,
     );
+    this.cache.set(key, result.data, 300); // 5 min TTL
     return result.data;
   }
 
@@ -119,7 +139,11 @@ export class ServicesController {
     description: 'Categories retrieved successfully'
   })
   async getCategories() {
-    return this.servicesService.getCategories();
+    const cached = this.cache.get<unknown>('services:categories');
+    if (cached) return cached;
+    const result = await this.servicesService.getCategories();
+    this.cache.set('services:categories', result, 600); // 10 min TTL
+    return result;
   }
 
   @Get('categories/incompatibilities/all')
@@ -133,7 +157,11 @@ export class ServicesController {
     description: 'All incompatibility pairs as a category map',
   })
   async getAllIncompatibilities(): Promise<Record<string, string[]>> {
-    return this.servicesService.getAllIncompatibilities();
+    const cached = this.cache.get<Record<string, string[]>>('services:incompatibilities:all');
+    if (cached) return cached;
+    const result = await this.servicesService.getAllIncompatibilities();
+    this.cache.set('services:incompatibilities:all', result, 600); // 10 min TTL
+    return result;
   }
 
   @Get('categories/incompatibilities')
@@ -238,7 +266,12 @@ export class ServicesController {
     }
     const languageCode = lang || acceptLanguage?.split(',')[0]?.split('-')[0];
     const serviceIdArray = serviceIds.split(',').map(id => id.trim());
-    return await this.servicesService.getAddonsByServiceIds(serviceIdArray, languageCode);
+    const key = this.cacheKey('services:addons', { serviceIds, lang: languageCode });
+    const cached = this.cache.get<unknown[]>(key);
+    if (cached) return cached;
+    const result = await this.servicesService.getAddonsByServiceIds(serviceIdArray, languageCode);
+    this.cache.set(key, result, 300);
+    return result;
   }
 
   @Get('removal-addons/by-services')
@@ -269,7 +302,12 @@ export class ServicesController {
     }
     const languageCode = lang || acceptLanguage?.split(',')[0]?.split('-')[0];
     const serviceIdArray = serviceIds.split(',').map(id => id.trim());
-    return await this.servicesService.getRemovalAddonsByServiceIds(serviceIdArray, languageCode);
+    const key = this.cacheKey('services:removal-addons', { serviceIds, lang: languageCode });
+    const cached = this.cache.get<unknown[]>(key);
+    if (cached) return cached;
+    const result = await this.servicesService.getRemovalAddonsByServiceIds(serviceIdArray, languageCode);
+    this.cache.set(key, result, 300);
+    return result;
   }
 
   @Get('combo-eligible/check')
@@ -371,7 +409,9 @@ export class ServicesController {
     description: 'Invalid input data'
   })
   async create(@Body() createServiceDto: CreateServiceDto): Promise<ServiceEntity> {
-    return this.servicesService.create(createServiceDto);
+    const result = await this.servicesService.create(createServiceDto);
+    this.cache.deleteByPrefix('services:');
+    return result;
   }
 
   @Put(':id')
@@ -397,7 +437,9 @@ export class ServicesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateServiceDto: UpdateServiceDto,
   ): Promise<ServiceEntity> {
-    return this.servicesService.update(id, updateServiceDto);
+    const result = await this.servicesService.update(id, updateServiceDto);
+    this.cache.deleteByPrefix('services:');
+    return result;
   }
 
   @Delete(':id')
@@ -416,6 +458,8 @@ export class ServicesController {
     description: 'Service not found'
   })
   async remove(@Param('id', ParseUUIDPipe) id: string): Promise<{ message: string }> {
-    return this.servicesService.remove(id);
+    const result = await this.servicesService.remove(id);
+    this.cache.deleteByPrefix('services:');
+    return result;
   }
 }

@@ -32,6 +32,7 @@ import { AddOnLangEntity } from './persistence/entities/addon-lang.entity';
 import { LanguageEntity } from '../../shared/domain/entities/language.entity';
 import { CreateAddOnDto } from '../application/dto/create-addon.dto';
 import { UpdateAddOnDto } from '../application/dto/update-addon.dto';
+import { AppCacheService } from '../../shared/cache/cache.service';
 
 @ApiTags('addons')
 @Controller('addons')
@@ -45,7 +46,17 @@ export class AddOnsController {
     private addOnLangModel: typeof AddOnLangEntity,
     @InjectModel(LanguageEntity)
     private languageModel: typeof LanguageEntity,
+    private readonly cache: AppCacheService,
   ) { }
+
+  private cacheKey(prefix: string, params: Record<string, unknown>): string {
+    const sorted = Object.keys(params)
+      .sort()
+      .filter((k) => params[k] !== undefined && params[k] !== null && params[k] !== '')
+      .map((k) => `${k}=${params[k]}`)
+      .join('&');
+    return `${prefix}:${sorted}`;
+  }
 
   /**
    * Apply translations to an addon entity based on language code
@@ -127,6 +138,11 @@ export class AddOnsController {
     @Query('lang') lang?: string,
     @Headers('accept-language') acceptLanguage?: string,
   ) {
+    const languageCode = lang || acceptLanguage?.split(',')[0]?.split('-')[0];
+    const key = this.cacheKey('addons:findAll', { page, limit, isActive, serviceId, search, lang: languageCode });
+    const cached = this.cache.get<unknown>(key);
+    if (cached) return cached;
+
     const where: Record<string, any> = {};
 
     if (isActive !== undefined) {
@@ -143,14 +159,12 @@ export class AddOnsController {
     }
 
     if (search) {
-       
       (where as any)[Op.or] = [
         { name: { [Op.iLike]: `%${search}%` } },
         { description: { [Op.iLike]: `%${search}%` } },
       ];
     }
 
-    // Limit pagination
     const maxLimit = 100;
     const actualLimit = Math.min(limit, maxLimit);
 
@@ -159,21 +173,12 @@ export class AddOnsController {
       offset: (page - 1) * actualLimit,
       limit: actualLimit,
       order: [['displayOrder', 'ASC'], ['name', 'ASC']],
-      include: [
-        {
-          association: 'services',
-          attributes: ['id', 'name'],
-        },
-      ],
+      include: [{ association: 'services', attributes: ['id', 'name'] }],
     });
 
-    // Use lang query param, or fall back to accept-language header
-    const languageCode = lang || acceptLanguage?.split(',')[0]?.split('-')[0];
-
-    // Apply translations if language code is provided
     const translatedAddOns = await this.applyAddonsTranslations(addOns, languageCode);
 
-    return {
+    const result = {
       success: true,
       data: translatedAddOns,
       pagination: {
@@ -185,6 +190,8 @@ export class AddOnsController {
         hasPrevPage: page > 1,
       },
     };
+    this.cache.set(key, result, 300); // 5 min TTL
+    return result;
   }
 
   @Get('compatible/:serviceId')
@@ -394,11 +401,13 @@ export class AddOnsController {
         }
       }
 
-      return {
+      const result = {
         success: true,
         data: addOn,
         message: 'Add-on created successfully',
       };
+      this.cache.deleteByPrefix('addons:');
+      return result;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException('Error creating add-on: ' + errorMessage);
@@ -504,11 +513,13 @@ export class AddOnsController {
         }
       }
 
-      return {
+      const updateResult = {
         success: true,
         data: addOn,
         message: 'Add-on updated successfully',
       };
+      this.cache.deleteByPrefix('addons:');
+      return updateResult;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException('Error updating add-on: ' + errorMessage);
@@ -543,10 +554,12 @@ export class AddOnsController {
     try {
       await addOn.destroy(); // Soft delete due to paranoid: true
 
-      return {
+      const result = {
         success: true,
         message: 'Add-on deleted successfully',
       };
+      this.cache.deleteByPrefix('addons:');
+      return result;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException('Error deleting add-on: ' + errorMessage);
@@ -575,6 +588,7 @@ export class AddOnsController {
     }
 
     await addOn.update({ isActive: true });
+    this.cache.deleteByPrefix('addons:');
 
     return {
       success: true,
@@ -605,6 +619,7 @@ export class AddOnsController {
     }
 
     await addOn.update({ isActive: false });
+    this.cache.deleteByPrefix('addons:');
 
     return {
       success: true,

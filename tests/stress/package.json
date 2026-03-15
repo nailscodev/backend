@@ -14,6 +14,16 @@
     "k6:run:local": "k6 run booking-stress.js --env BASE_URL=http://localhost:3001",
     "k6:ci": "k6 run booking-stress.js --out json=k6-results.json",
 
+    "k6:load": "k6 run load-test.js",
+    "k6:load:local": "k6 run load-test.js --env BASE_URL=http://localhost:3001",
+    "k6:stress": "k6 run stress-test.js",
+    "k6:stress:local": "k6 run stress-test.js --env BASE_URL=http://localhost:3001",
+    "k6:spike": "k6 run spike-test.js",
+    "k6:spike:local": "k6 run spike-test.js --env BASE_URL=http://localhost:3001",
+    "k6:soak": "k6 run soak-test.js",
+    "k6:soak:local": "k6 run soak-test.js --env BASE_URL=http://localhost:3001 --env DURATION=5m",
+    "k6:all": "k6 run load-test.js && k6 run stress-test.js && k6 run spike-test.js",
+
     "artillery:run": "npx artillery run artillery-config.yml",
     "artillery:run:local": "ARTILLERY_TARGET=http://localhost:3001 npx artillery run artillery-config.yml",
     "artillery:report": "npx artillery report artillery-report.json",
