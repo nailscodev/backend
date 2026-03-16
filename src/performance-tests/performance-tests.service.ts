@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { v4 as uuidv4 } from 'uuid';
+import * as crypto from 'crypto';
 import * as http from 'http';
 import * as https from 'https';
 
@@ -163,7 +163,7 @@ export class PerformanceTestsService implements OnModuleInit {
     ];
 
     const run: TestResult = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       type: dto.type,
       status: 'running',
       startedAt: new Date(),
