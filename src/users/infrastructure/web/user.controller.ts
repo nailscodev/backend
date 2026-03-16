@@ -16,6 +16,7 @@ import {
   HttpCode,
   Req,
   UnauthorizedException,
+  Put,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -698,5 +699,119 @@ export class UserController {
   ): Promise<{ message: string }> {
     await this.userService.resetPassword(resetPasswordDto.token, resetPasswordDto.newPassword);
     return { message: 'Password reset successfully.' };
+  }
+
+  @Get('roles/:role/permissions')
+  @RequireAuth()
+  @ApiOperation({
+    summary: 'Get permissions for a specific role',
+    description: 'Returns all screen permissions assigned to a specific role.',
+  })
+  @ApiParam({
+    name: 'role',
+    enum: UserRole,
+    description: 'Role to get permissions for',
+    example: 'admin',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Role permissions retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        role: { type: 'string', example: 'admin' },
+        screens: { 
+          type: 'array',
+          items: { type: 'string' },
+          example: ['admin-dashboard', 'admin-reservas', 'admin-clientes']
+        },
+      },
+    },
+  })
+  async getRolePermissions(
+    @Param('role', new ParseEnumPipe(UserRole)) role: UserRole,
+  ): Promise<{ role: string; screens: string[] }> {
+    const screens = await this.screenRoleService.getScreenIdsByRole(role);
+    return { role, screens };
+  }
+
+  @Put('roles/:role/permissions')
+  @RequireAuth()
+  @ApiOperation({
+    summary: 'Update permissions for a specific role',
+    description: 'Updates all screen permissions for a specific role. This will replace all existing permissions.',
+  })
+  @ApiParam({
+    name: 'role',
+    enum: UserRole,
+    description: 'Role to update permissions for',
+    example: 'admin',
+  })
+  @ApiBody({
+    description: 'Array of screen IDs to assign to the role',
+    schema: {
+      type: 'object',
+      properties: {
+        screens: {
+          type: 'array',
+          items: { type: 'string' },
+          example: ['admin-dashboard', 'admin-reservas', 'admin-clientes']
+        }
+      },
+      required: ['screens']
+    }
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Role permissions updated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Permissions updated successfully' },
+        role: { type: 'string', example: 'admin' },
+        screens: { 
+          type: 'array',
+          items: { type: 'string' },
+          example: ['admin-dashboard', 'admin-reservas', 'admin-clientes']
+        },
+      },
+    },
+  })
+  async updateRolePermissions(
+    @Param('role', new ParseEnumPipe(UserRole)) role: UserRole,
+    @Body() body: { screens: string[] },
+  ): Promise<{ message: string; role: string; screens: string[] }> {
+    await this.screenRoleService.setScreenPermissionsForRole(role, body.screens);
+    return {
+      message: 'Permissions updated successfully',
+      role,
+      screens: body.screens,
+    };
+  }
+
+  @Get('roles/permissions/all')
+  @RequireAuth()
+  @ApiOperation({
+    summary: 'Get all permissions by role',
+    description: 'Returns all screen permissions grouped by role.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'All permissions retrieved successfully',
+    schema: {
+      type: 'object',
+      additionalProperties: {
+        type: 'array',
+        items: { type: 'string' }
+      },
+      example: {
+        admin: ['admin-dashboard', 'admin-reservas', 'admin-clientes'],
+        manager: ['admin-dashboard', 'admin-reservas'],
+        staff: ['admin-dashboard']
+      }
+    },
+  })
+  async getAllRolePermissions(): Promise<Record<string, string[]>> {
+    return this.screenRoleService.getAllPermissionsByRole();
   }
 }

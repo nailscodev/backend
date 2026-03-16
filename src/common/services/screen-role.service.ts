@@ -47,4 +47,40 @@ export class ScreenRoleService {
     })));
     return allRoles;
   }
+
+  async setScreenPermissionsForRole(role: UserRole, screenIds: string[]): Promise<void> {
+    console.log('🔧 Setting permissions for role:', role, 'screens:', screenIds);
+    
+    // Remove existing permissions for this role
+    await this.screenRoleModel.destroy({
+      where: { role }
+    });
+
+    // Add new permissions
+    if (screenIds.length > 0) {
+      const screenRoles = screenIds.map(screenId => ({
+        role,
+        screenId
+      }));
+      
+      await this.screenRoleModel.bulkCreate(screenRoles);
+    }
+    
+    console.log('✅ Permissions updated for role:', role);
+  }
+
+  async getAllPermissionsByRole(): Promise<Record<string, string[]>> {
+    const allRoles = await this.screenRoleModel.findAll();
+    
+    const permissionsByRole: Record<string, string[]> = {};
+    
+    allRoles.forEach(screenRole => {
+      if (!permissionsByRole[screenRole.role]) {
+        permissionsByRole[screenRole.role] = [];
+      }
+      permissionsByRole[screenRole.role].push(screenRole.screenId);
+    });
+    
+    return permissionsByRole;
+  }
 }
