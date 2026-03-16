@@ -166,3 +166,70 @@ jobs:
         run: flyctl deploy --remote-only --strategy=immediate
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  performance-tests:
+    name: Performance Tests (Load)
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    continue-on-error: true  # Never block pipeline — informational only
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+
+      - name: Wait for deployment to be ready
+        run: |
+          echo "Waiting 30s for Fly.io deployment to stabilize..."
+          sleep 30
+          echo "Checking backend health..."
+          for i in $(seq 1 10); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.BACKEND_PROD_URL || 'https://nailsco-backend.fly.dev' }}/api/health" || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Backend is healthy (attempt $i)"
+              exit 0
+            fi
+            echo "Attempt $i/10 — status $STATUS, waiting 10s..."
+            sleep 10
+          done
+          echo "⚠️ Backend health check timed out — running tests anyway"
+
+      - name: Run Load Test
+        run: |
+          cd tests/stress
+          k6 run load-test.js \
+            --env BASE_URL=${{ secrets.BACKEND_PROD_URL || 'https://nailsco-backend.fly.dev' }} \
+            --out json=../../k6-load-results.json \
+            --summary-export=../../k6-load-summary.json
+        continue-on-error: true
+
+      - name: Upload k6 results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-performance-results-${{ github.run_number }}
+          path: |
+            k6-load-results.json
+            k6-load-summary.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Print k6 summary
+        if: always()
+        run: |
+          if [ -f k6-load-summary.json ]; then
+            echo "### k6 Load Test Summary" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            cat k6-load-summary.json >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No summary file found" >> $GITHUB_STEP_SUMMARY
+          fi
