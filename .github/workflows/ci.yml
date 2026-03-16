@@ -208,11 +208,14 @@ jobs:
       # ── 1. Load Test (~50s) ──────────────────────────────────────────────
       - name: Run Load Test
         id: load
+        env:
+          K6_WEB_DASHBOARD: "true"
+          K6_WEB_DASHBOARD_OPEN: "false"
+          K6_WEB_DASHBOARD_EXPORT: "../../k6-reports/load-report.html"
         run: |
           cd tests/stress
           k6 run load-test.js \
             --env BASE_URL=${{ secrets.BACKEND_PROD_URL || 'https://nailsco-backend.fly.dev' }} \
-            --out json=../../k6-reports/load-results.json \
             --summary-export=../../k6-reports/load-summary.json \
             2>&1 | tee ../../k6-reports/load-output.txt
           echo "exit_code=$?" >> $GITHUB_OUTPUT
@@ -221,11 +224,14 @@ jobs:
       # ── 2. Stress Test (~60s) ────────────────────────────────────────────
       - name: Run Stress Test
         id: stress
+        env:
+          K6_WEB_DASHBOARD: "true"
+          K6_WEB_DASHBOARD_OPEN: "false"
+          K6_WEB_DASHBOARD_EXPORT: "../../k6-reports/stress-report.html"
         run: |
           cd tests/stress
           k6 run stress-test.js \
             --env BASE_URL=${{ secrets.BACKEND_PROD_URL || 'https://nailsco-backend.fly.dev' }} \
-            --out json=../../k6-reports/stress-results.json \
             --summary-export=../../k6-reports/stress-summary.json \
             2>&1 | tee ../../k6-reports/stress-output.txt
           echo "exit_code=$?" >> $GITHUB_OUTPUT
@@ -234,11 +240,14 @@ jobs:
       # ── 3. Spike Test (~40s) ─────────────────────────────────────────────
       - name: Run Spike Test
         id: spike
+        env:
+          K6_WEB_DASHBOARD: "true"
+          K6_WEB_DASHBOARD_OPEN: "false"
+          K6_WEB_DASHBOARD_EXPORT: "../../k6-reports/spike-report.html"
         run: |
           cd tests/stress
           k6 run spike-test.js \
             --env BASE_URL=${{ secrets.BACKEND_PROD_URL || 'https://nailsco-backend.fly.dev' }} \
-            --out json=../../k6-reports/spike-results.json \
             --summary-export=../../k6-reports/spike-summary.json \
             2>&1 | tee ../../k6-reports/spike-output.txt
           echo "exit_code=$?" >> $GITHUB_OUTPUT
@@ -247,94 +256,175 @@ jobs:
       # ── 4. Soak Test (~3min in CI via DURATION=2m) ───────────────────────
       - name: Run Soak Test
         id: soak
+        env:
+          K6_WEB_DASHBOARD: "true"
+          K6_WEB_DASHBOARD_OPEN: "false"
+          K6_WEB_DASHBOARD_EXPORT: "../../k6-reports/soak-report.html"
         run: |
           cd tests/stress
           k6 run soak-test.js \
             --env BASE_URL=${{ secrets.BACKEND_PROD_URL || 'https://nailsco-backend.fly.dev' }} \
             --env DURATION=2m \
-            --out json=../../k6-reports/soak-results.json \
             --summary-export=../../k6-reports/soak-summary.json \
             2>&1 | tee ../../k6-reports/soak-output.txt
           echo "exit_code=$?" >> $GITHUB_OUTPUT
         continue-on-error: true
 
-      # ── Upload all reports as a single artifact ──────────────────────────
+      # ── Generate Step Summary + commit comment ───────────────────────────
+      - name: Generate reports and post commit comment
+        if: always()
+        id: report
+        run: |
+          BASE_URL="${{ secrets.BACKEND_PROD_URL || 'https://nailsco-backend.fly.dev' }}"
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          SHORT_SHA="${{ github.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
+
+          python3 << 'PYEOF'
+          import json, os, sys
+
+          def load(f):
+            try:
+              d = json.load(open(f))
+              m = d.get('metrics', {})
+              def v(key, sub): 
+                node = m.get(key, {})
+                return node.get(sub) or node.get('values', {}).get(sub)
+              p95  = v('http_req_duration', 'p(95)')
+              p99  = v('http_req_duration', 'p(99)')
+              avg  = v('http_req_duration', 'avg')
+              err  = v('http_req_failed',   'rate')
+              rps  = v('http_reqs',         'rate')
+              reqs = v('http_reqs',         'count')
+              def ms(x): return f"{float(x):.0f}ms" if x is not None else "N/A"
+              def pct(x): return f"{float(x)*100:.2f}%" if x is not None else "N/A"
+              def rp(x): return f"{float(x):.1f}" if x is not None else "N/A"
+              return {'p95': p95, 'p99': p99, 'avg': avg, 'err': err, 'rps': rps, 'reqs': reqs,
+                      'ms_p95': ms(p95), 'ms_p99': ms(p99), 'ms_avg': ms(avg),
+                      'pct_err': pct(err), 'rps_s': rp(rps), 'count': str(int(float(reqs))) if reqs else 'N/A'}
+            except Exception as e:
+              return {'ms_p95':'N/A','ms_p99':'N/A','ms_avg':'N/A','pct_err':'N/A','rps_s':'N/A','count':'N/A',
+                      'p95':None,'err':None}
+
+          tests = [
+            ('Load',   'k6-reports/load-summary.json',   800,  0.01,  '10 VUs · 50s',     'load-report.html'),
+            ('Stress', 'k6-reports/stress-summary.json', 5000, 0.20,  'up to 50 VUs · 60s','stress-report.html'),
+            ('Spike',  'k6-reports/spike-summary.json',  10000,0.30,  '2→50→2 VUs · 40s', 'spike-report.html'),
+            ('Soak',   'k6-reports/soak-summary.json',   1000, 0.01,  '10 VUs · 3min',    'soak-report.html'),
+          ]
+
+          rows_md = []
+          rows_summary = []
+          all_pass = True
+
+          for name, f, p95_thresh, err_thresh, profile, html_file in tests:
+            d = load(f)
+            p95_ok = (d['p95'] is not None and float(d['p95']) < p95_thresh)
+            err_ok = (d['err'] is not None and float(d['err']) < err_thresh)
+            ok = p95_ok and err_ok
+            if not ok: all_pass = False
+            badge = "✅" if ok else "⚠️"
+            p95_cell = f"**{d['ms_p95']}**" + ("" if p95_ok else " ⚠️")
+            err_cell  = d['pct_err'] + ("" if err_ok  else " ⚠️")
+            rows_md.append(f"| {badge} {name} | {profile} | {d['ms_avg']} | {p95_cell} | {d['ms_p99']} | {err_cell} | {d['rps_s']} req/s | {d['count']} |")
+            rows_summary.append((name, badge, d, p95_ok, err_ok, html_file))
+
+          overall = "✅ All tests passed" if all_pass else "⚠️ Some thresholds exceeded"
+          
+          run_url = os.environ.get('RUN_URL', '')
+          short_sha = os.environ.get('SHORT_SHA', '')
+          artifact_num = os.environ.get('RUN_NUMBER', '')
+
+          table = "\n".join(rows_md)
+
+          # ── GitHub Step Summary ──────────────────────────────────────────
+          summary_file = os.environ.get('GITHUB_STEP_SUMMARY', '/dev/null')
+          with open(summary_file, 'a') as f:
+            f.write(f"""## 🚀 k6 Performance Report — {overall}
+
+          > Commit `{short_sha}` · [View full run]({run_url})
+
+          | | Test | Profile | Avg | p95 | p99 | Error Rate | RPS | Requests |
+          |--|------|---------|-----|-----|-----|------------|-----|----------|
+          {table}
+
+          **Thresholds:** Load p95<800ms err<1% · Stress p95<5s err<20% · Spike p95<10s err<30% · Soak p95<1s err<1%
+
+          > 📦 Artifact **k6-performance-reports-{artifact_num}**: contains `load/stress/spike/soak-report.html` (open in browser for interactive charts)
+          """)
+
+          # ── Commit comment (markdown) ────────────────────────────────────
+          comment = f"""## 🚀 k6 Performance Tests — {overall}
+
+          | | Test | Profile | Avg | p95 | p99 | Error Rate | RPS |
+          |--|------|---------|-----|-----|-----|------------|-----|
+          {table.replace(' | '+rows_md[0].split('|')[-2].strip()+' |', ' |') if rows_md else table}
+
+          <details>
+          <summary>Thresholds reference</summary>
+
+          | Test | p95 limit | Error limit |
+          |------|-----------|-------------|
+          | Load | < 800ms | < 1% |
+          | Stress | < 5000ms | < 20% |
+          | Spike | < 10000ms | < 30% |
+          | Soak | < 1000ms | < 1% |
+
+          </details>
+
+          > 🔗 [Full run + HTML reports (artifact)]({run_url}) · Commit `{short_sha}`
+          """
+          with open('k6-reports/comment.md', 'w') as f:
+            f.write(comment)
+
+          print("Report generated OK")
+          sys.exit(0)
+          PYEOF
+
+          # Export vars for the python heredoc
+        env:
+          RUN_URL: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          SHORT_SHA: "${{ github.sha }}"
+          RUN_NUMBER: "${{ github.run_number }}"
+
+      # ── Post results as a commit comment ─────────────────────────────────
+      - name: Post commit comment with results
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let body;
+            try {
+              body = fs.readFileSync('k6-reports/comment.md', 'utf8');
+            } catch (e) {
+              body = '⚠️ k6 performance tests ran but report generation failed. Check the [Actions run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).';
+            }
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body: body
+            });
+
+      # ── Upload HTML reports + summaries as artifact ───────────────────────
       - name: Upload k6 reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: k6-performance-reports-${{ github.run_number }}
-          path: k6-reports/
+          path: |
+            k6-reports/load-report.html
+            k6-reports/stress-report.html
+            k6-reports/spike-report.html
+            k6-reports/soak-report.html
+            k6-reports/load-summary.json
+            k6-reports/stress-summary.json
+            k6-reports/spike-summary.json
+            k6-reports/soak-summary.json
+            k6-reports/load-output.txt
+            k6-reports/stress-output.txt
+            k6-reports/spike-output.txt
+            k6-reports/soak-output.txt
           retention-days: 30
           if-no-files-found: ignore
-
-      # ── Build consolidated GitHub Step Summary ───────────────────────────
-      - name: Generate consolidated report
-        if: always()
-        run: |
-          extract() {
-            local file="$1"
-            local metric="$2"
-            if [ -f "$file" ]; then
-              python3 -c "
-          import json, sys
-          try:
-            d = json.load(open('$file'))
-            m = d.get('metrics', {})
-            dur = m.get('http_req_duration', {})
-            err = m.get('http_req_failed', {})
-            reqs = m.get('http_reqs', {})
-            p95  = dur.get('p(95)', dur.get('values', {}).get('p(95)', 'N/A'))
-            p99  = dur.get('p(99)', dur.get('values', {}).get('p(99)', 'N/A'))
-            avg  = dur.get('avg', dur.get('values', {}).get('avg', 'N/A'))
-            rate = err.get('rate', err.get('values', {}).get('rate', 'N/A'))
-            rps  = reqs.get('rate', reqs.get('values', {}).get('rate', 'N/A'))
-            def fmt(v): return f'{float(v):.1f}' if v != 'N/A' else 'N/A'
-            def fmtpct(v): return f'{float(v)*100:.2f}%' if v != 'N/A' else 'N/A'
-            print(f'{fmt(avg)}ms | {fmt(p95)}ms | {fmt(p99)}ms | {fmtpct(rate)} | {fmt(rps)} req/s')
-          except Exception as e:
-            print('N/A | N/A | N/A | N/A | N/A')
-          " 2>/dev/null || echo "N/A | N/A | N/A | N/A | N/A"
-            else
-              echo "N/A | N/A | N/A | N/A | N/A"
-            fi
-          }
-
-          LOAD=$(extract  k6-reports/load-summary.json)
-          STRESS=$(extract k6-reports/stress-summary.json)
-          SPIKE=$(extract  k6-reports/spike-summary.json)
-          SOAK=$(extract   k6-reports/soak-summary.json)
-
-          cat >> $GITHUB_STEP_SUMMARY << EOF
-          ## 🚀 k6 Performance Tests — Run #${{ github.run_number }}
-
-          > Commit \`${{ github.sha }}\` · Branch \`${{ github.ref_name }}\`
-
-          | Test | Avg | p95 | p99 | Error Rate | RPS |
-          |------|-----|-----|-----|------------|-----|
-          | Load (~50s, 10 VUs) | $LOAD |
-          | Stress (~60s, up to 50 VUs) | $STRESS |
-          | Spike (~40s, 2→50→2 VUs) | $SPIKE |
-          | Soak (~3min, 10 VUs steady) | $SOAK |
-
-          ### Thresholds
-          - **Load**: p95 < 800ms, error rate < 1%
-          - **Stress**: p95 < 5000ms, error rate < 20%
-          - **Spike**: p95 < 10000ms, error rate < 30%
-          - **Soak**: p95 < 1000ms at all times, error rate < 1%
-
-          > 📦 Full JSON reports available in artifact **k6-performance-reports-${{ github.run_number }}** (30-day retention)
-          EOF
-
-          echo ""
-          echo "=== Load Test Output (last 20 lines) ==="
-          tail -20 k6-reports/load-output.txt 2>/dev/null || echo "(no output)"
-          echo ""
-          echo "=== Stress Test Output (last 20 lines) ==="
-          tail -20 k6-reports/stress-output.txt 2>/dev/null || echo "(no output)"
-          echo ""
-          echo "=== Spike Test Output (last 20 lines) ==="
-          tail -20 k6-reports/spike-output.txt 2>/dev/null || echo "(no output)"
-          echo ""
-          echo "=== Soak Test Output (last 20 lines) ==="
-          tail -20 k6-reports/soak-output.txt 2>/dev/null || echo "(no output)"
