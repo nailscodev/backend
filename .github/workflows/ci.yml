@@ -173,6 +173,8 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     continue-on-error: true  # Never block pipeline — informational only
+    permissions:
+      contents: write  # Required to post commit comments
 
     steps:
       - name: Checkout code
