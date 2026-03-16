@@ -516,18 +516,16 @@ jobs:
 
       # ── Send email with results ───────────────────────────────────────────
       - name: Send results email
-        if: always() && env.NOTIFY_EMAIL_TO != ''
+        if: always()
         uses: dawidd6/action-send-mail@v3
-        env:
-          NOTIFY_EMAIL_TO: ${{ secrets.NOTIFY_EMAIL_TO }}
         with:
           server_address: smtp.gmail.com
           server_port: 465
           secure: true
-          username: ${{ secrets.NOTIFY_EMAIL_FROM }}
+          username: nailscodev@gmail.com
           password: ${{ secrets.NOTIFY_EMAIL_PASSWORD }}
           subject: "🚀 k6 Performance Tests — ${{ github.repository }} #${{ github.run_number }}"
-          to: ${{ secrets.NOTIFY_EMAIL_TO }}
-          from: "Nails & Co. CI <${{ secrets.NOTIFY_EMAIL_FROM }}>"
+          to: ilan.daniele@gmail.com
+          from: "Nails & Co. CI <nailscodev@gmail.com>"
           html_body: file://k6-reports/email.html
           ignore_cert: false
