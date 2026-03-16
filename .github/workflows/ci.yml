@@ -377,6 +377,90 @@ jobs:
           with open('k6-reports/comment.md', 'w') as f:
             f.write(comment)
 
+          # ── HTML email body ──────────────────────────────────────────────
+          def row_color(ok): return '#d4edda' if ok else '#fff3cd'
+          def badge_html(ok): return '<span style="color:#155724;font-weight:700">✅ PASS</span>' if ok else '<span style="color:#856404;font-weight:700">⚠️ WARN</span>'
+
+          html_rows = ''
+          for name, f, p95_thresh, err_thresh, profile, _ in tests:
+            d = load(f)
+            p95_ok = (d['p95'] is not None and float(d['p95']) < p95_thresh)
+            err_ok = (d['err'] is not None and float(d['err']) < err_thresh)
+            ok = p95_ok and err_ok
+            bg = row_color(ok)
+            p95_style = '' if p95_ok else 'color:#856404;font-weight:700'
+            err_style  = '' if err_ok  else 'color:#856404;font-weight:700'
+            html_rows += f'''
+              <tr style="background:{bg}">
+                <td style="padding:10px 14px;border-bottom:1px solid #dee2e6">{badge_html(ok)}</td>
+                <td style="padding:10px 14px;border-bottom:1px solid #dee2e6;font-weight:600">{name}</td>
+                <td style="padding:10px 14px;border-bottom:1px solid #dee2e6;color:#555">{profile}</td>
+                <td style="padding:10px 14px;border-bottom:1px solid #dee2e6">{d["ms_avg"]}</td>
+                <td style="padding:10px 14px;border-bottom:1px solid #dee2e6;{p95_style}">{d["ms_p95"]}</td>
+                <td style="padding:10px 14px;border-bottom:1px solid #dee2e6">{d["ms_p99"]}</td>
+                <td style="padding:10px 14px;border-bottom:1px solid #dee2e6;{err_style}">{d["pct_err"]}</td>
+                <td style="padding:10px 14px;border-bottom:1px solid #dee2e6">{d["rps_s"]} req/s</td>
+                <td style="padding:10px 14px;border-bottom:1px solid #dee2e6">{d["count"]}</td>
+              </tr>'''
+
+          overall_color = '#155724' if all_pass else '#856404'
+          overall_bg    = '#d4edda' if all_pass else '#fff3cd'
+          overall_border= '#c3e6cb' if all_pass else '#ffeeba'
+          overall_icon  = '✅' if all_pass else '⚠️'
+
+          email_html = f"""<!DOCTYPE html>
+          <html>
+          <head><meta charset="utf-8"/></head>
+          <body style="font-family:Arial,sans-serif;background:#f8f9fa;padding:24px;margin:0">
+            <div style="max-width:820px;margin:0 auto;background:white;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)">
+              <!-- Header -->
+              <div style="background:#1a1a1a;padding:20px 28px;color:white">
+                <h1 style="margin:0;font-size:20px;letter-spacing:1px">🚀 k6 Performance Tests</h1>
+                <p style="margin:6px 0 0;color:#aaa;font-size:13px">Nails &amp; Co. Backend · Commit <code style="color:#ddd">{short_sha}</code></p>
+              </div>
+              <!-- Overall status -->
+              <div style="background:{overall_bg};border:1px solid {overall_border};margin:20px;border-radius:6px;padding:14px 18px">
+                <strong style="color:{overall_color};font-size:15px">{overall_icon} {overall}</strong>
+              </div>
+              <!-- Results table -->
+              <div style="padding:0 20px 20px">
+                <table style="width:100%;border-collapse:collapse;font-size:13px">
+                  <thead>
+                    <tr style="background:#f1f3f5">
+                      <th style="padding:10px 14px;text-align:left;border-bottom:2px solid #dee2e6"></th>
+                      <th style="padding:10px 14px;text-align:left;border-bottom:2px solid #dee2e6">Test</th>
+                      <th style="padding:10px 14px;text-align:left;border-bottom:2px solid #dee2e6">Profile</th>
+                      <th style="padding:10px 14px;text-align:left;border-bottom:2px solid #dee2e6">Avg</th>
+                      <th style="padding:10px 14px;text-align:left;border-bottom:2px solid #dee2e6">p95</th>
+                      <th style="padding:10px 14px;text-align:left;border-bottom:2px solid #dee2e6">p99</th>
+                      <th style="padding:10px 14px;text-align:left;border-bottom:2px solid #dee2e6">Error Rate</th>
+                      <th style="padding:10px 14px;text-align:left;border-bottom:2px solid #dee2e6">RPS</th>
+                      <th style="padding:10px 14px;text-align:left;border-bottom:2px solid #dee2e6">Requests</th>
+                    </tr>
+                  </thead>
+                  <tbody>{html_rows}</tbody>
+                </table>
+              </div>
+              <!-- Thresholds -->
+              <div style="background:#f8f9fa;padding:14px 20px;border-top:1px solid #dee2e6;font-size:12px;color:#666">
+                <strong>Thresholds:</strong>
+                Load p95&lt;800ms err&lt;1% &nbsp;·&nbsp;
+                Stress p95&lt;5s err&lt;20% &nbsp;·&nbsp;
+                Spike p95&lt;10s err&lt;30% &nbsp;·&nbsp;
+                Soak p95&lt;1s err&lt;1%
+              </div>
+              <!-- Footer -->
+              <div style="padding:16px 20px;font-size:12px;color:#888;border-top:1px solid #eee">
+                <a href="{run_url}" style="color:#1a1a1a">View full run &amp; HTML reports →</a>
+                &nbsp;·&nbsp; Run #{artifact_num} on <code>main</code>
+              </div>
+            </div>
+          </body>
+          </html>"""
+
+          with open('k6-reports/email.html', 'w') as f:
+            f.write(email_html)
+
           print("Report generated OK")
           sys.exit(0)
           PYEOF
@@ -418,6 +502,7 @@ jobs:
             k6-reports/stress-report.html
             k6-reports/spike-report.html
             k6-reports/soak-report.html
+            k6-reports/email.html
             k6-reports/load-summary.json
             k6-reports/stress-summary.json
             k6-reports/spike-summary.json
@@ -428,3 +513,21 @@ jobs:
             k6-reports/soak-output.txt
           retention-days: 30
           if-no-files-found: ignore
+
+      # ── Send email with results ───────────────────────────────────────────
+      - name: Send results email
+        if: always() && env.NOTIFY_EMAIL_TO != ''
+        uses: dawidd6/action-send-mail@v3
+        env:
+          NOTIFY_EMAIL_TO: ${{ secrets.NOTIFY_EMAIL_TO }}
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.NOTIFY_EMAIL_FROM }}
+          password: ${{ secrets.NOTIFY_EMAIL_PASSWORD }}
+          subject: "🚀 k6 Performance Tests — ${{ github.repository }} #${{ github.run_number }}"
+          to: ${{ secrets.NOTIFY_EMAIL_TO }}
+          from: "Nails & Co. CI <${{ secrets.NOTIFY_EMAIL_FROM }}>"
+          html_body: file://k6-reports/email.html
+          ignore_cert: false
