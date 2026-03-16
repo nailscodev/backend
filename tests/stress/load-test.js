@@ -58,7 +58,7 @@ export const options = {
 export default function () {
   // 1) Health check — baseline
   {
-    const res = http.get(`${BASE_URL}/api/health`);
+    const res = http.get(`${BASE_URL}/api/v1/health`);
     healthTime.add(res.timings.duration);
     const ok = check(res, { 'health: status 200': (r) => r.status === 200 });
     if (!ok) { errorCount.add(1); errorRate.add(1); } else { errorRate.add(0); }
@@ -68,7 +68,7 @@ export default function () {
 
   // 2) Services list — popular booking page load
   {
-    const res = http.get(`${BASE_URL}/api/services/list`);
+    const res = http.get(`${BASE_URL}/api/v1/services/list`);
     servicesTime.add(res.timings.duration);
     const ok = check(res, { 'services: status 200': (r) => r.status === 200 });
     if (!ok) { errorCount.add(1); errorRate.add(1); } else { errorRate.add(0); }
@@ -78,7 +78,7 @@ export default function () {
 
   // 3) Staff availability — technician selection screen
   {
-    const res = http.get(`${BASE_URL}/api/staff/available`);
+    const res = http.get(`${BASE_URL}/api/v1/staff/available`);
     staffTime.add(res.timings.duration);
     const ok = check(res, { 'staff: status 200': (r) => r.status === 200 });
     if (!ok) { errorCount.add(1); errorRate.add(1); } else { errorRate.add(0); }
@@ -88,7 +88,7 @@ export default function () {
 
   // 4) Addons — shown on booking flow
   {
-    const res = http.get(`${BASE_URL}/api/addons?page=1&limit=20`);
+    const res = http.get(`${BASE_URL}/api/v1/addons?page=1&limit=20`);
     addonsTime.add(res.timings.duration);
     const ok = check(res, { 'addons: status 200': (r) => r.status === 200 });
     if (!ok) { errorCount.add(1); errorRate.add(1); } else { errorRate.add(0); }

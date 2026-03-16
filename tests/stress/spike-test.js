@@ -52,8 +52,8 @@ export default function () {
   const isSpike = __VU > 2; // VUs > 2 means we're in the spike
 
   const endpoints = isSpike
-    ? ['/api/services/list', '/api/staff/available'] // Heavy endpoints during spike
-    : ['/api/health', '/api/services/list'];          // Lighter load at baseline
+    ? ['/api/v1/services/list', '/api/v1/staff/available'] // Heavy endpoints during spike
+    : ['/api/v1/health', '/api/v1/services/list'];          // Lighter load at baseline
 
   for (const path of endpoints) {
     const res = http.get(`${BASE_URL}${path}`);

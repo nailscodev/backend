@@ -51,10 +51,10 @@ export const options = {
 };
 
 const ENDPOINTS = [
-  '/api/health',
-  '/api/services/list',
-  '/api/staff/available',
-  '/api/addons?page=1&limit=20',
+  '/api/v1/health',
+  '/api/v1/services/list',
+  '/api/v1/staff/available',
+  '/api/v1/addons?page=1&limit=20',
 ];
 
 export default function () {

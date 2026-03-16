@@ -72,9 +72,9 @@ export interface RunTestDto {
 function scenarioDuration(type: TestType): number {
   switch (type) {
     case 'load':   return 50;  // 10s ramp + 30s steady + 10s ramp-down
-    case 'stress': return 40;  // ramp from 1 to 50
+    case 'stress': return 60;  // 5s+10s+10s+10s+10s+10s+5s stages → 60s
     case 'spike':  return 40;  // 10s base + 15s spike + 15s recovery
-    case 'soak':   return 120; // 2-minute steady soak
+    case 'soak':   return 180; // 3-minute steady soak (quick CI-friendly version)
   }
 }
 
@@ -87,17 +87,24 @@ function vuProfile(type: TestType, elapsed: number): number {
       return Math.max(0, 10 - Math.ceil(elapsed - 40));      // ramp down
     }
     case 'stress': {
-      // Linear ramp 1 → 50 over 40 seconds
-      return Math.min(50, Math.max(1, Math.ceil(elapsed * 1.2)));
+      // Mirrors k6 stages: 1→1(5s) →5(15s) →10(25s) →20(35s) →30(45s) →50(55s) →0(60s)
+      if (elapsed < 5)  return 1;
+      if (elapsed < 15) return Math.ceil(1 + ((elapsed - 5)  / 10) * 4);   // 1→5
+      if (elapsed < 25) return Math.ceil(5 + ((elapsed - 15) / 10) * 5);   // 5→10
+      if (elapsed < 35) return Math.ceil(10 + ((elapsed - 25) / 10) * 10); // 10→20
+      if (elapsed < 45) return Math.ceil(20 + ((elapsed - 35) / 10) * 10); // 20→30
+      if (elapsed < 55) return Math.ceil(30 + ((elapsed - 45) / 10) * 20); // 30→50
+      return Math.max(0, 50 - Math.ceil((elapsed - 55) * 10));              // cool-down
     }
     case 'spike': {
-      if (elapsed < 10) return 2;
-      if (elapsed < 25) return 50;
-      return 2;
+      if (elapsed < 10) return 2;   // normal traffic
+      if (elapsed < 25) return 50;  // spike
+      return 2;                     // recovery
     }
     case 'soak': {
-      if (elapsed < 5) return Math.ceil(elapsed * 2);        // quick 0→10 ramp
-      return 10;
+      if (elapsed < 10) return Math.ceil(elapsed);           // ramp 0→10 VUs in 10s
+      if (elapsed < 170) return 10;                          // steady soak
+      return Math.max(0, 10 - Math.ceil(elapsed - 170));     // cool-down
     }
   }
 }
@@ -105,13 +112,13 @@ function vuProfile(type: TestType, elapsed: number): number {
 function scenarioDescription(type: TestType): string {
   switch (type) {
     case 'load':
-      return 'Load Test: Ramp from 0 → 10 VUs over 10s, hold 30s steady, ramp down 10s. Validates expected traffic.';
+      return 'Load Test: Ramp 0→10 VUs over 10s, hold 30s steady, ramp down 10s (50s total). Targets: turnero + booking APIs.';
     case 'stress':
-      return 'Stress Test: Ramp from 1 → 50 VUs over 40s. Finds the breaking point.';
+      return 'Stress Test: Staged ramp 1→5→10→20→30→50 VUs over 60s then cool-down. Finds the breaking point of the turnero.';
     case 'spike':
-      return 'Spike Test: 2 VUs base → sudden jump to 50 VUs for 15s → recover. Simulates a traffic burst.';
+      return 'Spike Test: 2 VUs base → instant jump to 50 VUs for 15s → recover to 2 VUs (40s total). Simulates viral traffic.';
     case 'soak':
-      return 'Soak Test: 10 VUs for 2 minutes. Detects memory leaks and performance degradation over time.';
+      return 'Soak Test: Ramp to 10 VUs, hold 160s steady, ramp down (180s total). Detects memory leaks and DB connection drift.';
   }
 }
 
@@ -153,13 +160,27 @@ export class PerformanceTestsService implements OnModuleInit {
    * The caller should poll `getResult(id)` for progress.
    */
   async startTest(dto: RunTestDto): Promise<TestResult> {
-    const baseUrl = dto.baseUrl || process.env.BASE_URL || 'http://localhost:3001';
+    // Primary target: the booking webapp (turnero)
+    const frontendUrl =
+      dto.baseUrl ||
+      process.env.FRONTEND_URL ||
+      'https://nailsco-frontend.fly.dev';
 
+    // Backend API base (what the turnero calls under the hood)
+    const backendUrl =
+      process.env.BACKEND_SELF_URL ||
+      process.env.BASE_URL ||
+      'https://nailsco-backend.fly.dev';
+
+    // Realistic booking-flow endpoints: frontend pages + public backend APIs
+    // Staff endpoint requires JWT auth → excluded to avoid false 401 errors in metrics
     const endpoints = [
-      `${baseUrl}/api/health`,
-      `${baseUrl}/api/services/list`,
-      `${baseUrl}/api/staff/available`,
-      `${baseUrl}/api/addons?page=1&limit=20`,
+      `${frontendUrl}/`,                                       // Turnero landing page
+      `${frontendUrl}/booking`,                               // Booking flow (SSR)
+      `${backendUrl}/api/v1/categories`,                      // Service categories (public)
+      `${backendUrl}/api/v1/services`,                        // Services list (public)
+      `${backendUrl}/api/v1/services/list`,                   // Simple services array (public)
+      `${backendUrl}/api/v1/addons`,                          // Add-ons list (public)
     ];
 
     const run: TestResult = {
@@ -231,7 +252,8 @@ export class PerformanceTestsService implements OnModuleInit {
             const latency = Date.now() - t0;
             windowLatencies.push(latency);
             windowRequests++;
-            if (res.statusCode && res.statusCode >= 500) {
+            // Count any non-2xx/3xx as an error (includes 4xx, 5xx)
+            if (res.statusCode && res.statusCode >= 400) {
               windowErrors++;
             }
             resolve();

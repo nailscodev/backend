@@ -55,11 +55,11 @@ export const options = {
 export default function () {
   // Cycle through endpoints to spread DB load evenly
   const paths = [
-    '/api/health',
-    '/api/services/list',
-    '/api/staff/available',
-    '/api/addons?page=1&limit=20',
-    '/api/services/categories/list',
+    '/api/v1/health',
+    '/api/v1/services/list',
+    '/api/v1/staff/available',
+    '/api/v1/addons?page=1&limit=20',
+    '/api/v1/categories',
   ];
 
   const path = paths[__ITER % paths.length];
