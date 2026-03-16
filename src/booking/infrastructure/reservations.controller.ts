@@ -1450,6 +1450,7 @@ export class ReservationsController {
    * Efficient endpoint for backoffice booking creation
    * Returns available slots considering all services, addons, removals, and staff selection
    */
+  @SkipCsrf() // Read-like operation (querying availability), no state change
   @Post('backoffice-availability')
   @ApiOperation({
     summary: 'Get available time slots for backoffice booking creation',
