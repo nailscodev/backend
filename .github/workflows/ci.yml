@@ -194,7 +194,7 @@ jobs:
           sleep 30
           echo "Checking backend health..."
           for i in $(seq 1 10); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.BACKEND_PROD_URL || 'https://nailsco-backend.fly.dev' }}/api/health" || echo "000")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.BACKEND_PROD_URL || 'https://nailsco-backend.fly.dev' }}/api/v1/health" || echo "000")
             if [ "$STATUS" = "200" ]; then
               echo "✅ Backend is healthy (attempt $i)"
               exit 0
