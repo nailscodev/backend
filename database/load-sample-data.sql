@@ -1831,6 +1831,7 @@ INSERT INTO screen_roles (screen_id, role) VALUES
 ('admin-config', 'admin'),
 ('usuarios-roles', 'admin'),
 ('idioma', 'admin'),
+('admin-tests', 'admin'),
 
 -- Manager can see daily operations but not revenue management or configuration
 ('admin-dashboard', 'manager'),
@@ -1844,6 +1845,7 @@ INSERT INTO screen_roles (screen_id, role) VALUES
 ('admin-staff', 'manager'),
 ('admin-clientes', 'manager'),
 ('admin-reportes', 'manager'),
+('admin-tests', 'manager'),
 
 -- Reception can see reservations, customers and calendar
 ('admin-dashboard', 'reception'),
