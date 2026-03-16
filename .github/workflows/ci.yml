@@ -168,7 +168,7 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
   performance-tests:
-    name: Performance Tests (Load)
+    name: Performance Tests (All)
     needs: [deploy]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -202,34 +202,139 @@ jobs:
           done
           echo "⚠️ Backend health check timed out — running tests anyway"
 
+      - name: Create reports directory
+        run: mkdir -p k6-reports
+
+      # ── 1. Load Test (~50s) ──────────────────────────────────────────────
       - name: Run Load Test
+        id: load
         run: |
           cd tests/stress
           k6 run load-test.js \
             --env BASE_URL=${{ secrets.BACKEND_PROD_URL || 'https://nailsco-backend.fly.dev' }} \
-            --out json=../../k6-load-results.json \
-            --summary-export=../../k6-load-summary.json
+            --out json=../../k6-reports/load-results.json \
+            --summary-export=../../k6-reports/load-summary.json \
+            2>&1 | tee ../../k6-reports/load-output.txt
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
         continue-on-error: true
 
-      - name: Upload k6 results
+      # ── 2. Stress Test (~60s) ────────────────────────────────────────────
+      - name: Run Stress Test
+        id: stress
+        run: |
+          cd tests/stress
+          k6 run stress-test.js \
+            --env BASE_URL=${{ secrets.BACKEND_PROD_URL || 'https://nailsco-backend.fly.dev' }} \
+            --out json=../../k6-reports/stress-results.json \
+            --summary-export=../../k6-reports/stress-summary.json \
+            2>&1 | tee ../../k6-reports/stress-output.txt
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      # ── 3. Spike Test (~40s) ─────────────────────────────────────────────
+      - name: Run Spike Test
+        id: spike
+        run: |
+          cd tests/stress
+          k6 run spike-test.js \
+            --env BASE_URL=${{ secrets.BACKEND_PROD_URL || 'https://nailsco-backend.fly.dev' }} \
+            --out json=../../k6-reports/spike-results.json \
+            --summary-export=../../k6-reports/spike-summary.json \
+            2>&1 | tee ../../k6-reports/spike-output.txt
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      # ── 4. Soak Test (~3min in CI via DURATION=2m) ───────────────────────
+      - name: Run Soak Test
+        id: soak
+        run: |
+          cd tests/stress
+          k6 run soak-test.js \
+            --env BASE_URL=${{ secrets.BACKEND_PROD_URL || 'https://nailsco-backend.fly.dev' }} \
+            --env DURATION=2m \
+            --out json=../../k6-reports/soak-results.json \
+            --summary-export=../../k6-reports/soak-summary.json \
+            2>&1 | tee ../../k6-reports/soak-output.txt
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      # ── Upload all reports as a single artifact ──────────────────────────
+      - name: Upload k6 reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: k6-performance-results-${{ github.run_number }}
-          path: |
-            k6-load-results.json
-            k6-load-summary.json
+          name: k6-performance-reports-${{ github.run_number }}
+          path: k6-reports/
           retention-days: 30
           if-no-files-found: ignore
 
-      - name: Print k6 summary
+      # ── Build consolidated GitHub Step Summary ───────────────────────────
+      - name: Generate consolidated report
         if: always()
         run: |
-          if [ -f k6-load-summary.json ]; then
-            echo "### k6 Load Test Summary" >> $GITHUB_STEP_SUMMARY
-            echo '```json' >> $GITHUB_STEP_SUMMARY
-            cat k6-load-summary.json >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          else
-            echo "No summary file found" >> $GITHUB_STEP_SUMMARY
-          fi
+          extract() {
+            local file="$1"
+            local metric="$2"
+            if [ -f "$file" ]; then
+              python3 -c "
+          import json, sys
+          try:
+            d = json.load(open('$file'))
+            m = d.get('metrics', {})
+            dur = m.get('http_req_duration', {})
+            err = m.get('http_req_failed', {})
+            reqs = m.get('http_reqs', {})
+            p95  = dur.get('p(95)', dur.get('values', {}).get('p(95)', 'N/A'))
+            p99  = dur.get('p(99)', dur.get('values', {}).get('p(99)', 'N/A'))
+            avg  = dur.get('avg', dur.get('values', {}).get('avg', 'N/A'))
+            rate = err.get('rate', err.get('values', {}).get('rate', 'N/A'))
+            rps  = reqs.get('rate', reqs.get('values', {}).get('rate', 'N/A'))
+            def fmt(v): return f'{float(v):.1f}' if v != 'N/A' else 'N/A'
+            def fmtpct(v): return f'{float(v)*100:.2f}%' if v != 'N/A' else 'N/A'
+            print(f'{fmt(avg)}ms | {fmt(p95)}ms | {fmt(p99)}ms | {fmtpct(rate)} | {fmt(rps)} req/s')
+          except Exception as e:
+            print('N/A | N/A | N/A | N/A | N/A')
+          " 2>/dev/null || echo "N/A | N/A | N/A | N/A | N/A"
+            else
+              echo "N/A | N/A | N/A | N/A | N/A"
+            fi
+          }
+
+          LOAD=$(extract  k6-reports/load-summary.json)
+          STRESS=$(extract k6-reports/stress-summary.json)
+          SPIKE=$(extract  k6-reports/spike-summary.json)
+          SOAK=$(extract   k6-reports/soak-summary.json)
+
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 🚀 k6 Performance Tests — Run #${{ github.run_number }}
+
+          > Commit \`${{ github.sha }}\` · Branch \`${{ github.ref_name }}\`
+
+          | Test | Avg | p95 | p99 | Error Rate | RPS |
+          |------|-----|-----|-----|------------|-----|
+          | Load (~50s, 10 VUs) | $LOAD |
+          | Stress (~60s, up to 50 VUs) | $STRESS |
+          | Spike (~40s, 2→50→2 VUs) | $SPIKE |
+          | Soak (~3min, 10 VUs steady) | $SOAK |
+
+          ### Thresholds
+          - **Load**: p95 < 800ms, error rate < 1%
+          - **Stress**: p95 < 5000ms, error rate < 20%
+          - **Spike**: p95 < 10000ms, error rate < 30%
+          - **Soak**: p95 < 1000ms at all times, error rate < 1%
+
+          > 📦 Full JSON reports available in artifact **k6-performance-reports-${{ github.run_number }}** (30-day retention)
+          EOF
+
+          echo ""
+          echo "=== Load Test Output (last 20 lines) ==="
+          tail -20 k6-reports/load-output.txt 2>/dev/null || echo "(no output)"
+          echo ""
+          echo "=== Stress Test Output (last 20 lines) ==="
+          tail -20 k6-reports/stress-output.txt 2>/dev/null || echo "(no output)"
+          echo ""
+          echo "=== Spike Test Output (last 20 lines) ==="
+          tail -20 k6-reports/spike-output.txt 2>/dev/null || echo "(no output)"
+          echo ""
+          echo "=== Soak Test Output (last 20 lines) ==="
+          tail -20 k6-reports/soak-output.txt 2>/dev/null || echo "(no output)"
