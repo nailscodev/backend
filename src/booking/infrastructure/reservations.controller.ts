@@ -1450,6 +1450,7 @@ export class ReservationsController {
    * Efficient endpoint for backoffice booking creation
    * Returns available slots considering all services, addons, removals, and staff selection
    */
+  @Public() // Called by turnero (public booking flow) without auth
   @SkipCsrf() // Read-like operation (querying availability), no state change
   @Post('backoffice-availability')
   @ApiOperation({
