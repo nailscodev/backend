@@ -2370,6 +2370,7 @@ export class ReservationsController {
   }
 
   @Public()
+  @SkipCsrf() // Called from turnero booking flow without a CSRF session
   @Post('assign-optimal-staff')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
