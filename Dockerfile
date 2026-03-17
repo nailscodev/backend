@@ -3,7 +3,9 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+# Cache npm downloads between depot rebuilds (BuildKit cache mount)
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
 
 # Copy configs first (changes often, small)
 COPY tsconfig*.json nest-cli.json ./
@@ -20,10 +22,13 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# Copy production dependencies and built app
-COPY --from=builder /app/node_modules ./node_modules
+COPY package*.json ./
+# Install only production dependencies — skip devDeps (smaller image)
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --omit=dev
+
+# Copy compiled app
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package.json ./
 
 # Create uploads directory
 RUN mkdir -p uploads/categories

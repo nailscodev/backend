@@ -12,3 +12,10 @@ test
 tests
 **/*.test.ts
 **/*.spec.ts
+# Runtime data — not needed at build time
+uploads
+# CI/scripts — not needed in image
+scripts
+.github
+*.log
+*.md
