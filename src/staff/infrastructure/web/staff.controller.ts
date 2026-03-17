@@ -14,6 +14,7 @@ import {
   ParseIntPipe,
   ParseBoolPipe,
   HttpCode,
+  Header,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -107,6 +108,7 @@ export class StaffController {
   }
 
   @Get('available')
+  @Header('Cache-Control', 'public, max-age=120, stale-while-revalidate=240')
   @ApiOperation({
     summary: 'Get available staff members',
     description: 'Retrieves staff members who are active and available for bookings, optionally filtered by service IDs'

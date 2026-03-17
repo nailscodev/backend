@@ -8,6 +8,7 @@ import {
   Param,
   Query,
   Headers,
+  Header,
   ParseUUIDPipe,
   ParseIntPipe,
   ParseBoolPipe,
@@ -98,6 +99,7 @@ export class ServicesController {
 
   @Get('list')
   @SkipResponseWrapper(true)
+  @Header('Cache-Control', 'public, max-age=120, stale-while-revalidate=300')
   @ApiOperation({
     summary: 'Get all services as simple array',
     description: 'Retrieves all active services as a simple array for frontend consumption'
@@ -130,6 +132,7 @@ export class ServicesController {
 
   @Get('categories/list')
   @SkipResponseWrapper(true)
+  @Header('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
   @ApiOperation({
     summary: 'Get service categories',
     description: 'Retrieves list of unique service categories from database'
@@ -148,6 +151,7 @@ export class ServicesController {
 
   @Get('categories/incompatibilities/all')
   @SkipResponseWrapper(true)
+  @Header('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
   @ApiOperation({
     summary: 'Get all incompatibilities as a map',
     description: 'Returns { categoryId: [incompatibleCategoryIds] } for ALL categories — used to pre-load at startup'

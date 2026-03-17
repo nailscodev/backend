@@ -1,14 +1,19 @@
-import { Controller, Get, Post, Patch, Delete, Param, Query, Body } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Query, Body, Header } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { CategoriesService } from '../../application/services/categories.service';
 import { CategoryEntity } from '../persistence/entities/category.entity';
+import { AppCacheService } from '../../../shared/cache/cache.service';
 
 @ApiTags('categories')
 @Controller('categories')
 export class CategoriesController {
-  constructor(private readonly categoriesService: CategoriesService) { }
+  constructor(
+    private readonly categoriesService: CategoriesService,
+    private readonly cache: AppCacheService,
+  ) { }
 
   @Get()
+  @Header('Cache-Control', 'public, max-age=120, stale-while-revalidate=300')
   @ApiOperation({ summary: 'Get all active categories' })
   @ApiQuery({ name: 'lang', required: false, description: 'Language code (EN, ES, etc.)' })
   @ApiResponse({
@@ -17,7 +22,12 @@ export class CategoriesController {
     type: [CategoryEntity],
   })
   async findAll(@Query('lang') lang?: string): Promise<CategoryEntity[]> {
-    return this.categoriesService.findAll(lang);
+    const key = `categories:all:${lang || 'en'}`;
+    const cached = this.cache.get<CategoryEntity[]>(key);
+    if (cached) return cached;
+    const result = await this.categoriesService.findAll(lang);
+    this.cache.set(key, result, 600); // 10 min TTL
+    return result;
   }
 
   @Get(':id')

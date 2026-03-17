@@ -8,6 +8,7 @@ import {
   Param,
   Query,
   Headers,
+  Header,
   NotFoundException,
   BadRequestException,
   HttpStatus,
@@ -195,6 +196,7 @@ export class AddOnsController {
   }
 
   @Get('compatible/:serviceId')
+  @Header('Cache-Control', 'public, max-age=120, stale-while-revalidate=300')
   @ApiOperation({
     summary: 'Get add-ons compatible with a service',
     description: 'Retrieve add-ons that are compatible with a specific service.',
@@ -215,6 +217,11 @@ export class AddOnsController {
     @Query('lang') lang?: string,
     @Headers('accept-language') acceptLanguage?: string,
   ) {
+    const languageCode = lang || acceptLanguage?.split(',')[0]?.split('-')[0];
+    const key = this.cacheKey('addons:compatible', { serviceId, lang: languageCode });
+    const cached = this.cache.get<unknown>(key);
+    if (cached) return cached;
+
     const addOns = await this.addOnModel.findAll({
       where: {
         isActive: true,
@@ -227,15 +234,14 @@ export class AddOnsController {
     });
 
     // Use lang query param, or fall back to accept-language header
-    const languageCode = lang || acceptLanguage?.split(',')[0]?.split('-')[0];
-
-    // Apply translations if language code is provided
     const translatedAddOns = await this.applyAddonsTranslations(addOns, languageCode);
 
-    return {
+    const result = {
       success: true,
       data: translatedAddOns,
     };
+    this.cache.set(key, result, 300); // 5 min TTL
+    return result;
   }
 
   @Get('incompatibilities/:addonIds')
