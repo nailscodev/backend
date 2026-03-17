@@ -1278,10 +1278,7 @@ export class ReservationsController {
       throw new BadRequestException('Date must be in YYYY-MM-DD format');
     }
 
-    console.log(`\n📅 AVAILABLE SLOTS REQUEST:`);
-    console.log(`   Date: ${date}`);
-    console.log(`   StaffId: ${staffId || 'all'}`);
-
+    try {
     // Build where clause for existing bookings
     const where: Record<string, any> = {
       appointmentDate: date,
@@ -1387,9 +1384,17 @@ export class ReservationsController {
       });
     });
 
+    // Helper: parse shifts safely — raw Sequelize queries may return JSONB as a string
+    const parseShifts = (raw: unknown): Array<{ shiftStart: string; shiftEnd: string }> => {
+      if (!raw) return [];
+      if (Array.isArray(raw)) return raw;
+      try { return JSON.parse(raw as string); } catch { return []; }
+    };
+
     // Helper: check if a time slot falls within staff shifts
-    const isSlotWithinShifts = (slotTime: string, shifts: Array<{ shiftStart: string; shiftEnd: string }>) => {
-      if (!shifts || shifts.length === 0) return true; // no shifts defined = always available
+    const isSlotWithinShifts = (slotTime: string, rawShifts: unknown) => {
+      const shifts = parseShifts(rawShifts);
+      if (shifts.length === 0) return true; // no shifts defined = always available
       const [h, m] = slotTime.split(':').map(Number);
       const slotMin = h * 60 + m;
       const slotEndMin = slotMin + 60; // 1-hour intervals
@@ -1443,6 +1448,11 @@ export class ReservationsController {
       date,
       staffId: staffId || 'all'
     };
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to retrieve available slots: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
   }
 
   /**
