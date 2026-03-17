@@ -67,9 +67,10 @@ function parseDatabaseUrl(url: string) {
               models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity, CategoryLangEntity],
               pool: {
                 max: 5,
-                min: 0,
+                min: 1,          // keep at least 1 connection warm
                 acquire: 30000,
-                idle: 10000,
+                idle: 20000,     // close idle connections after 20s (< Neon's 300s timeout)
+                evict: 10000,    // check for dead connections every 10s
               },
               retry: { max: 3 },
               dialectOptions: (isProduction && !disableSSL) ? {
@@ -77,7 +78,13 @@ function parseDatabaseUrl(url: string) {
                   require: true,
                   rejectUnauthorized: false,
                 },
-              } : {},
+                // Keep TCP connection alive so Neon doesn't drop it
+                keepAlive: true,
+                keepAliveInitialDelayMillis: 10000,
+              } : {
+                keepAlive: true,
+                keepAliveInitialDelayMillis: 10000,
+              },
             };
           }
         }
@@ -96,11 +103,16 @@ function parseDatabaseUrl(url: string) {
           models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity, CategoryLangEntity],
           pool: {
             max: 5,
-            min: 0,
+            min: 1,
             acquire: 30000,
-            idle: 10000,
+            idle: 20000,
+            evict: 10000,
           },
           retry: { max: 3 },
+          dialectOptions: {
+            keepAlive: true,
+            keepAliveInitialDelayMillis: 10000,
+          },
         };
       },
     }),
