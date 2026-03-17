@@ -1353,8 +1353,6 @@ export class ReservationsController {
         endTime = endTimeObj.toTimeString().slice(0, 5);
       }
 
-      console.log(`[AVAILABILITY] Booking found: staff=${staff}, startTime=${startTime}, endTime=${endTime}`);
-
       allTimeSlots.forEach(slot => {
         // Check if this slot would overlap with the existing booking
         // Assume each slot is 60 minutes duration (can be made configurable later)

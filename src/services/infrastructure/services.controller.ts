@@ -15,6 +15,7 @@ import {
   HttpStatus,
   HttpCode,
   Logger,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -116,18 +117,25 @@ export class ServicesController {
     @Query('lang') lang?: string,
     @Headers('accept-language') acceptLanguage?: string,
   ): Promise<ServiceEntity[]> {
-    const languageCode = lang || acceptLanguage?.split(',')[0]?.split('-')[0];
-    const key = this.cacheKey('services:list', { category, lang: languageCode });
-    const cached = this.cache.get<ServiceEntity[]>(key);
-    if (cached) return cached;
+    try {
+      const languageCode = lang || acceptLanguage?.split(',')[0]?.split('-')[0];
+      const key = this.cacheKey('services:list', { category, lang: languageCode });
+      const cached = this.cache.get<ServiceEntity[]>(key);
+      if (cached) return cached;
 
-    const result = await this.servicesService.findAll(
-      { category, isActive: true },
-      { page: 1, limit: 1000 },
-      languageCode,
-    );
-    this.cache.set(key, result.data, 300); // 5 min TTL
-    return result.data;
+      const result = await this.servicesService.findAll(
+        { category, isActive: true },
+        { page: 1, limit: 1000 },
+        languageCode,
+      );
+      this.cache.set(key, result.data, 300); // 5 min TTL
+      return result.data;
+    } catch (error) {
+      this.logger.error('Failed to retrieve services list', error instanceof Error ? error.message : error);
+      throw new BadRequestException(
+        `Failed to retrieve services: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
   }
 
   @Get('categories/list')
