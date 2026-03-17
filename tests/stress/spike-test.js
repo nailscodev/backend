@@ -30,7 +30,7 @@ const errorRate       = new Rate('error_rate');
 const latencyDurSpike = new Trend('latency_during_spike', true);
 const latencyBase     = new Trend('latency_baseline', true);
 
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:3001';
+const BASE_URL = __ENV.BASE_URL || 'https://nailsco-backend.fly.dev';
 
 export const options = {
   stages: [
@@ -52,8 +52,8 @@ export default function () {
   const isSpike = __VU > 2; // VUs > 2 means we're in the spike
 
   const endpoints = isSpike
-    ? ['/api/v1/services/list', '/api/v1/staff/available'] // Heavy endpoints during spike
-    : ['/api/v1/health', '/api/v1/services/list'];          // Lighter load at baseline
+    ? ['/api/v1/services/list', '/api/v1/categories'] // Heavy endpoints during spike (/staff/available requires auth)
+    : ['/api/v1/health', '/api/v1/services/list'];    // Lighter load at baseline
 
   for (const path of endpoints) {
     const res = http.get(`${BASE_URL}${path}`);

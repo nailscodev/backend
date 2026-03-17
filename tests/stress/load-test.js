@@ -27,12 +27,12 @@ import { Counter, Rate, Trend } from 'k6/metrics';
 const errorCount   = new Counter('errors');
 const errorRate    = new Rate('error_rate');
 const servicesTime = new Trend('services_response_time', true);
-const staffTime    = new Trend('staff_response_time', true);
+  const staffTime    = new Trend('categories_response_time', true);
 const addonsTime   = new Trend('addons_response_time', true);
 const healthTime   = new Trend('health_response_time', true);
 
 // ─── Config ──────────────────────────────────────────────────────────────────
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:3001';
+const BASE_URL = __ENV.BASE_URL || 'https://nailsco-backend.fly.dev';
 
 // ─── Test scenario ───────────────────────────────────────────────────────────
 export const options = {
@@ -47,9 +47,9 @@ export const options = {
     // Error rate must be below 1%
     error_rate: ['rate<0.01'],
     // Per-endpoint thresholds
-    services_response_time: ['p(95)<1000'],
-    staff_response_time:    ['p(95)<1000'],
-    addons_response_time:   ['p(95)<800'],
+    services_response_time:    ['p(95)<1000'],
+    categories_response_time:  ['p(95)<1000'],
+    addons_response_time:      ['p(95)<800'],
     health_response_time:   ['p(95)<200'],
   },
 };
@@ -76,11 +76,11 @@ export default function () {
 
   sleep(0.1);
 
-  // 3) Staff availability — technician selection screen
+  // 3) Categories — public endpoint, no auth required
   {
-    const res = http.get(`${BASE_URL}/api/v1/staff/available`);
+    const res = http.get(`${BASE_URL}/api/v1/categories`);
     staffTime.add(res.timings.duration);
-    const ok = check(res, { 'staff: status 200': (r) => r.status === 200 });
+    const ok = check(res, { 'categories: status 200': (r) => r.status === 200 });
     if (!ok) { errorCount.add(1); errorRate.add(1); } else { errorRate.add(0); }
   }
 

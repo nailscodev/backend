@@ -31,7 +31,7 @@ const errorCount = new Counter('errors');
 const errorRate  = new Rate('error_rate');
 const latency    = new Trend('endpoint_latency', true);
 
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:3001';
+const BASE_URL = __ENV.BASE_URL || 'https://nailsco-backend.fly.dev';
 
 export const options = {
   stages: [
@@ -53,7 +53,7 @@ export const options = {
 const ENDPOINTS = [
   '/api/v1/health',
   '/api/v1/services/list',
-  '/api/v1/staff/available',
+  '/api/v1/categories',          // replaces /staff/available (requires auth)
   '/api/v1/addons?page=1&limit=20',
 ];
 
