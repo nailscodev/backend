@@ -117,12 +117,13 @@ export class ServicesController {
     @Query('lang') lang?: string,
     @Headers('accept-language') acceptLanguage?: string,
   ): Promise<ServiceEntity[]> {
-    try {
-      const languageCode = lang || acceptLanguage?.split(',')[0]?.split('-')[0];
-      const key = this.cacheKey('services:list', { category, lang: languageCode });
-      const cached = this.cache.get<ServiceEntity[]>(key);
-      if (cached) return cached;
+    const languageCode = lang || acceptLanguage?.split(',')[0]?.split('-')[0];
+    const key = this.cacheKey('services:list', { category, lang: languageCode });
 
+    const cached = this.cache.get<ServiceEntity[]>(key);
+    if (cached) return cached;
+
+    try {
       const result = await this.servicesService.findAll(
         { category, isActive: true },
         { page: 1, limit: 1000 },
@@ -131,10 +132,18 @@ export class ServicesController {
       this.cache.set(key, result.data, 300); // 5 min TTL
       return result.data;
     } catch (error) {
-      this.logger.error('Failed to retrieve services list', error instanceof Error ? error.message : error);
-      throw new BadRequestException(
-        `Failed to retrieve services: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error('Failed to retrieve services list', msg);
+
+      // Neon serverless kills idle connections; serve stale cache rather than
+      // failing with a 400 when the connection is momentarily unavailable.
+      const stale = this.cache.getStale<ServiceEntity[]>(key);
+      if (stale) {
+        this.logger.warn('Serving stale services list due to DB error');
+        return stale;
+      }
+
+      throw new BadRequestException(`Failed to retrieve services: ${msg}`);
     }
   }
 

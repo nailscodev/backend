@@ -28,11 +28,20 @@ export class AppCacheService {
     const entry = this.store.get(key) as CacheEntry<T> | undefined;
     if (!entry) return null;
     if (Date.now() > entry.expiresAt) {
-      this.store.delete(key);
+      // Keep the entry in store so getStale() can still use it as a fallback
       return null;
     }
     entry.hits++;
     return entry.data;
+  }
+
+  /**
+   * Return cached data even if expired (stale-while-revalidate fallback).
+   * Used when the backing store (DB) is temporarily unavailable.
+   */
+  getStale<T>(key: string): T | null {
+    const entry = this.store.get(key) as CacheEntry<T> | undefined;
+    return entry ? entry.data : null;
   }
 
   /** Store a value with a TTL in seconds */
