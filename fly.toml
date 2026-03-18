@@ -13,6 +13,7 @@ primary_region = 'iad'
   NODE_ENV = 'production'
   PORT = '3001'
   AXIOM_DATASET = 'nailsco-logs'
+  ALLOWED_ORIGINS = 'http://localhost:3000,http://localhost:3001,http://localhost:3002,https://nailsco-frontend.fly.dev,https://backoffice-web-so8xwa.fly.dev,https://frontend-web-wt6y.onrender.com'
 
 [http_service]
   internal_port = 3001

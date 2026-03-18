@@ -74,7 +74,8 @@ async function bootstrap() {
     'http://192.168.1.32:3002',
     'http://127.0.0.1:3002',
     'https://frontend-web-wt6y.onrender.com',
-    'https://backoffice-web-so8xwa.fly.dev/'
+    'https://backoffice-web-so8xwa.fly.dev',
+    'https://nailsco-frontend.fly.dev',
   ];
 
   app.enableCors({
