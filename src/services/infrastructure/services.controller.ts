@@ -161,9 +161,20 @@ export class ServicesController {
   async getCategories() {
     const cached = this.cache.get<unknown>('services:categories');
     if (cached) return cached;
-    const result = await this.servicesService.getCategories();
-    this.cache.set('services:categories', result, 600); // 10 min TTL
-    return result;
+    try {
+      const result = await this.servicesService.getCategories();
+      this.cache.set('services:categories', result, 600);
+      return result;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error('Failed to retrieve categories', msg);
+      const stale = this.cache.getStale<unknown>('services:categories');
+      if (stale) {
+        this.logger.warn('Serving stale categories due to DB error');
+        return stale;
+      }
+      throw new BadRequestException(`Failed to retrieve categories: ${msg}`);
+    }
   }
 
   @Get('categories/incompatibilities/all')
@@ -180,9 +191,20 @@ export class ServicesController {
   async getAllIncompatibilities(): Promise<Record<string, string[]>> {
     const cached = this.cache.get<Record<string, string[]>>('services:incompatibilities:all');
     if (cached) return cached;
-    const result = await this.servicesService.getAllIncompatibilities();
-    this.cache.set('services:incompatibilities:all', result, 600); // 10 min TTL
-    return result;
+    try {
+      const result = await this.servicesService.getAllIncompatibilities();
+      this.cache.set('services:incompatibilities:all', result, 600);
+      return result;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error('Failed to retrieve incompatibilities', msg);
+      const stale = this.cache.getStale<Record<string, string[]>>('services:incompatibilities:all');
+      if (stale) {
+        this.logger.warn('Serving stale incompatibilities due to DB error');
+        return stale;
+      }
+      throw new BadRequestException(`Failed to retrieve incompatibilities: ${msg}`);
+    }
   }
 
   @Get('categories/incompatibilities')

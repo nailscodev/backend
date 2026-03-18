@@ -169,30 +169,41 @@ export class AddOnsController {
     const maxLimit = 100;
     const actualLimit = Math.min(limit, maxLimit);
 
-    const { rows: addOns, count: total } = await this.addOnModel.findAndCountAll({
-      where,
-      offset: (page - 1) * actualLimit,
-      limit: actualLimit,
-      order: [['displayOrder', 'ASC'], ['name', 'ASC']],
-      include: [{ association: 'services', attributes: ['id', 'name'] }],
-    });
-
-    const translatedAddOns = await this.applyAddonsTranslations(addOns, languageCode);
-
-    const result = {
-      success: true,
-      data: translatedAddOns,
-      pagination: {
-        page,
+    try {
+      const { rows: addOns, count: total } = await this.addOnModel.findAndCountAll({
+        where,
+        offset: (page - 1) * actualLimit,
         limit: actualLimit,
-        total,
-        totalPages: Math.ceil(total / actualLimit),
-        hasNextPage: page < Math.ceil(total / actualLimit),
-        hasPrevPage: page > 1,
-      },
-    };
-    this.cache.set(key, result, 300); // 5 min TTL
-    return result;
+        order: [['displayOrder', 'ASC'], ['name', 'ASC']],
+        include: [{ association: 'services', attributes: ['id', 'name'] }],
+      });
+
+      const translatedAddOns = await this.applyAddonsTranslations(addOns, languageCode);
+
+      const result = {
+        success: true,
+        data: translatedAddOns,
+        pagination: {
+          page,
+          limit: actualLimit,
+          total,
+          totalPages: Math.ceil(total / actualLimit),
+          hasNextPage: page < Math.ceil(total / actualLimit),
+          hasPrevPage: page > 1,
+        },
+      };
+      this.cache.set(key, result, 300); // 5 min TTL
+      return result;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error('Failed to retrieve add-ons', msg);
+      const stale = this.cache.getStale<unknown>(key);
+      if (stale) {
+        this.logger.warn('Serving stale add-ons due to DB error');
+        return stale;
+      }
+      throw new BadRequestException(`Failed to retrieve add-ons: ${msg}`);
+    }
   }
 
   @Get('compatible/:serviceId')

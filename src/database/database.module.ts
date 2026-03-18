@@ -67,10 +67,10 @@ function parseDatabaseUrl(url: string) {
               models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity, CategoryLangEntity],
               pool: {
                 max: 5,
-                min: 1,          // keep at least 1 connection warm
+                min: 0,          // 0 = no idle connections kept; avoids Neon killing a stale 'warm' connection
                 acquire: 30000,
-                idle: 20000,     // close idle connections after 20s (< Neon's 300s timeout)
-                evict: 10000,    // check for dead connections every 10s
+                idle: 10000,     // evict idle connections quickly
+                evict: 5000,     // check frequently
               },
               retry: { max: 3 },
               dialectOptions: (isProduction && !disableSSL) ? {
@@ -103,10 +103,10 @@ function parseDatabaseUrl(url: string) {
           models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity, CategoryLangEntity],
           pool: {
             max: 5,
-            min: 1,
+            min: 0,
             acquire: 30000,
-            idle: 20000,
-            evict: 10000,
+            idle: 10000,
+            evict: 5000,
           },
           retry: { max: 3 },
           dialectOptions: {
