@@ -15,7 +15,7 @@ import {
   HttpStatus,
   HttpCode,
   Logger,
-  BadRequestException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -58,6 +58,42 @@ export class ServicesController {
       .map((k) => `${k}=${params[k]}`)
       .join('&');
     return `${prefix}:${sorted}`;
+  }
+
+  /**
+   * Retry a DB operation with exponential-ish backoff.
+   * Neon serverless compute takes 1-5 s to wake from hibernation — the first
+   * connection attempt fails instantly (proxy rejects it), but subsequent ones
+   * (after a short sleep) succeed once the compute is live again.
+   * After all retries, falls back to stale cache, then throws 503.
+   */
+  private async retryDbQuery<T>(
+    operation: () => Promise<T>,
+    staleKey: string,
+    label: string,
+    maxAttempts = 6,
+    delayMs = 2000,
+  ): Promise<T> {
+    let lastError: Error | null = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await operation();
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        this.logger.warn(`${label} DB attempt ${attempt}/${maxAttempts}: ${lastError.message}`);
+        if (attempt < maxAttempts) {
+          await new Promise(r => setTimeout(r, delayMs));
+        }
+      }
+    }
+    const stale = this.cache.getStale<T>(staleKey);
+    if (stale) {
+      this.logger.warn(`${label}: serving stale data after ${maxAttempts} DB retries`);
+      return stale;
+    }
+    const msg = lastError?.message ?? 'Unknown error';
+    this.logger.error(`${label}: all DB retries exhausted — ${msg}`);
+    throw new ServiceUnavailableException(`${label} temporarily unavailable: ${msg}`);
   }
 
   @Get()
@@ -123,28 +159,19 @@ export class ServicesController {
     const cached = this.cache.get<ServiceEntity[]>(key);
     if (cached) return cached;
 
-    try {
-      const result = await this.servicesService.findAll(
-        { category, isActive: true },
-        { page: 1, limit: 1000 },
-        languageCode,
-      );
-      this.cache.set(key, result.data, 300); // 5 min TTL
-      return result.data;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      this.logger.error('Failed to retrieve services list', msg);
-
-      // Neon serverless kills idle connections; serve stale cache rather than
-      // failing with a 400 when the connection is momentarily unavailable.
-      const stale = this.cache.getStale<ServiceEntity[]>(key);
-      if (stale) {
-        this.logger.warn('Serving stale services list due to DB error');
-        return stale;
-      }
-
-      throw new BadRequestException(`Failed to retrieve services: ${msg}`);
-    }
+    return this.retryDbQuery(
+      async () => {
+        const result = await this.servicesService.findAll(
+          { category, isActive: true },
+          { page: 1, limit: 1000 },
+          languageCode,
+        );
+        this.cache.set(key, result.data, 300); // 5 min TTL
+        return result.data;
+      },
+      key,
+      'getServicesList',
+    );
   }
 
   @Get('categories/list')
@@ -161,20 +188,15 @@ export class ServicesController {
   async getCategories() {
     const cached = this.cache.get<unknown>('services:categories');
     if (cached) return cached;
-    try {
-      const result = await this.servicesService.getCategories();
-      this.cache.set('services:categories', result, 600);
-      return result;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      this.logger.error('Failed to retrieve categories', msg);
-      const stale = this.cache.getStale<unknown>('services:categories');
-      if (stale) {
-        this.logger.warn('Serving stale categories due to DB error');
-        return stale;
-      }
-      throw new BadRequestException(`Failed to retrieve categories: ${msg}`);
-    }
+    return this.retryDbQuery(
+      async () => {
+        const result = await this.servicesService.getCategories();
+        this.cache.set('services:categories', result, 600);
+        return result;
+      },
+      'services:categories',
+      'getCategories',
+    );
   }
 
   @Get('categories/incompatibilities/all')
@@ -191,20 +213,15 @@ export class ServicesController {
   async getAllIncompatibilities(): Promise<Record<string, string[]>> {
     const cached = this.cache.get<Record<string, string[]>>('services:incompatibilities:all');
     if (cached) return cached;
-    try {
-      const result = await this.servicesService.getAllIncompatibilities();
-      this.cache.set('services:incompatibilities:all', result, 600);
-      return result;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      this.logger.error('Failed to retrieve incompatibilities', msg);
-      const stale = this.cache.getStale<Record<string, string[]>>('services:incompatibilities:all');
-      if (stale) {
-        this.logger.warn('Serving stale incompatibilities due to DB error');
-        return stale;
-      }
-      throw new BadRequestException(`Failed to retrieve incompatibilities: ${msg}`);
-    }
+    return this.retryDbQuery(
+      async () => {
+        const result = await this.servicesService.getAllIncompatibilities();
+        this.cache.set('services:incompatibilities:all', result, 600);
+        return result;
+      },
+      'services:incompatibilities:all',
+      'getAllIncompatibilities',
+    );
   }
 
   @Get('categories/incompatibilities')

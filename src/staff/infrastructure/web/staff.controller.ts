@@ -16,6 +16,7 @@ import {
   HttpCode,
   Header,
   BadRequestException,
+  ServiceUnavailableException,
   Logger,
 } from '@nestjs/common';
 import {
@@ -54,6 +55,36 @@ export class StaffController {
     private readonly staffService: StaffService,
     private readonly cache: AppCacheService,
   ) { }
+
+  /** Retry a DB operation; on exhaustion fall back to stale cache or throw 503. */
+  private async retryDbQuery<T>(
+    operation: () => Promise<T>,
+    staleKey: string,
+    label: string,
+    maxAttempts = 6,
+    delayMs = 2000,
+  ): Promise<T> {
+    let lastError: Error | null = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await operation();
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        this.logger.warn(`${label} DB attempt ${attempt}/${maxAttempts}: ${lastError.message}`);
+        if (attempt < maxAttempts) {
+          await new Promise(r => setTimeout(r, delayMs));
+        }
+      }
+    }
+    const stale = this.cache.getStale<T>(staleKey);
+    if (stale) {
+      this.logger.warn(`${label}: serving stale data after ${maxAttempts} DB retries`);
+      return stale;
+    }
+    const msg = lastError?.message ?? 'Unknown error';
+    this.logger.error(`${label}: all DB retries exhausted — ${msg}`);
+    throw new ServiceUnavailableException(`${label} temporarily unavailable: ${msg}`);
+  }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -136,30 +167,23 @@ export class StaffController {
     const cached = this.cache.get<StaffResponseDto[]>(key);
     if (cached) return cached;
 
-    try {
-      let result: StaffResponseDto[];
-      if (serviceIds) {
-        const serviceIdArray = Array.isArray(serviceIds)
-          ? serviceIds
-          : serviceIds.split(',').map(id => id.trim());
-        result = await this.staffService.findStaffByServiceIds(serviceIdArray);
-      } else {
-        result = await this.staffService.findAvailableStaff();
-      }
-      this.cache.set(key, result, 120); // 2 min TTL
-      return result;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      this.logger.error('Failed to retrieve available staff', msg);
-
-      const stale = this.cache.getStale<StaffResponseDto[]>(key);
-      if (stale) {
-        this.logger.warn('Serving stale available-staff due to DB error');
-        return stale;
-      }
-
-      throw new BadRequestException(`Failed to retrieve available staff: ${msg}`);
-    }
+    return this.retryDbQuery(
+      async () => {
+        let result: StaffResponseDto[];
+        if (serviceIds) {
+          const serviceIdArray = Array.isArray(serviceIds)
+            ? serviceIds
+            : serviceIds.split(',').map(id => id.trim());
+          result = await this.staffService.findStaffByServiceIds(serviceIdArray);
+        } else {
+          result = await this.staffService.findAvailableStaff();
+        }
+        this.cache.set(key, result, 120); // 2 min TTL
+        return result;
+      },
+      key,
+      'findAvailableStaff',
+    );
   }
 
   @Get('statistics')

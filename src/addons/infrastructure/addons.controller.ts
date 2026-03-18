@@ -11,6 +11,7 @@ import {
   Header,
   NotFoundException,
   BadRequestException,
+  ServiceUnavailableException,
   HttpStatus,
   ValidationPipe,
   ParseUUIDPipe,
@@ -57,6 +58,36 @@ export class AddOnsController {
       .map((k) => `${k}=${params[k]}`)
       .join('&');
     return `${prefix}:${sorted}`;
+  }
+
+  /** Retry a DB operation; on exhaustion fall back to stale cache or throw 503. */
+  private async retryDbQuery<T>(
+    operation: () => Promise<T>,
+    staleKey: string,
+    label: string,
+    maxAttempts = 6,
+    delayMs = 2000,
+  ): Promise<T> {
+    let lastError: Error | null = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await operation();
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        this.logger.warn(`${label} DB attempt ${attempt}/${maxAttempts}: ${lastError.message}`);
+        if (attempt < maxAttempts) {
+          await new Promise(r => setTimeout(r, delayMs));
+        }
+      }
+    }
+    const stale = this.cache.getStale<T>(staleKey);
+    if (stale) {
+      this.logger.warn(`${label}: serving stale data after ${maxAttempts} DB retries`);
+      return stale;
+    }
+    const msg = lastError?.message ?? 'Unknown error';
+    this.logger.error(`${label}: all DB retries exhausted — ${msg}`);
+    throw new ServiceUnavailableException(`${label} temporarily unavailable: ${msg}`);
   }
 
   /**
@@ -170,38 +201,40 @@ export class AddOnsController {
     const actualLimit = Math.min(limit, maxLimit);
 
     try {
-      const { rows: addOns, count: total } = await this.addOnModel.findAndCountAll({
-        where,
-        offset: (page - 1) * actualLimit,
-        limit: actualLimit,
-        order: [['displayOrder', 'ASC'], ['name', 'ASC']],
-        include: [{ association: 'services', attributes: ['id', 'name'] }],
-      });
+      return await this.retryDbQuery(
+        async () => {
+          const { rows: addOns, count: total } = await this.addOnModel.findAndCountAll({
+            where,
+            offset: (page - 1) * actualLimit,
+            limit: actualLimit,
+            order: [['displayOrder', 'ASC'], ['name', 'ASC']],
+            include: [{ association: 'services', attributes: ['id', 'name'] }],
+          });
 
-      const translatedAddOns = await this.applyAddonsTranslations(addOns, languageCode);
+          const translatedAddOns = await this.applyAddonsTranslations(addOns, languageCode);
 
-      const result = {
-        success: true,
-        data: translatedAddOns,
-        pagination: {
-          page,
-          limit: actualLimit,
-          total,
-          totalPages: Math.ceil(total / actualLimit),
-          hasNextPage: page < Math.ceil(total / actualLimit),
-          hasPrevPage: page > 1,
+          const result = {
+            success: true,
+            data: translatedAddOns,
+            pagination: {
+              page,
+              limit: actualLimit,
+              total,
+              totalPages: Math.ceil(total / actualLimit),
+              hasNextPage: page < Math.ceil(total / actualLimit),
+              hasPrevPage: page > 1,
+            },
+          };
+          this.cache.set(key, result, 300); // 5 min TTL
+          return result;
         },
-      };
-      this.cache.set(key, result, 300); // 5 min TTL
-      return result;
+        key,
+        'addons.findAll',
+      );
     } catch (error) {
+      // Re-throw ServiceUnavailableException as-is; wrap anything else
+      if (error instanceof ServiceUnavailableException) throw error;
       const msg = error instanceof Error ? error.message : String(error);
-      this.logger.error('Failed to retrieve add-ons', msg);
-      const stale = this.cache.getStale<unknown>(key);
-      if (stale) {
-        this.logger.warn('Serving stale add-ons due to DB error');
-        return stale;
-      }
       throw new BadRequestException(`Failed to retrieve add-ons: ${msg}`);
     }
   }
