@@ -15,6 +15,8 @@ import {
   ParseBoolPipe,
   HttpCode,
   Header,
+  BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -46,6 +48,8 @@ class MockJwtGuard {
 @UseGuards(MockJwtGuard)
 @ApiBearerAuth()
 export class StaffController {
+  private readonly logger = new Logger(StaffController.name);
+
   constructor(
     private readonly staffService: StaffService,
     private readonly cache: AppCacheService,
@@ -128,26 +132,34 @@ export class StaffController {
   async findAvailableStaff(
     @Query('serviceIds') serviceIds?: string | string[]
   ): Promise<StaffResponseDto[]> {
-    // Cache key based on serviceIds
     const key = `staff:available:${Array.isArray(serviceIds) ? serviceIds.sort().join(',') : (serviceIds || '')}`;
     const cached = this.cache.get<StaffResponseDto[]>(key);
     if (cached) return cached;
 
-    let result: StaffResponseDto[];
-    if (serviceIds) {
-      let serviceIdArray: string[];
-      if (Array.isArray(serviceIds)) {
-        serviceIdArray = serviceIds;
+    try {
+      let result: StaffResponseDto[];
+      if (serviceIds) {
+        const serviceIdArray = Array.isArray(serviceIds)
+          ? serviceIds
+          : serviceIds.split(',').map(id => id.trim());
+        result = await this.staffService.findStaffByServiceIds(serviceIdArray);
       } else {
-        serviceIdArray = serviceIds.split(',').map(id => id.trim());
+        result = await this.staffService.findAvailableStaff();
       }
-      result = await this.staffService.findStaffByServiceIds(serviceIdArray);
-    } else {
-      result = await this.staffService.findAvailableStaff();
-    }
+      this.cache.set(key, result, 120); // 2 min TTL
+      return result;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error('Failed to retrieve available staff', msg);
 
-    this.cache.set(key, result, 120); // 2 min TTL — working days data changes rarely
-    return result;
+      const stale = this.cache.getStale<StaffResponseDto[]>(key);
+      if (stale) {
+        this.logger.warn('Serving stale available-staff due to DB error');
+        return stale;
+      }
+
+      throw new BadRequestException(`Failed to retrieve available staff: ${msg}`);
+    }
   }
 
   @Get('statistics')
