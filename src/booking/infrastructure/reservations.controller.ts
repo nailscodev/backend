@@ -42,6 +42,11 @@ import { BookingsBySourceDto } from './dto/bookings-by-source.dto';
 import { BookingListItemDto } from './dto/booking-list-item.dto';
 import { ManualAdjustment } from '../../common/entities/manual-adjustment.entity';
 import { BookingConfig } from '../../common/config/booking.config';
+import { MailService } from '../../common/services/mail.service';
+import { CustomerEntity } from '../../customers/infrastructure/persistence/entities/customer.entity';
+import { ServiceEntity } from '../../services/infrastructure/persistence/entities/service.entity';
+import { AddOnEntity } from '../../addons/infrastructure/persistence/entities/addon.entity';
+import { bookingConfirmationEmail } from '../../common/templates/booking-confirmation-email';
 
 // Interfaces for type safety
 interface StaffMember {
@@ -66,9 +71,58 @@ export class ReservationsController {
     private bookingModel: typeof BookingEntity,
     @InjectModel(ManualAdjustment)
     private manualAdjustmentModel: typeof ManualAdjustment,
+    @InjectModel(CustomerEntity)
+    private customerModel: typeof CustomerEntity,
+    @InjectModel(ServiceEntity)
+    private serviceModel: typeof ServiceEntity,
+    @InjectModel(AddOnEntity)
+    private addOnModel: typeof AddOnEntity,
     private sequelize: Sequelize,
     private multiServiceAvailabilityService: MultiServiceAvailabilityService,
+    private mailService: MailService,
   ) { }
+
+  private async sendBookingConfirmationEmail(booking: BookingEntity, dto: CreateBookingDto): Promise<void> {
+    try {
+      if (!dto.customerId) return;
+
+      const customer = await this.customerModel.findByPk(dto.customerId);
+      if (!customer?.email) return;
+
+      const services: Array<{ name: string; price: number }> = [];
+
+      if (dto.serviceId) {
+        const service = await this.serviceModel.findByPk(dto.serviceId);
+        if (service) {
+          services.push({ name: service.name, price: service.price / 100 });
+        }
+      }
+
+      if (dto.addOnIds?.length) {
+        const addOns = await this.addOnModel.findAll({ where: { id: dto.addOnIds } });
+        for (const addOn of addOns) {
+          services.push({ name: addOn.name, price: addOn.price / 100 });
+        }
+      }
+
+      const html = bookingConfirmationEmail({
+        customerFirstName: customer.firstName,
+        appointmentDate: dto.appointmentDate,
+        startTime: dto.startTime,
+        endTime: dto.endTime,
+        services,
+        totalPrice: (dto.totalPrice ?? 0) / 100,
+      });
+
+      await this.mailService.sendMail({
+        to: customer.email,
+        subject: 'Your Appointment is Confirmed – N&CO. MIDTOWN',
+        html,
+      });
+    } catch (err) {
+      console.error('Failed to send booking confirmation email:', err);
+    }
+  }
 
   /**
    * Auto-update all in_progress bookings that have passed their end time to pending status
@@ -2230,6 +2284,9 @@ export class ReservationsController {
           return await this.bookingModel.create(bookingData as any, { transaction: t });
         }
       );
+
+      // Fire-and-forget — never blocks booking creation
+      this.sendBookingConfirmationEmail(createdBooking, createBookingDto).catch(() => {});
 
       return createdBooking;
     } catch (error: unknown) {
