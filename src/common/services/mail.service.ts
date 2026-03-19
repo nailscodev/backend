@@ -1,3 +1,4 @@
+import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
 export interface SendMailOptions {
@@ -6,6 +7,7 @@ export interface SendMailOptions {
   html: string;
 }
 
+@Injectable()
 export class MailService {
   private transporter: nodemailer.Transporter;
 

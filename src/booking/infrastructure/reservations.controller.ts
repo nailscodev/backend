@@ -15,6 +15,7 @@ import {
   ParseIntPipe,
   HttpCode,
   ConflictException,
+  Inject,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -79,6 +80,7 @@ export class ReservationsController {
     private addOnModel: typeof AddOnEntity,
     private sequelize: Sequelize,
     private multiServiceAvailabilityService: MultiServiceAvailabilityService,
+    @Inject(MailService)
     private mailService: MailService,
   ) { }
 
