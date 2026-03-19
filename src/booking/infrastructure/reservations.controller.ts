@@ -2449,55 +2449,59 @@ export class ReservationsController {
       throw new BadRequestException('No active staff members available');
     }
 
-    // Calculate appointment end time
-    const [requestHour, requestMinute] = time.split(':').map(Number);
-    const appointmentStart = new Date(date);
-    appointmentStart.setUTCHours(requestHour, requestMinute, 0, 0);
-
-    const appointmentEnd = new Date(appointmentStart);
-    appointmentEnd.setUTCMinutes(appointmentEnd.getUTCMinutes() + duration);
+    // Parse the requested slot as plain HH:MM strings — same as booking creation and
+    // getBackofficeAvailability use. Never create Date objects for TIME columns to avoid
+    // UTC offset bugs (the DB stores TIME without timezone).
+    const parseTimeToMinutes = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    };
+    const requestStartMinutes = parseTimeToMinutes(time);
+    const requestEndMinutes = requestStartMinutes + duration;
 
     // Find staff members who are available at the requested time
     const availableStaff: AvailableStaffMember[] = [];
 
     for (const staff of allActiveStaff) {
-      // Check if this staff member has any conflicting bookings
-      const conflictingBookings = await this.bookingModel.findAll({
-        where: {
-          staffId: staff.id,
-          appointmentDate: date,
-          status: { [Op.not]: BookingStatus.CANCELLED },
-          [Op.or]: [
-            // Existing booking starts before our appointment ends AND ends after our appointment starts
-            {
-              startTime: { [Op.lt]: appointmentEnd },
-              endTime: { [Op.gt]: appointmentStart }
-            }
-          ]
-        }
+      // Fetch all non-cancelled bookings for this staff on the requested date,
+      // then compare times as plain minutes — no UTC Date objects.
+      const dayBookings = await this.sequelize.query<{ startTime: string; endTime: string }>(
+        `SELECT "startTime", "endTime" FROM bookings
+         WHERE "staffId" = :staffId AND "appointmentDate" = :date
+           AND status NOT IN ('cancelled', 'CANCELLED')`,
+        { replacements: { staffId: staff.id, date }, type: QueryTypes.SELECT, raw: true }
+      );
+
+      const hasConflict = dayBookings.some(b => {
+        const bStart = parseTimeToMinutes(String(b.startTime).substring(0, 5));
+        const bEnd   = parseTimeToMinutes(String(b.endTime).substring(0, 5));
+        return requestStartMinutes < bEnd && requestEndMinutes > bStart;
       });
 
-      if (conflictingBookings.length === 0) {
-        // This staff member is available, now calculate their weekly workload
-        const weeklyBookings = await this.bookingModel.findAll({
-          where: {
-            staffId: staff.id,
-            appointmentDate: {
-              [Op.between]: [startOfWeek.toISOString().split('T')[0], endOfWeek.toISOString().split('T')[0]]
+      if (!hasConflict) {
+        // Calculate weekly workload using the same string-arithmetic approach
+        const weeklyBookings = await this.sequelize.query<{ startTime: string; endTime: string }>(
+          `SELECT "startTime", "endTime" FROM bookings
+           WHERE "staffId" = :staffId
+             AND "appointmentDate" BETWEEN :weekStart AND :weekEnd
+             AND status NOT IN ('cancelled', 'CANCELLED')`,
+          {
+            replacements: {
+              staffId: staff.id,
+              weekStart: startOfWeek.toISOString().split('T')[0],
+              weekEnd: endOfWeek.toISOString().split('T')[0],
             },
-            status: { [Op.not]: BookingStatus.CANCELLED }
-          },
-          attributes: ['startTime', 'endTime']
-        });
+            type: QueryTypes.SELECT,
+            raw: true,
+          }
+        );
 
-        // Calculate total workload in minutes
-        let totalWorkloadMinutes = 0;
-        for (const booking of weeklyBookings) {
-          const start = new Date(booking.startTime);
-          const end = new Date(booking.endTime);
-          const bookingDuration = (end.getTime() - start.getTime()) / (1000 * 60); // Convert to minutes
-          totalWorkloadMinutes += bookingDuration;
-        }
+        // Calculate total workload in minutes using plain string parsing
+        const totalWorkloadMinutes = weeklyBookings.reduce((sum, b) => {
+          const bStart = parseTimeToMinutes(String(b.startTime).substring(0, 5));
+          const bEnd   = parseTimeToMinutes(String(b.endTime).substring(0, 5));
+          return sum + Math.max(0, bEnd - bStart);
+        }, 0);
 
         availableStaff.push({
           id: staff.id,
