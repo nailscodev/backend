@@ -96,14 +96,14 @@ export class ReservationsController {
       if (dto.serviceId) {
         const service = await this.serviceModel.findByPk(dto.serviceId);
         if (service) {
-          services.push({ name: service.name, price: service.price / 100 });
+          services.push({ name: service.name, price: service.price });
         }
       }
 
       if (dto.addOnIds?.length) {
         const addOns = await this.addOnModel.findAll({ where: { id: dto.addOnIds } });
         for (const addOn of addOns) {
-          services.push({ name: addOn.name, price: addOn.price / 100 });
+          services.push({ name: addOn.name, price: addOn.price });
         }
       }
 
@@ -113,7 +113,7 @@ export class ReservationsController {
         startTime: dto.startTime,
         endTime: dto.endTime,
         services,
-        totalPrice: (dto.totalPrice ?? 0) / 100,
+        totalPrice: services.reduce((sum, s) => sum + s.price, 0),
       });
 
       await this.mailService.sendMail({

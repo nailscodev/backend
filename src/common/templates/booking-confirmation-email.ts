@@ -55,8 +55,9 @@ export function bookingConfirmationEmail(data: BookingConfirmationEmailData): st
     )
     .join('');
 
-  const salonFee = Math.round(totalPrice * 0.06 * 100) / 100;
-  const subtotal = (totalPrice - salonFee);
+  const subtotal = services.reduce((sum, s) => sum + s.price, 0);
+  const salonFee = Math.round(subtotal * 0.06 * 100) / 100;
+  const displayTotal = subtotal + salonFee;
 
   return `
 <!DOCTYPE html>
@@ -139,7 +140,7 @@ export function bookingConfirmationEmail(data: BookingConfirmationEmailData): st
                       </tr>
                       <tr>
                         <td style="padding:8px 0 0; font-size:16px; font-weight:700; color:#1a1a1a;">Total</td>
-                        <td style="padding:8px 0 0; font-size:16px; font-weight:700; color:#1a1a1a; text-align:right;">$${totalPrice.toFixed(2)}</td>
+                        <td style="padding:8px 0 0; font-size:16px; font-weight:700; color:#1a1a1a; text-align:right;">$${displayTotal.toFixed(2)}</td>
                       </tr>
                     </table>
                   </td>
