@@ -28,6 +28,7 @@ import {
   ApiParam,
   ApiBody,
 } from '@nestjs/swagger';
+import { SkipCsrf } from '../../../common/decorators/csrf.decorator';
 import { StaffService } from '../../application/staff.service';
 import { CreateStaffDto } from '../../application/dto/create-staff.dto';
 import { UpdateStaffDto } from '../../application/dto/update-staff.dto';
@@ -87,6 +88,7 @@ export class StaffController {
   }
 
   @Post()
+  @SkipCsrf()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Create a new staff member',
@@ -243,6 +245,7 @@ export class StaffController {
   }
 
   @Patch(':id')
+  @SkipCsrf()
   @ApiOperation({
     summary: 'Update staff member',
     description: 'Updates an existing staff member'
@@ -276,6 +279,7 @@ export class StaffController {
   }
 
   @Delete(':id')
+  @SkipCsrf()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete staff member',
@@ -298,6 +302,7 @@ export class StaffController {
   }
 
   @Patch(':id/activate')
+  @SkipCsrf()
   @ApiOperation({
     summary: 'Activate staff member',
     description: 'Activates a staff member (sets status to ACTIVE)'
@@ -319,6 +324,7 @@ export class StaffController {
   }
 
   @Patch(':id/deactivate')
+  @SkipCsrf()
   @ApiOperation({
     summary: 'Deactivate staff member',
     description: 'Deactivates a staff member (sets status to INACTIVE)'
