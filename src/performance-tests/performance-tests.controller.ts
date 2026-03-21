@@ -22,9 +22,11 @@ import {
   RunTestDto,
   TestResult,
 } from './performance-tests.service';
+import { SkipCsrf } from '../common/decorators/csrf.decorator';
 
 @ApiTags('performance-tests')
 @Controller('performance-tests')
+@SkipCsrf() // Routes require JWT auth — CSRF is redundant and blocks DELETE cancel
 export class PerformanceTestsController {
   private readonly logger = new Logger(PerformanceTestsController.name);
 

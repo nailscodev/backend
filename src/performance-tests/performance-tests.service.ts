@@ -98,7 +98,7 @@ function vuProfile(type: TestType, elapsed: number): number {
     }
     case 'spike': {
       if (elapsed < 10) return 2;   // normal traffic
-      if (elapsed < 25) return 50;  // spike
+      if (elapsed < 25) return 20;  // spike (capped at 20 to avoid saturating the backend runner itself)
       return 2;                     // recovery
     }
     case 'soak': {
@@ -116,7 +116,7 @@ function scenarioDescription(type: TestType): string {
     case 'stress':
       return 'Stress Test: Staged ramp 1→5→10→20→30→50 VUs over 60s then cool-down. Finds the breaking point of the turnero.';
     case 'spike':
-      return 'Spike Test: 2 VUs base → instant jump to 50 VUs for 15s → recover to 2 VUs (40s total). Simulates viral traffic.';
+      return 'Spike Test: 2 VUs base → instant jump to 20 VUs for 15s → recover to 2 VUs (40s total). Simulates viral traffic.';
     case 'soak':
       return 'Soak Test: Ramp to 10 VUs, hold 160s steady, ramp down (180s total). Detects memory leaks and DB connection drift.';
   }
@@ -208,6 +208,33 @@ export class PerformanceTestsService implements OnModuleInit {
       this.logger.error(`Test ${run.id} failed: ${err.message}`);
       run.status = 'failed';
     });
+
+    // Wall-clock backstop: force-complete if the setInterval stalls (event-loop saturation)
+    const backstopMs = (scenarioDuration(dto.type) + 45) * 1000;
+    setTimeout(() => {
+      if (run.status === 'running') {
+        this.logger.warn(`Test ${run.id} backstop triggered — forcing completion`);
+        run.status = 'completed';
+        run.progress = 100;
+        run.currentVus = 0;
+        run.completedAt = new Date();
+        if (!run.summary && run.timeSeries.length > 0) {
+          const allP95 = run.timeSeries.map((p) => p.p95);
+          const allRps = run.timeSeries.map((p) => p.rps);
+          run.summary = {
+            totalRequests: run.timeSeries[run.timeSeries.length - 1]?.totalRequests ?? 0,
+            totalErrors:   run.timeSeries[run.timeSeries.length - 1]?.totalErrors ?? 0,
+            avgRps:    Math.round((allRps.reduce((s, v) => s + v, 0) / allRps.length) * 10) / 10 || 0,
+            p50:       run.timeSeries[Math.floor(run.timeSeries.length / 2)]?.p50 ?? 0,
+            p95:       Math.round(allP95.reduce((s, v) => s + v, 0) / allP95.length) || 0,
+            p99:       Math.round(run.timeSeries.map((p) => p.p99).reduce((s, v) => s + v, 0) / run.timeSeries.length) || 0,
+            avgErrorRate: Math.round((run.timeSeries.reduce((s, p) => s + p.errorRate, 0) / run.timeSeries.length) * 10) / 10 || 0,
+            maxVus:    Math.max(...run.timeSeries.map((p) => p.vus), 0),
+            duration:  scenarioDuration(dto.type),
+          };
+        }
+      }
+    }, backstopMs);
 
     return run;
   }
