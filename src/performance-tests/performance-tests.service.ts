@@ -112,13 +112,13 @@ function vuProfile(type: TestType, elapsed: number): number {
 function scenarioDescription(type: TestType): string {
   switch (type) {
     case 'load':
-      return 'Load Test: Ramp 0→10 VUs over 10s, hold 30s steady, ramp down 10s (50s total). Targets: turnero + booking APIs.';
+      return 'Load Test: Ramp 0→10 VUs over 10s, hold 30s steady, ramp down 10s (50s total). Targets: turnero frontend availability.';
     case 'stress':
-      return 'Stress Test: Staged ramp 1→5→10→20→30→50 VUs over 60s then cool-down. Finds the breaking point of the turnero.';
+      return 'Stress Test: Staged ramp 1→5→10→20→30→50 VUs over 60s then cool-down. Finds the point where the turnero frontend degrades.';
     case 'spike':
-      return 'Spike Test: 2 VUs base → instant jump to 20 VUs for 15s → recover to 2 VUs (40s total). Simulates viral traffic.';
+      return 'Spike Test: 2 VUs base → instant jump to 20 VUs for 15s → recover to 2 VUs (40s total). Simulates viral traffic burst on the turnero.';
     case 'soak':
-      return 'Soak Test: Ramp to 10 VUs, hold 160s steady, ramp down (180s total). Detects memory leaks and DB connection drift.';
+      return 'Soak Test: Ramp to 10 VUs, hold 160s steady, ramp down (180s total). Detects CDN/cache eviction and connection issues over time.';
   }
 }
 
@@ -160,27 +160,22 @@ export class PerformanceTestsService implements OnModuleInit {
    * The caller should poll `getResult(id)` for progress.
    */
   async startTest(dto: RunTestDto): Promise<TestResult> {
-    // Primary target: the booking webapp (turnero)
+    // Primary target: the booking webapp (turnero — separate Fly.io machine).
+    // IMPORTANT: backend API endpoints (nailsco-backend.fly.dev/api/v1/*) are intentionally
+    // excluded from this embedded runner. Firing them from within the same process creates
+    // a self-DDoS: the backend handles its own VU traffic on the same single-threaded Node.js
+    // event loop, saturates the CPU, and Fly.io OOM-kills/restarts the process — wiping the
+    // in-memory runs Map and causing immediate 404s on every subsequent poll.
+    // To stress-test the backend API, run k6 externally: `k6 run backend/tests/stress/load-test.js`
     const frontendUrl =
       dto.baseUrl ||
       process.env.FRONTEND_URL ||
       'https://nailsco-frontend.fly.dev';
 
-    // Backend API base (what the turnero calls under the hood)
-    const backendUrl =
-      process.env.BACKEND_SELF_URL ||
-      process.env.BASE_URL ||
-      'https://nailsco-backend.fly.dev';
-
-    // Realistic booking-flow endpoints: frontend pages + public backend APIs
-    // Staff endpoint requires JWT auth → excluded to avoid false 401 errors in metrics
+    // Two frontend pages — served by a different Fly.io machine, no feedback loop.
     const endpoints = [
-      `${frontendUrl}/`,                                       // Turnero landing page
-      `${frontendUrl}/booking`,                               // Booking flow (SSR)
-      `${backendUrl}/api/v1/categories`,                      // Service categories (public)
-      `${backendUrl}/api/v1/services`,                        // Services list (public)
-      `${backendUrl}/api/v1/services/list`,                   // Simple services array (public)
-      `${backendUrl}/api/v1/addons`,                          // Add-ons list (public)
+      `${frontendUrl}/`,        // Turnero landing page
+      `${frontendUrl}/booking`, // Booking flow (Next.js SSR)
     ];
 
     const run: TestResult = {
