@@ -209,8 +209,10 @@ export class PerformanceTestsService implements OnModuleInit {
       run.status = 'failed';
     });
 
-    // Wall-clock backstop: force-complete if the setInterval stalls (event-loop saturation)
-    const backstopMs = (scenarioDuration(dto.type) + 45) * 1000;
+    // Wall-clock backstop: force-complete if the setInterval stalls (event-loop saturation).
+    // +10s grace period is enough to absorb Fly.io CPU-throttle jitter without leaving
+    // the UI stuck at 96% for nearly a minute (the old +45s was too generous).
+    const backstopMs = (scenarioDuration(dto.type) + 10) * 1000;
     setTimeout(() => {
       if (run.status === 'running') {
         this.logger.warn(`Test ${run.id} backstop triggered — forcing completion`);
@@ -239,12 +241,18 @@ export class PerformanceTestsService implements OnModuleInit {
     return run;
   }
 
-  /** Cancel a running test */
-  cancelTest(id: string): boolean {
+  /** Cancel a running test.
+   * Returns:
+   *   'cancelled'    — successfully cancelled
+   *   'already_done' — run exists but is no longer running (completed/cancelled/failed)
+   *   'not_found'    — no run with this ID in memory (backend may have restarted)
+   */
+  cancelTest(id: string): 'cancelled' | 'already_done' | 'not_found' {
     const run = this.runs.get(id);
-    if (!run || run.status !== 'running') return false;
+    if (!run) return 'not_found';
+    if (run.status !== 'running') return 'already_done';
     run.status = 'cancelled';
-    return true;
+    return 'cancelled';
   }
 
   // ─── Core runner ────────────────────────────────────────────────────────────
@@ -375,6 +383,21 @@ export class PerformanceTestsService implements OnModuleInit {
       windowLatencies = [];
       windowErrors = 0;
       windowRequests = 0;
+
+      // Belt-and-suspenders: if the interval fires late due to CPU throttling and
+      // elapsed has already overshot totalSeconds, force-complete immediately instead
+      // of waiting for the backstop setTimeout.
+      if (elapsed > totalSeconds + 2 && run.status === 'running') {
+        this.logger.warn(`Test ${run.id} interval overshot by ${elapsed - totalSeconds}s — completing inline`);
+        clearInterval(interval);
+        vuAbortControllers.forEach((c) => c.abort());
+        vuAbortControllers.length = 0;
+        run.status = 'completed';
+        run.completedAt = new Date();
+        run.progress = 100;
+        run.currentVus = 0;
+        return;
+      }
 
       // Check if test is done
       if (elapsed >= totalSeconds) {
