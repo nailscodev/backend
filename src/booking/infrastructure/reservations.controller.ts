@@ -1688,15 +1688,186 @@ export class ReservationsController {
         };
       });
 
-      // Generate time slots (9:00 AM - 7:00 PM, 30-min intervals)
-      const generateTimeSlots = () => {
-        const slots: string[] = [];
-        for (let hour = 9; hour < 19; hour++) {
-          for (let minute = 0; minute < 60; minute += 30) {
-            slots.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`);
+      // Helper to get shifts for current day from new weekly structure or fallback to legacy format
+      const getShiftsForStaffDay = (staffData: any): Array<{ shiftStart: string; shiftEnd: string }> => {
+        const staffShifts = staffData.shifts;
+        
+        // If shifts is in new format (weekly structure)
+        if (staffShifts && typeof staffShifts === 'object' && !Array.isArray(staffShifts)) {
+          const dayKey = dayOfWeek.toLowerCase();
+          console.log(`🔍 Looking for day key: "${dayKey}" in staff shifts`);
+          
+          const dayShifts = staffShifts[dayKey];
+          console.log(`📅 Raw day shifts for ${dayKey}:`, dayShifts);
+          
+          // In the new format, dayShifts is directly an array of shift objects
+          if (Array.isArray(dayShifts)) {
+            console.log(`✅ Found ${dayShifts.length} shifts for ${dayKey}`);
+            return dayShifts.filter(shift => 
+              shift && 
+              typeof shift === 'object' && 
+              shift.shiftStart && 
+              shift.shiftEnd
+            );
+          }
+          
+          console.log(`❌ Day shifts is not an array for ${dayKey}:`, typeof dayShifts);
+          return [];
+        }
+        
+        // Fallback to legacy format (array of shifts for all days)
+        if (staffShifts && Array.isArray(staffShifts)) {
+          console.log(`📋 Using legacy format, found ${staffShifts.length} shifts`);
+          return staffShifts.filter(shift => 
+            shift && 
+            typeof shift === 'object' && 
+            shift.shiftStart && 
+            shift.shiftEnd
+          );
+        }
+        
+        console.log(`❌ No valid shifts format found`);
+        return [];
+      };
+
+      // Calculate working hours range based on selected staff
+      const calculateWorkingHours = () => {
+        const specificStaffIds = services
+          .map(s => s.staffId)
+          .filter(id => id && id !== 'any');
+
+        console.log(`🔍 Looking for specific staff IDs:`, specificStaffIds);
+        console.log(`📊 Available staff count: ${filteredActiveStaff.length}`);
+        console.log(`📋 Available staff IDs:`, filteredActiveStaff.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })));
+
+        let earliestStart = '09:00:00';
+        let latestEnd = '19:00:00';
+
+        if (specificStaffIds.length > 0) {
+          // Use working hours from specific staff
+          let foundSpecificHours = false;
+          
+          for (const staffId of specificStaffIds) {
+            console.log(`🔎 Searching for staff ID: ${staffId}`);
+            const staffData = filteredActiveStaff.find(s => s.id === staffId);
+            
+            if (staffData) {
+              console.log(`✅ Found staff: ${staffData.firstName} ${staffData.lastName}`);
+              console.log(`📋 Staff shifts data:`, JSON.stringify((staffData as any).shifts));
+              
+              const dayShifts = getShiftsForStaffDay(staffData);
+              console.log(`📅 Day shifts for ${dayOfWeek}:`, dayShifts);
+              
+              if (dayShifts.length > 0) {
+                foundSpecificHours = true;
+                // Find earliest start and latest end from all shifts for this staff
+                for (const shift of dayShifts) {
+                  // Convert timestamps to HH:MM:SS if needed
+                  const shiftStart = shift.shiftStart.length === 5 ? `${shift.shiftStart}:00` : shift.shiftStart;
+                  const shiftEnd = shift.shiftEnd.length === 5 ? `${shift.shiftEnd}:00` : shift.shiftEnd;
+                  
+                  console.log(`⏰ Processing shift: ${shiftStart} - ${shiftEnd}`);
+                  
+                  if (shiftStart < earliestStart) {
+                    earliestStart = shiftStart;
+                    console.log(`📅 Updated earliest start to: ${earliestStart}`);
+                  }
+                  if (shiftEnd > latestEnd) {
+                    latestEnd = shiftEnd;
+                    console.log(`📅 Updated latest end to: ${latestEnd}`);
+                  }
+                }
+              } else {
+                console.log(`⚠️ No shifts found for staff ${staffData.firstName} on ${dayOfWeek}`);
+              }
+            } else {
+              console.log(`❌ Staff ID ${staffId} not found in filtered staff`);
+            }
+          }
+          
+          // If we found specific staff hours, use them; otherwise fall back to all staff
+          if (foundSpecificHours) {
+            console.log(`✅ Using specific staff hours: ${earliestStart} - ${latestEnd}`);
+          } else {
+            console.log('🔍 No specific staff hours found, using hours from all available staff');
           }
         }
+
+        // If no specific staff or we need to expand the range, check all available staff
+        if (specificStaffIds.length === 0 || specificStaffIds.some(id => id === 'any') || earliestStart === '09:00:00') {
+          console.log(`🌍 Checking all ${filteredActiveStaff.length} available staff for working hours`);
+          
+          for (const staffData of filteredActiveStaff) {
+            const dayShifts = getShiftsForStaffDay(staffData);
+            
+            for (const shift of dayShifts) {
+              // Convert timestamps to HH:MM:SS if needed
+              const shiftStart = shift.shiftStart.length === 5 ? `${shift.shiftStart}:00` : shift.shiftStart;
+              const shiftEnd = shift.shiftEnd.length === 5 ? `${shift.shiftEnd}:00` : shift.shiftEnd;
+              
+              if (shiftStart < earliestStart) {
+                earliestStart = shiftStart;
+              }
+              if (shiftEnd > latestEnd) {
+                latestEnd = shiftEnd;
+              }
+            }
+          }
+          console.log(`🌍 Final working hours from all staff: ${earliestStart} - ${latestEnd}`);
+        }
+
+        return { earliestStart, latestEnd };
+      };
+
+      const { earliestStart, latestEnd } = calculateWorkingHours();
+      
+      // Calculate the maximum service duration to determine when to stop generating slots
+      const maxServiceDuration = Math.max(...servicesWithTotalDuration.map(s => s.totalDuration));
+      
+      // Parse hours for time slot generation
+      const startHour = parseInt(earliestStart.split(':')[0]);
+      const startMinute = parseInt(earliestStart.split(':')[1]);
+      const endHour = parseInt(latestEnd.split(':')[0]);
+      const endMinute = parseInt(latestEnd.split(':')[1]);
+      
+      // Calculate the latest possible start time for a service to finish before closing
+      const latestEndMinutes = endHour * 60 + endMinute;
+      const latestStartMinutes = latestEndMinutes - maxServiceDuration;
+      const latestStartHour = Math.floor(latestStartMinutes / 60);
+      const latestStartMin = latestStartMinutes % 60;
+
+      console.log(`⏰ Generating time slots from ${earliestStart} to ${latestEnd} based on staff schedules`);
+      console.log(`🕐 Max service duration: ${maxServiceDuration} minutes`);
+      console.log(`🕐 Latest start time: ${latestStartHour.toString().padStart(2, '0')}:${latestStartMin.toString().padStart(2, '0')} (to finish by ${latestEnd})`);
+
+      // Generate time slots based on staff working hours (30-min intervals)
+      const generateTimeSlots = () => {
+        const slots: string[] = [];
+        let currentHour = startHour;
+        let currentMinute = startMinute;
+
+        while (currentHour < latestStartHour || (currentHour === latestStartHour && currentMinute <= latestStartMin)) {
+          slots.push(`${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}:00`);
+          
+          currentMinute += 30;
+          if (currentMinute >= 60) {
+            currentHour++;
+            currentMinute = 0;
+          }
+        }
+        
+        console.log(`📅 Generated ${slots.length} time slots from ${slots[0]} to ${slots[slots.length - 1]}`);
+        console.log(`🎯 Last slot ${slots[slots.length - 1]} + ${maxServiceDuration}min = ends at ${addMinutesToTime(slots[slots.length - 1], maxServiceDuration)}`);
         return slots;
+      };
+      
+      // Helper function to add minutes to a time string
+      const addMinutesToTime = (timeStr: string, minutes: number): string => {
+        const [h, m] = timeStr.split(':').map(Number);
+        const totalMinutes = h * 60 + m + minutes;
+        const newHour = Math.floor(totalMinutes / 60);
+        const newMinute = totalMinutes % 60;
+        return `${newHour.toString().padStart(2, '0')}:${newMinute.toString().padStart(2, '0')}:00`;
       };
 
       const allTimeSlots = generateTimeSlots();
