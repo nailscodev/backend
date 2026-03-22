@@ -22,9 +22,11 @@ import {
   RunTestDto,
   TestResult,
 } from './performance-tests.service';
+import { SkipCsrf } from '../common/decorators/csrf.decorator';
 
 @ApiTags('performance-tests')
 @Controller('performance-tests')
+@SkipCsrf() // Routes require JWT auth — CSRF is redundant and blocks DELETE cancel
 export class PerformanceTestsController {
   private readonly logger = new Logger(PerformanceTestsController.name);
 
@@ -95,8 +97,12 @@ Test types:
   @ApiResponse({ status: 200, description: 'Test cancelled' })
   @ApiResponse({ status: 404, description: 'Test not found' })
   cancelTest(@Param('id') id: string): { message: string } {
-    const ok = this.service.cancelTest(id);
-    if (!ok) throw new NotFoundException(`Test ${id} not found or not running`);
-    return { message: 'Test cancelled' };
+    const result = this.service.cancelTest(id);
+    if (result === 'not_found') {
+      throw new NotFoundException(`Test run ${id} not found`);
+    }
+    // 'already_done': test exists but finished before the cancel arrived — treat as success
+    // so the UI doesn't show an error when the user clicks Cancel on a race-condition edge.
+    return { message: result === 'cancelled' ? 'Test cancelled' : 'Test already completed' };
   }
 }
