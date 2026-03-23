@@ -1371,7 +1371,15 @@ export class ReservationsController {
     const dayAbbr = dayAbbreviations[dayOfWeek];
     const filteredStaff = allActiveStaff.filter(staff => {
       const wd = staff.workingDays || [];
-      return wd.includes(dayOfWeek) || wd.includes(dayAbbr);
+      if (wd.includes(dayOfWeek) || wd.includes(dayAbbr)) return true;
+      // Fallback for new-format staff whose workingDays[] may be empty:
+      // check the shifts object (keyed by lowercase day name e.g. "monday").
+      const staffShifts = (staff as any).shifts;
+      if (staffShifts && typeof staffShifts === 'object' && !Array.isArray(staffShifts)) {
+        const dayShifts = staffShifts[dayOfWeek.toLowerCase()];
+        return Array.isArray(dayShifts) && dayShifts.length > 0;
+      }
+      return false;
     });
 
     const allActiveStaffIds: string[] = filteredStaff.map(staff => staff.id);
@@ -1654,7 +1662,15 @@ export class ReservationsController {
       const dayAbbr = dayAbbreviations[dayOfWeek];
       const filteredActiveStaff = allActiveStaff.filter(staff => {
         const wd = (staff as any).workingDays || [];
-        return wd.includes(dayOfWeek) || wd.includes(dayAbbr);
+        if (wd.includes(dayOfWeek) || wd.includes(dayAbbr)) return true;
+        // Fallback for new-format staff whose workingDays[] may be empty:
+        // check the shifts object (keyed by lowercase day name e.g. "monday").
+        const staffShifts = (staff as any).shifts;
+        if (staffShifts && typeof staffShifts === 'object' && !Array.isArray(staffShifts)) {
+          const dayShifts = staffShifts[dayOfWeek.toLowerCase()];
+          return Array.isArray(dayShifts) && dayShifts.length > 0;
+        }
+        return false;
       });
 
       // Get existing bookings for the date
