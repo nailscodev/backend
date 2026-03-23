@@ -499,7 +499,11 @@ export class CsrfService implements ICsrfService {
   private resolveSecretKey(): string {
     // Option 1: explicit CSRF secret
     const explicitKey = this.configService.get<string>('CSRF_SECRET_KEY');
-    if (explicitKey && explicitKey.length >= 32) {
+    if (explicitKey) {
+      // If explicitly set but too short, fail loudly — don't silently ignore misconfiguration
+      if (explicitKey.length < 32) {
+        throw new Error('CSRF secret key must be at least 32 characters long');
+      }
       return explicitKey;
     }
 
