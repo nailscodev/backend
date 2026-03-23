@@ -22,7 +22,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as CryptoJS from 'crypto-js';
-import { randomBytes } from 'crypto';
+import { randomBytes, createHmac } from 'crypto';
 import {
   ICsrfService,
   ICsrfConfiguration,
@@ -448,8 +448,7 @@ export class CsrfService implements ICsrfService {
    */
   private buildConfiguration(customConfig?: Partial<ICsrfConfiguration>): ICsrfConfiguration {
     const defaultConfig: ICsrfConfiguration = {
-      secretKey: this.configService.get<string>('CSRF_SECRET_KEY') || 
-                this.generateSecureDefaultKey(),
+      secretKey: this.resolveSecretKey(),
       tokenTtl: Number(this.configService.get<string>('CSRF_TOKEN_TTL')) || 3600000, // 1 hour
       allowedOrigins: this.parseAllowedOrigins(),
       debugMode: this.configService.get<boolean>('CSRF_DEBUG_MODE') || false,
@@ -492,10 +491,34 @@ export class CsrfService implements ICsrfService {
   }
 
   /**
-   * Generates a secure default key if none is configured
+   * Resolves the CSRF secret key in priority order:
+   * 1. CSRF_SECRET_KEY env var (explicit, preferred)
+   * 2. Derived from JWT_SECRET via HMAC-SHA256 (stable across all VMs when JWT_SECRET is a shared secret)
+   * 3. Random (last resort — generates a different key per instance, logs error)
    */
-  private generateSecureDefaultKey(): string {
-    this.logger.warn('No CSRF secret key configured, generating temporary key');
+  private resolveSecretKey(): string {
+    // Option 1: explicit CSRF secret
+    const explicitKey = this.configService.get<string>('CSRF_SECRET_KEY');
+    if (explicitKey && explicitKey.length >= 32) {
+      return explicitKey;
+    }
+
+    // Option 2: derive from JWT_SECRET so all VMs share the same CSRF key
+    const jwtSecret = this.configService.get<string>('JWT_SECRET');
+    if (jwtSecret && jwtSecret.length >= 16) {
+      const derived = createHmac('sha256', jwtSecret)
+        .update('csrf-protection-key-v1')
+        .digest('hex'); // always 64 hex chars (256 bits)
+      this.logger.log('CSRF secret key derived from JWT_SECRET (stable across instances)');
+      return derived;
+    }
+
+    // Option 3: random — different per instance/restart, will break multi-VM setups
+    this.logger.error(
+      'CSRF_SECRET_KEY and JWT_SECRET are both unset. Using a random per-instance key. ' +
+      'CSRF tokens will be invalid across instances or after restarts. ' +
+      'Set CSRF_SECRET_KEY (or JWT_SECRET) as a shared secret in your environment.'
+    );
     return randomBytes(32).toString('hex');
   }
 
