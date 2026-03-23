@@ -1515,7 +1515,6 @@ export class ReservationsController {
    * Returns available slots considering all services, addons, removals, and staff selection
    */
   @Public() // Called by turnero (public booking flow) without auth
-  @SkipCsrf() // Read-like operation (querying availability), no state change
   @Post('backoffice-availability')
   @ApiOperation({
     summary: 'Get available time slots for backoffice booking creation',
@@ -2102,7 +2101,6 @@ export class ReservationsController {
 
   @Post('multi-service-slots')
   @Public() // Allow public access for booking flow (combo packages without VIP)
-  @SkipCsrf() // Read operation, skip CSRF for performance
   @ApiOperation({
     summary: 'Get available time slots for multiple consecutive services',
     description: 'Retrieve available time slots where multiple services can be performed consecutively. Each service may be performed by a different technician, but all must be available in consecutive time slots. Supports addons per service.',
@@ -2206,7 +2204,6 @@ export class ReservationsController {
 
   @Post('vip-combo-slots')
   @Public() // Allow public access for booking flow
-  @SkipCsrf()
   @ApiOperation({
     summary: 'Get available time slots for VIP Combo (simultaneous services)',
     description: 'Retrieve available time slots where two services can be performed SIMULTANEOUSLY by two different technicians. This is for VIP Combo bookings where Mani + Pedi are done at the same time.',
@@ -2330,7 +2327,6 @@ export class ReservationsController {
   }
 
   @Public()
-  @SkipCsrf()
   @Post()
   @ApiOperation({
     summary: 'Create a new booking',
@@ -2608,7 +2604,6 @@ export class ReservationsController {
   }
 
   @Public()
-  @SkipCsrf() // Called from turnero booking flow without a CSRF session
   @Post('assign-optimal-staff')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -2804,7 +2799,6 @@ export class ReservationsController {
    */
   @Post('verify-slot-with-permutations')
   @Public() // Allow public access for booking flow
-  @SkipCsrf()
   @ApiOperation({
     summary: 'Verify slot availability using all permutations',
     description: 'Central availability check that tries all service order permutations to find valid staff assignments'
@@ -2921,7 +2915,6 @@ export class ReservationsController {
    * POST /bookings/verify-multi-availability
    */
   @Post('verify-multi-availability')
-  @SkipCsrf()
   @ApiOperation({
     summary: 'Verify availability for multiple service slots',
     description: 'Check if all slots with their assigned technicians are still available before creating bookings'
@@ -3025,7 +3018,6 @@ export class ReservationsController {
    * POST /bookings/create-multiple
    */
   @Post('create-multiple')
-  @SkipCsrf()
   @ApiOperation({
     summary: 'Create multiple bookings atomically',
     description: 'Create multiple bookings in a single transaction. If any fails, all are rolled back.'

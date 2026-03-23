@@ -30,11 +30,12 @@ export function extractSessionId(request: ExtendedRequest): string {
     return userSessionId;
   }
 
-  // Strategy 3: Generate from IP and User Agent (fallback)
-  const ip = getClientIP(request);
+  // Strategy 3: Generate from User Agent only (stable across Fly.io edge nodes)
+  // Using IP was unreliable: X-Forwarded-For rotates per edge routing,
+  // causing SESSION_MISMATCH on every CSRF validation.
   const userAgent = request.get('user-agent') || 'unknown';
   
-  return `${ip}_${Buffer.from(userAgent).toString('base64').substring(0, 8)}`;
+  return `ua_${Buffer.from(userAgent).toString('base64').substring(0, 16)}`;
 }
 
 /**
