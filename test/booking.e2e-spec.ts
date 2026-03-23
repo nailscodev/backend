@@ -21,6 +21,7 @@ import { ResponseInterceptor } from '../src/common/interceptors/response.interce
 describe('Booking System E2E Tests', () => {
   let app: INestApplication;
   let sequelize: Sequelize;
+  let csrfToken: string;
   
   // Test data IDs (from seed data)
   const testData = {
@@ -79,6 +80,10 @@ describe('Booking System E2E Tests', () => {
     app.useGlobalInterceptors(new ResponseInterceptor(moduleFixture.get<Reflector>(Reflector)));
     
     await app.init();
+
+    // Fetch CSRF token once — reused for all write requests in this test run
+    const csrfRes = await request(app.getHttpServer()).get('/api/v1/csrf/token');
+    csrfToken = csrfRes.body.data.token;
     
     sequelize = moduleFixture.get<Sequelize>(Sequelize);
 
@@ -136,6 +141,7 @@ describe('Booking System E2E Tests', () => {
 
       const response = await request(app.getHttpServer())
         .post('/api/v1/bookings')
+        .set('X-CSRF-Token', csrfToken)
         .send(bookingData)
         .expect(201);
 
@@ -171,6 +177,7 @@ describe('Booking System E2E Tests', () => {
 
       const response = await request(app.getHttpServer())
         .post('/api/v1/bookings')
+        .set('X-CSRF-Token', csrfToken)
         .send(duplicateBooking)
         .expect(400);
 
@@ -182,6 +189,7 @@ describe('Booking System E2E Tests', () => {
       if (createdBookingId) {
         await request(app.getHttpServer())
           .put(`/api/v1/bookings/${createdBookingId}/cancel`)
+          .set('X-CSRF-Token', csrfToken)
           .send({ reason: 'E2E test cleanup' });
       }
     });
@@ -199,6 +207,7 @@ describe('Booking System E2E Tests', () => {
     it('should get multi-service slots for consecutive booking', async () => {
       const response = await request(app.getHttpServer())
         .post('/api/v1/bookings/multi-service-slots')
+        .set('X-CSRF-Token', csrfToken)
         .send({
           servicesWithAddons: [
             { id: testData.services.basicManicure, duration: 30 },
@@ -224,6 +233,7 @@ describe('Booking System E2E Tests', () => {
       // First get available slots to find a valid start time (avoids hardcoded time that may already be booked)
       const slotsResp = await request(app.getHttpServer())
         .post('/api/v1/bookings/multi-service-slots')
+        .set('X-CSRF-Token', csrfToken)
         .send({
           servicesWithAddons: [
             { id: testData.services.basicManicure, duration: 30 },
@@ -242,6 +252,7 @@ describe('Booking System E2E Tests', () => {
 
       const response = await request(app.getHttpServer())
         .post('/api/v1/bookings/verify-slot-with-permutations')
+        .set('X-CSRF-Token', csrfToken)
         .send({
           serviceIds: [
             testData.services.basicManicure,
@@ -264,6 +275,7 @@ describe('Booking System E2E Tests', () => {
       // First, get the optimal assignments
       const slotsResponse = await request(app.getHttpServer())
         .post('/api/v1/bookings/multi-service-slots')
+        .set('X-CSRF-Token', csrfToken)
         .send({
           servicesWithAddons: [
             { id: testData.services.basicManicure, duration: 30 },
@@ -292,6 +304,7 @@ describe('Booking System E2E Tests', () => {
 
         const response = await request(app.getHttpServer())
           .post('/api/v1/bookings')
+          .set('X-CSRF-Token', csrfToken)
           .send(bookingData)
           .expect(201);
 
@@ -307,6 +320,7 @@ describe('Booking System E2E Tests', () => {
       for (const id of createdBookingIds) {
         await request(app.getHttpServer())
           .put(`/api/v1/bookings/${id}/cancel`)
+          .set('X-CSRF-Token', csrfToken)
           .send({ reason: 'E2E test cleanup' });
       }
     });
@@ -322,6 +336,7 @@ describe('Booking System E2E Tests', () => {
     it('should get VIP combo slots (2 technicians simultaneously)', async () => {
       const response = await request(app.getHttpServer())
         .post('/api/v1/bookings/vip-combo-slots')
+        .set('X-CSRF-Token', csrfToken)
         .send({
           servicesWithAddons: [
             { id: testData.services.basicManicure, duration: 30 },
@@ -354,6 +369,7 @@ describe('Booking System E2E Tests', () => {
     it('should get VIP combo slots with specific technician preference', async () => {
       const response = await request(app.getHttpServer())
         .post('/api/v1/bookings/vip-combo-slots')
+        .set('X-CSRF-Token', csrfToken)
         .send({
           servicesWithAddons: [
             { id: testData.services.basicManicure, duration: 30 },
@@ -380,6 +396,7 @@ describe('Booking System E2E Tests', () => {
     it('should create VIP combo bookings (simultaneous)', async () => {
       const slotsResponse = await request(app.getHttpServer())
         .post('/api/v1/bookings/vip-combo-slots')
+        .set('X-CSRF-Token', csrfToken)
         .send({
           servicesWithAddons: [
             { id: testData.services.basicManicure, duration: 30 },
@@ -412,6 +429,7 @@ describe('Booking System E2E Tests', () => {
 
         const response = await request(app.getHttpServer())
           .post('/api/v1/bookings')
+          .set('X-CSRF-Token', csrfToken)
           .send(bookingData)
           .expect(201);
 
@@ -426,6 +444,7 @@ describe('Booking System E2E Tests', () => {
       for (const id of createdBookingIds) {
         await request(app.getHttpServer())
           .put(`/api/v1/bookings/${id}/cancel`)
+          .set('X-CSRF-Token', csrfToken)
           .send({ reason: 'E2E test cleanup' });
       }
     });
@@ -457,6 +476,7 @@ describe('Booking System E2E Tests', () => {
       // Regular Pack: Mani + Pedi combo
       const response = await request(app.getHttpServer())
         .post('/api/v1/bookings/multi-service-slots')
+        .set('X-CSRF-Token', csrfToken)
         .send({
           servicesWithAddons: [
             { id: testData.services.basicManicure, duration: 30 },
@@ -473,6 +493,7 @@ describe('Booking System E2E Tests', () => {
     it('should handle gel services combo', async () => {
       const response = await request(app.getHttpServer())
         .post('/api/v1/bookings/multi-service-slots')
+        .set('X-CSRF-Token', csrfToken)
         .send({
           servicesWithAddons: [
             { id: testData.services.gelBasicManicure, duration: 45 },
@@ -489,6 +510,7 @@ describe('Booking System E2E Tests', () => {
       for (const id of createdBookingIds) {
         await request(app.getHttpServer())
           .put(`/api/v1/bookings/${id}/cancel`)
+          .set('X-CSRF-Token', csrfToken)
           .send({ reason: 'E2E test cleanup' });
       }
     });
@@ -515,6 +537,7 @@ describe('Booking System E2E Tests', () => {
 
       const blockResponse = await request(app.getHttpServer())
         .post('/api/v1/bookings')
+        .set('X-CSRF-Token', csrfToken)
         .send(blockingBooking);
 
       const blockingId = blockResponse.body.data?.id;
@@ -523,6 +546,7 @@ describe('Booking System E2E Tests', () => {
       // Sofia is busy 10:30-11:30, so slot 10:30 should use permutation
       const slotsResponse = await request(app.getHttpServer())
         .post('/api/v1/bookings/multi-service-slots')
+        .set('X-CSRF-Token', csrfToken)
         .send({
           servicesWithAddons: [
             { id: testData.services.basicManicure, duration: 30 },
@@ -538,6 +562,7 @@ describe('Booking System E2E Tests', () => {
       if (blockingId) {
         await request(app.getHttpServer())
           .put(`/api/v1/bookings/${blockingId}/cancel`)
+          .set('X-CSRF-Token', csrfToken)
           .send({ reason: 'E2E test cleanup' });
       }
     });
