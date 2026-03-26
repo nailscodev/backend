@@ -245,7 +245,8 @@ export class StaffService {
       const staff = await this.staffModel.findAll({
         where: {
           status: StaffStatus.ACTIVE,
-          isBookable: true
+          isBookable: true,
+          isWebVisible: true
         },
         include: [ServiceEntity],
         order: [['lastName', 'ASC'], ['firstName', 'ASC']]
@@ -268,6 +269,7 @@ export class StaffService {
         where: {
           status: StaffStatus.ACTIVE,
           isBookable: true,
+          isWebVisible: true,
           id: {
             [Op.in]: literal(`(SELECT staff_id FROM staff_services WHERE service_id = '${serviceId}')`)
           }

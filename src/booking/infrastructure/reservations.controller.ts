@@ -1647,7 +1647,7 @@ export class ReservationsController {
       }
 
       const allActiveStaff = await this.sequelize.query<StaffRecord>(
-        `SELECT id, "firstName", "lastName", "workingDays", shifts FROM staff WHERE status = 'ACTIVE' AND "isBookable" = true`,
+        `SELECT id, "firstName", "lastName", "workingDays", shifts FROM staff WHERE status = 'ACTIVE' AND "isBookable" = true AND "isWebVisible" = true`,
         {
           type: QueryTypes.SELECT,
           raw: true
