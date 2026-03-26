@@ -1,7 +1,9 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { InjectModel } from '@nestjs/sequelize';
 import * as crypto from 'crypto';
 import * as http from 'http';
 import * as https from 'https';
+import { PerformanceTestRunEntity } from './performance-test-run.entity';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -136,23 +138,80 @@ function percentile(sorted: number[], p: number): number {
 export class PerformanceTestsService implements OnModuleInit {
   private readonly logger = new Logger(PerformanceTestsService.name);
 
-  /** In-memory store — keeps last 10 runs */
+  /** In-memory cache — keeps live timeSeries data for the current run */
   private readonly runs = new Map<string, TestResult>();
 
-  onModuleInit() {
+  constructor(
+    @InjectModel(PerformanceTestRunEntity)
+    private readonly runModel: typeof PerformanceTestRunEntity,
+  ) {}
+
+  async onModuleInit() {
     this.logger.log('PerformanceTestsService ready');
+    // On restart, mark any runs left in 'running' state as failed
+    try {
+      const updated = await this.runModel.update(
+        { status: 'failed' },
+        { where: { status: 'running' } },
+      );
+      if (updated[0] > 0) {
+        this.logger.warn(`Marked ${updated[0]} stale running test(s) as failed on startup`);
+      }
+    } catch (err) {
+      this.logger.error('Failed to cleanup stale runs on startup', err);
+    }
   }
 
-  /** Returns all stored test results, newest first */
-  listResults(): TestResult[] {
-    return Array.from(this.runs.values()).sort(
-      (a, b) => b.startedAt.getTime() - a.startedAt.getTime(),
-    );
+  /** Returns the 10 most recent test results from the database */
+  async listResults(): Promise<TestResult[]> {
+    try {
+      const rows = await this.runModel.findAll({
+        order: [['started_at', 'DESC']],
+        limit: 10,
+      });
+      return rows.map((r) => this.rowToResult(r));
+    } catch (err) {
+      this.logger.error('Failed to list test results from DB', err);
+      // Fallback to in-memory cache so the UI still gets data if DB is unavailable
+      return Array.from(this.runs.values()).sort(
+        (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+      );
+    }
   }
 
-  /** Returns a single test result or undefined */
-  getResult(id: string): TestResult | undefined {
-    return this.runs.get(id);
+  /**
+   * Returns a single test result.
+   * Tries the in-memory cache first (has live timeSeries), falls back to DB.
+   */
+  async getResult(id: string): Promise<TestResult | undefined> {
+    const cached = this.runs.get(id);
+    if (cached) return cached;
+
+    try {
+      const row = await this.runModel.findByPk(id);
+      if (!row) return undefined;
+      return this.rowToResult(row);
+    } catch (err) {
+      this.logger.error(`Failed to fetch test run ${id} from DB`, err);
+      return undefined;
+    }
+  }
+
+  /** Maps a DB row to the TestResult shape the controller/frontend expects */
+  private rowToResult(row: PerformanceTestRunEntity): TestResult {
+    return {
+      id: row.id,
+      type: row.type,
+      status: row.status,
+      startedAt: row.startedAt,
+      completedAt: row.completedAt ?? undefined,
+      progress: row.progress,
+      currentVus: 0,
+      timeSeries: [],
+      summary: row.summary as TestSummary | undefined,
+      targetEndpoints: row.targetEndpoints ?? [],
+      scenario: row.scenario ?? '',
+    };
   }
 
   /**
@@ -192,16 +251,38 @@ export class PerformanceTestsService implements OnModuleInit {
 
     this.runs.set(run.id, run);
 
-    // Prune old runs (keep last 10)
+    // Prune old runs (keep last 10) from in-memory cache
     if (this.runs.size > 10) {
       const oldestKey = this.runs.keys().next().value;
       if (oldestKey) this.runs.delete(oldestKey);
+    }
+
+    // Persist initial run state to DB so other machines can find it
+    try {
+      await this.runModel.create({
+        id: run.id,
+        type: run.type,
+        status: run.status,
+        startedAt: run.startedAt,
+        progress: run.progress,
+        scenario: run.scenario,
+        targetEndpoints: run.targetEndpoints,
+        summary: null,
+      } as any);
+    } catch (err) {
+      this.logger.error(`Failed to persist run ${run.id} to DB`, err);
+      // Continue — in-memory fallback still works for this machine
     }
 
     // Run test in the background (do not await)
     this.executeTest(run, endpoints).catch((err) => {
       this.logger.error(`Test ${run.id} failed: ${err.message}`);
       run.status = 'failed';
+      // Persist failed status to DB
+      this.runModel.update(
+        { status: 'failed', progress: run.progress },
+        { where: { id: run.id } },
+      ).catch((dbErr) => this.logger.error(`Failed to mark run ${run.id} as failed in DB`, dbErr));
     });
 
     // Wall-clock backstop: force-complete if the setInterval stalls (event-loop saturation).
@@ -230,6 +311,11 @@ export class PerformanceTestsService implements OnModuleInit {
             duration:  scenarioDuration(dto.type),
           };
         }
+        // Persist backstop completion to DB
+        this.runModel.update(
+          { status: 'completed', completedAt: run.completedAt, progress: 100, summary: run.summary as any },
+          { where: { id: run.id } },
+        ).catch((dbErr) => this.logger.error(`Failed to persist backstop completion for ${run.id}`, dbErr));
       }
     }, backstopMs);
 
@@ -240,14 +326,29 @@ export class PerformanceTestsService implements OnModuleInit {
    * Returns:
    *   'cancelled'    — successfully cancelled
    *   'already_done' — run exists but is no longer running (completed/cancelled/failed)
-   *   'not_found'    — no run with this ID in memory (backend may have restarted)
+   *   'not_found'    — no run with this ID in memory or DB
    */
-  cancelTest(id: string): 'cancelled' | 'already_done' | 'not_found' {
+  async cancelTest(id: string): Promise<'cancelled' | 'already_done' | 'not_found'> {
     const run = this.runs.get(id);
-    if (!run) return 'not_found';
-    if (run.status !== 'running') return 'already_done';
-    run.status = 'cancelled';
-    return 'cancelled';
+    if (run) {
+      if (run.status !== 'running') return 'already_done';
+      run.status = 'cancelled';
+    }
+    // Always try to update DB so the cancel is durable
+    try {
+      const [affected] = await this.runModel.update(
+        { status: 'cancelled' },
+        { where: { id, status: 'running' } },
+      );
+      if (affected === 0 && !run) {
+        // Check if it exists at all
+        const exists = await this.runModel.count({ where: { id } });
+        return exists > 0 ? 'already_done' : 'not_found';
+      }
+    } catch (err) {
+      this.logger.error(`Failed to cancel run ${id} in DB`, err);
+    }
+    return run ? 'cancelled' : 'already_done';
   }
 
   // ─── Core runner ────────────────────────────────────────────────────────────
@@ -391,6 +492,11 @@ export class PerformanceTestsService implements OnModuleInit {
         run.completedAt = new Date();
         run.progress = 100;
         run.currentVus = 0;
+        // Persist inline overshot completion
+        this.runModel.update(
+          { status: 'completed', completedAt: run.completedAt, progress: 100 },
+          { where: { id: run.id } },
+        ).catch((dbErr) => this.logger.error(`Failed to persist overshot completion for ${run.id}`, dbErr));
         return;
       }
 
@@ -431,6 +537,12 @@ export class PerformanceTestsService implements OnModuleInit {
           `Test ${run.id} (${run.type}) completed: ${cumulativeRequests} requests, ` +
             `${cumulativeErrors} errors, avg p95=${run.summary.p95}ms`,
         );
+
+        // Persist final completed state to DB
+        this.runModel.update(
+          { status: 'completed', completedAt: run.completedAt, progress: 100, summary: run.summary as any },
+          { where: { id: run.id } },
+        ).catch((dbErr) => this.logger.error(`Failed to persist completion for ${run.id}`, dbErr));
       }
       })();
     }, intervalMs);

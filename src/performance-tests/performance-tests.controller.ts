@@ -38,7 +38,7 @@ export class PerformanceTestsController {
     description: 'Returns all stored performance test results, newest first.',
   })
   @ApiResponse({ status: 200, description: 'List of test results' })
-  listResults(): TestResult[] {
+  async listResults(): Promise<TestResult[]> {
     return this.service.listResults();
   }
 
@@ -50,8 +50,8 @@ export class PerformanceTestsController {
   @ApiParam({ name: 'id', type: String, description: 'Test run UUID' })
   @ApiResponse({ status: 200, description: 'Test result' })
   @ApiResponse({ status: 404, description: 'Test not found' })
-  getResult(@Param('id') id: string): TestResult {
-    const result = this.service.getResult(id);
+  async getResult(@Param('id') id: string): Promise<TestResult> {
+    const result = await this.service.getResult(id);
     if (!result) throw new NotFoundException(`Test run ${id} not found`);
     return result;
   }
@@ -96,8 +96,8 @@ Test types:
   @ApiParam({ name: 'id', type: String, description: 'Test run UUID' })
   @ApiResponse({ status: 200, description: 'Test cancelled' })
   @ApiResponse({ status: 404, description: 'Test not found' })
-  cancelTest(@Param('id') id: string): { message: string } {
-    const result = this.service.cancelTest(id);
+  async cancelTest(@Param('id') id: string): Promise<{ message: string }> {
+    const result = await this.service.cancelTest(id);
     if (result === 'not_found') {
       throw new NotFoundException(`Test run ${id} not found`);
     }
