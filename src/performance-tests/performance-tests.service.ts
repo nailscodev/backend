@@ -237,7 +237,7 @@ export class PerformanceTestsService implements OnModuleInit {
       progress: row.progress,
       currentVus: 0,
       timeSeries: [],
-      summary: row.summary as TestSummary | undefined,
+      summary: row.summary as unknown as TestSummary | undefined,
       targetEndpoints: row.targetEndpoints ?? [],
       scenario: row.scenario ?? '',
     };
