@@ -1661,16 +1661,18 @@ export class ReservationsController {
       const dayOfWeek = dayNames[requestedDate.getDay()];
       const dayAbbr = dayAbbreviations[dayOfWeek];
       const filteredActiveStaff = allActiveStaff.filter(staff => {
-        const wd = (staff as any).workingDays || [];
-        if (wd.includes(dayOfWeek) || wd.includes(dayAbbr)) return true;
-        // Fallback for new-format staff whose workingDays[] may be empty:
-        // check the shifts object (keyed by lowercase day name e.g. "monday").
         const staffShifts = (staff as any).shifts;
+
+        // New-format staff: shifts is a plain object keyed by lowercase day name (e.g. "monday").
+        // Use shifts as the SOLE source of truth — workingDays may be stale/inconsistent.
         if (staffShifts && typeof staffShifts === 'object' && !Array.isArray(staffShifts)) {
           const dayShifts = staffShifts[dayOfWeek.toLowerCase()];
           return Array.isArray(dayShifts) && dayShifts.length > 0;
         }
-        return false;
+
+        // Legacy-format staff: shifts is an array (or absent) — fall back to workingDays[].
+        const wd = (staff as any).workingDays || [];
+        return wd.includes(dayOfWeek) || wd.includes(dayAbbr);
       });
 
       // Get existing bookings for the date

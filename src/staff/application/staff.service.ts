@@ -612,14 +612,29 @@ export class StaffService {
     if (updateStaffDto.specialties !== undefined) {
       updateData.specialties = updateStaffDto.specialties?.filter(Boolean) || [];
     }
-    if (updateStaffDto.workingDays !== undefined) {
-      updateData.workingDays = updateStaffDto.workingDays?.filter(Boolean) || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-    }
-
     // Process schedule data - prefer weeklySchedule over legacy shifts
     if (updateStaffDto.weeklySchedule !== undefined || updateStaffDto.shifts !== undefined) {
       const processedShifts = this.processScheduleData(updateStaffDto.weeklySchedule, updateStaffDto.shifts);
       updateData.shifts = processedShifts;
+
+      // When a new-format weeklySchedule is provided, derive workingDays from it so the
+      // DB stays consistent: a day is "working" iff it has at least one shift configured.
+      if (updateStaffDto.weeklySchedule !== undefined) {
+        const dayMapping: Record<string, string> = {
+          monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed',
+          thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun'
+        };
+        const derivedWorkingDays = Object.entries(processedShifts)
+          .filter(([, shifts]) => Array.isArray(shifts) && (shifts as any[]).length > 0)
+          .map(([day]) => dayMapping[day])
+          .filter(Boolean);
+        updateData.workingDays = derivedWorkingDays;
+      }
+    }
+
+    if (updateStaffDto.workingDays !== undefined && updateStaffDto.weeklySchedule === undefined) {
+      // Only apply manual workingDays if no weeklySchedule was provided (legacy path)
+      updateData.workingDays = updateStaffDto.workingDays?.filter(Boolean) || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
     }
 
     if (updateStaffDto.commissionPercentage !== undefined) {
