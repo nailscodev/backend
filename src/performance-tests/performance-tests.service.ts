@@ -504,6 +504,13 @@ export class PerformanceTestsService implements OnModuleInit {
       run.currentVus = activeVuCount;
       run.progress = Math.min(100, Math.round((elapsed / totalSeconds) * 100));
 
+      // Write live progress to DB so other Fly.io machines always get the current value
+      // (fire-and-forget — a missed write is harmless, Map is authoritative on this machine)
+      this.runModel.update(
+        { progress: run.progress },
+        { where: { id: run.id, status: 'running' } },
+      ).catch(() => { /* non-critical */ });
+
       // Reset window
       windowLatencies = [];
       windowErrors = 0;
