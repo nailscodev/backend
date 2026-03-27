@@ -32,6 +32,8 @@ Sentry.init({
 import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import compression from 'compression';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -41,6 +43,16 @@ async function bootstrap() {
   const axiomLogger = new AxiomLogger();
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.useLogger(axiomLogger);
+
+  // Gzip compression — must be registered before routes
+  app.use(compression());
+
+  // Security headers — disable CSP in dev so Swagger UI loads without restriction
+  app.use(
+    helmet({
+      contentSecurityPolicy: process.env.NODE_ENV === 'production',
+    }),
+  );
 
   // Set content-type header with UTF-8 charset
   app.use((req: any, res: any, next: any) => {

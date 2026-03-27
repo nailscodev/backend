@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   Query,
+  Header,
   NotFoundException,
   BadRequestException,
   HttpStatus,
@@ -457,6 +458,7 @@ export class ReservationsController {
   }
 
   @Get('dashboard/stats')
+  @Header('Cache-Control', 'private, max-age=60')
   @ApiOperation({
     summary: 'Get dashboard statistics',
     description: 'Retrieve dashboard statistics including cash, bank payments, bookings count, distinct services, and new customers for a given date range.',
@@ -477,39 +479,67 @@ export class ReservationsController {
     }
 
     // Get completed bookings with payment method
-    const completedBookings = await this.bookingModel.findAll({
-      where: {
-        status: BookingStatus.COMPLETED,
-        appointmentDate: {
-          [Op.between]: [startDate, endDate],
+    // Run all independent DB queries in parallel to avoid sequential round-trips
+    const [
+      completedBookings,
+      manualAdjustments,
+      bookingsCount,
+      distinctServicesResult,
+      newCustomersResult,
+    ] = await Promise.all([
+      this.bookingModel.findAll({
+        where: {
+          status: BookingStatus.COMPLETED,
+          appointmentDate: { [Op.between]: [startDate, endDate] },
         },
-      },
-      attributes: ['totalPrice', 'paymentMethod'],
-    });
-
-    // Get manual adjustments in the date range
-    const manualAdjustments = await this.manualAdjustmentModel.findAll({
-      where: {
-        createdAt: {
-          [Op.between]: [
-            new Date(startDate + ' 00:00:00'),
-            new Date(endDate + ' 23:59:59')
-          ],
+        attributes: ['totalPrice', 'paymentMethod'],
+      }),
+      this.manualAdjustmentModel.findAll({
+        where: {
+          createdAt: {
+            [Op.between]: [
+              new Date(startDate + ' 00:00:00'),
+              new Date(endDate + ' 23:59:59'),
+            ],
+          },
         },
-      },
-      attributes: ['amount', 'paymentMethod', 'type'],
-    });
+        attributes: ['amount', 'paymentMethod', 'type'],
+      }),
+      this.bookingModel.count({
+        where: {
+          status: BookingStatus.COMPLETED,
+          appointmentDate: { [Op.between]: [startDate, endDate] },
+        },
+      }),
+      this.sequelize.query(
+        `SELECT COUNT(DISTINCT "serviceId") as count
+         FROM bookings
+         WHERE status = 'completed'
+           AND "appointmentDate" >= :startDate
+           AND "appointmentDate" <= :endDate`,
+        { replacements: { startDate, endDate }, type: QueryTypes.SELECT },
+      ) as Promise<any[]>,
+      this.sequelize.query(
+        `SELECT COUNT(DISTINCT c.id) as count
+         FROM customers c
+         INNER JOIN bookings b ON b."customerId" = c.id
+         WHERE b.status = 'completed'
+           AND b."appointmentDate" >= :startDate
+           AND b."appointmentDate" <= :endDate
+           AND c."createdAt" >= :startDate
+           AND c."createdAt" <= (:endDate || ' 23:59:59')::timestamp`,
+        { replacements: { startDate, endDate }, type: QueryTypes.SELECT },
+      ) as Promise<any[]>,
+    ]);
 
     // Calculate cash and bank totals based on payment method
     let cash = 0;
     let bank = 0;
     let totalRevenue = 0;
-    
-    // Add bookings to totals
+
     for (const booking of completedBookings) {
       const amount = parseFloat(String(booking.totalPrice || 0));
-      totalRevenue += amount; // Add to total revenue
-      
+      totalRevenue += amount;
       if (booking.paymentMethod === 'CASH') {
         cash += amount;
       } else if (booking.paymentMethod === 'CARD') {
@@ -522,10 +552,8 @@ export class ReservationsController {
     for (const adjustment of manualAdjustments) {
       const amount = parseFloat(String(adjustment.amount || 0));
       const adjustmentAmount = adjustment.type === 'expense' ? -amount : amount;
-      
-      manualAdjustmentsTotal += adjustmentAmount; // Sum all adjustments (positive and negative)
-      totalRevenue += adjustmentAmount; // Add to total revenue (net)
-      
+      manualAdjustmentsTotal += adjustmentAmount;
+      totalRevenue += adjustmentAmount;
       if (adjustment.paymentMethod === 'CASH') {
         cash += adjustmentAmount;
       } else if (adjustment.paymentMethod === 'CARD') {
@@ -533,52 +561,8 @@ export class ReservationsController {
       }
     }
 
-    // Count completed bookings
-    const bookingsCount = await this.bookingModel.count({
-      where: {
-        status: BookingStatus.COMPLETED,
-        appointmentDate: {
-          [Op.between]: [startDate, endDate],
-        },
-      },
-    });
-
-    // Count distinct services
-    const distinctServicesResult: any[] = await this.sequelize.query(
-      `
-      SELECT COUNT(DISTINCT "serviceId") as count
-      FROM bookings
-      WHERE status = 'completed'
-        AND "appointmentDate" >= :startDate
-        AND "appointmentDate" <= :endDate
-      `,
-      {
-        replacements: { startDate, endDate },
-        type: QueryTypes.SELECT,
-      },
-    );
-
-    const distinctServices = parseInt(distinctServicesResult[0]?.count || '0');
-
-    // Count new customers (created in the date range with completed bookings)
-    const newCustomersResult: any[] = await this.sequelize.query(
-      `
-      SELECT COUNT(DISTINCT c.id) as count
-      FROM customers c
-      INNER JOIN bookings b ON b."customerId" = c.id
-      WHERE b.status = 'completed'
-        AND b."appointmentDate" >= :startDate
-        AND b."appointmentDate" <= :endDate
-        AND c."createdAt" >= :startDate
-        AND c."createdAt" <= (:endDate || ' 23:59:59')::timestamp
-      `,
-      {
-        replacements: { startDate, endDate },
-        type: QueryTypes.SELECT,
-      },
-    );
-
-    const newCustomers = parseInt(newCustomersResult[0]?.count || '0');
+    const distinctServices = parseInt((distinctServicesResult as any[])[0]?.count || '0');
+    const newCustomers = parseInt((newCustomersResult as any[])[0]?.count || '0');
 
     return {
       success: true,
@@ -1316,6 +1300,7 @@ export class ReservationsController {
   }
 
   @Get('available-slots')
+  @Header('Cache-Control', 'public, max-age=30, stale-while-revalidate=60')
   @ApiOperation({
     summary: 'Get available time slots',
     description: 'Retrieve available time slots for a specific date, excluding already booked times.',

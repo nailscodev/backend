@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Sequelize } from 'sequelize-typescript';
 import { QueryTypes } from 'sequelize';
+import { AppCacheService } from '../../../shared/cache/cache.service';
 
 // Interfaces
 interface Addon {
@@ -59,6 +60,7 @@ export class MultiServiceAvailabilityService {
 
   constructor(
     private sequelize: Sequelize,
+    private cache: AppCacheService,
   ) { }
 
   /**
@@ -72,6 +74,18 @@ export class MultiServiceAvailabilityService {
     selectedTechnicianId?: string,
     servicesWithAddons?: any[]
   ): Promise<MultiServiceSlot[]> {
+
+    // Build a deterministic cache key covering all inputs that affect output
+    const addonSig = (servicesWithAddons ?? [])
+      .flatMap(s => (s.addOns ?? []).map((a: any) => a.id as string))
+      .sort()
+      .join(',');
+    const cacheKey = `avail:multi:${date}:${[...serviceIds].sort().join(',')}:${selectedTechnicianId ?? 'any'}:${addonSig}`;
+    const cached = this.cache.get<MultiServiceSlot[]>(cacheKey);
+    if (cached) {
+      this.logger.log(`🗃️ Cache HIT for multi-service slots (${cacheKey})`);
+      return cached;
+    }
 
     try {
       this.logger.log(`\n🔍 === FINDING MULTI-SERVICE SLOTS ===`);
@@ -153,6 +167,9 @@ export class MultiServiceAvailabilityService {
       if (availableSlots.length > 0) {
         this.logger.log(`   First slot: ${availableSlots[0].startTime}`);
       }
+
+      // Cache for 60 s — short TTL so new bookings reflect quickly
+      this.cache.set(cacheKey, availableSlots, 60);
 
       return availableSlots;
 
