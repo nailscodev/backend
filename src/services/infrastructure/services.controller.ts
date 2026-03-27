@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -122,14 +123,18 @@ export class ServicesController {
   ): Promise<PaginatedResponse<ServiceEntity>> {
     const languageCode = lang || acceptLanguage?.split(',')[0]?.split('-')[0];
     const key = this.cacheKey('services:findAll', { page, limit, search, category, isActive, lang: languageCode });
+    
     const cached = this.cache.get<PaginatedResponse<ServiceEntity>>(key);
-    if (cached) return cached;
+    if (cached) {
+      return cached;
+    }
 
     const result = await this.servicesService.findAll(
       { search, category, isActive },
       { page: page || 1, limit: Math.min(limit || 10, 100) },
       languageCode,
     );
+    
     this.cache.set(key, result, 300); // 5 min TTL
     return result;
   }
@@ -520,6 +525,58 @@ export class ServicesController {
   async remove(@Param('id', ParseUUIDPipe) id: string): Promise<{ message: string }> {
     const result = await this.servicesService.remove(id);
     this.cache.deleteByPrefix('services:');
+    return result;
+  }
+
+  @Patch(':id/activate')
+  @ApiOperation({
+    summary: 'Activate service',
+    description: 'Activates a service by setting isActive to true'
+  })
+  @ApiParam({ name: 'id', type: String, description: 'Service UUID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Service activated successfully'
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Service not found'
+  })
+  async activate(@Param('id', ParseUUIDPipe) id: string): Promise<ServiceEntity> {
+    const result = await this.servicesService.activate(id);
+    
+    // Aggressively clear all service-related cache
+    this.cache.deleteByPrefix('services:');
+    
+    // Also clear any potential staff cache that might include services
+    this.cache.deleteByPrefix('staff:');
+    
+    return result;
+  }
+
+  @Patch(':id/deactivate')
+  @ApiOperation({
+    summary: 'Deactivate service',
+    description: 'Deactivates a service by setting isActive to false'
+  })
+  @ApiParam({ name: 'id', type: String, description: 'Service UUID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Service deactivated successfully'
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Service not found'
+  })
+  async deactivate(@Param('id', ParseUUIDPipe) id: string): Promise<ServiceEntity> {
+    const result = await this.servicesService.deactivate(id);
+    
+    // Aggressively clear all service-related cache
+    this.cache.deleteByPrefix('services:');
+    
+    // Also clear any potential staff cache that might include services
+    this.cache.deleteByPrefix('staff:');
+    
     return result;
   }
 }

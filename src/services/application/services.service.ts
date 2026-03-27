@@ -372,6 +372,20 @@ export class ServicesService {
     return { message: `Service with ID ${id} has been deleted` };
   }
 
+  async activate(id: string): Promise<ServiceEntity> {
+    const service = await this.findOne(id);
+    await service.update({ isActive: true });
+    this.logger.log(`Service ${id} activated`);
+    return service;
+  }
+
+  async deactivate(id: string): Promise<ServiceEntity> {
+    const service = await this.findOne(id);
+    await service.update({ isActive: false });
+    this.logger.log(`Service ${id} deactivated`);
+    return service;
+  }
+
   async getAddonsByServiceIds(serviceIds: string[], languageCode?: string): Promise<AddOnEntity[]> {
 
     if (!serviceIds || serviceIds.length === 0) {
