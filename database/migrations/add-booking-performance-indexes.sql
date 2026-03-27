@@ -7,7 +7,7 @@
 -- CONCURRENTLY prevents table lock — safe to run against live production database.
 
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_bookings_staff_date
-  ON bookings (staff_id, appointment_date);
+  ON bookings ("staffId", "appointmentDate");
 
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_bookings_created_at_desc
-  ON bookings (created_at DESC);
+  ON bookings ("createdAt" DESC);
