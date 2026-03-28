@@ -2,6 +2,7 @@
 import { getModelToken } from '@nestjs/sequelize';
 import { StaffService } from './staff.service';
 import { StaffEntity } from '../../staff/infrastructure/persistence/entities/staff.entity';
+import { StaffServiceEntity } from '../../staff/infrastructure/persistence/entities/staff-service.entity';
 import { ServiceEntity } from '../../services/infrastructure/persistence/entities/service.entity';
 import { BookingEntity } from '../../booking/infrastructure/persistence/entities/booking.entity';
 
@@ -15,6 +16,12 @@ describe('StaffService', () => {
     update: jest.fn(),
     destroy: jest.fn(),
     count: jest.fn(),
+  };
+
+  const mockStaffServiceModel = {
+    findAll: jest.fn(),
+    bulkCreate: jest.fn(),
+    destroy: jest.fn(),
   };
 
   const mockServiceModel = {
@@ -35,6 +42,10 @@ describe('StaffService', () => {
         {
           provide: getModelToken(StaffEntity),
           useValue: mockStaffModel,
+        },
+        {
+          provide: getModelToken(StaffServiceEntity),
+          useValue: mockStaffServiceModel,
         },
         {
           provide: getModelToken(ServiceEntity),
