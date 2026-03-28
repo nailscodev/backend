@@ -602,40 +602,12 @@ export class UserController {
   async getCurrentUserPermissions(
     @CurrentUser() currentUser: CurrentUserData,
   ): Promise<{ screens: string[] }> {
-    console.log('🎭 Full currentUser object:', JSON.stringify(currentUser, null, 2));
-    
-    // Check if user is authenticated
     if (!currentUser || !currentUser.role) {
-      console.error('❌ User not authenticated or role not found');
       throw new UnauthorizedException('User not authenticated or role not found');
     }
 
-    console.log('🎭 Getting permissions for user:', {
-      id: currentUser.id,
-      username: currentUser.username,
-      role: currentUser.role,
-      roleType: typeof currentUser.role
-    });
-
     const screens = await this.screenRoleService.getScreenIdsByRole(currentUser.role as UserRole);
-    
-    console.log('📱 Final screens found:', screens);
-
     return { screens };
-  }
-
-  @Get('debug/screen-roles')
-  @Public()
-  @ApiOperation({
-    summary: 'Debug: Get all screen roles (temporary)',
-    description: 'Returns all screen roles for debugging purposes.',
-  })
-  async debugScreenRoles(): Promise<any> {
-    const allRoles = await this.screenRoleService.getAllScreenRoles();
-    return {
-      total: allRoles.length,
-      roles: allRoles
-    };
   }
 
   @Patch(':id/update-last-login')

@@ -154,7 +154,8 @@ export class JwtAuthInterceptor implements NestInterceptor {
 
     try {
       // Verify JWT signature and decode
-      const secret = process.env.JWT_SECRET || 'fallback-secret';
+      const secret = process.env.JWT_SECRET;
+      if (!secret) throw new Error('JWT_SECRET environment variable is required');
       const decoded = jwt.verify(token, secret) as {
         sub: string; // userId as UUID string
         username: string;

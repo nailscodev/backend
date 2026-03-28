@@ -392,34 +392,26 @@ export class UserService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    console.log('🔐 USER ACTIVE STATUS:', user.isActive, 'TYPE:', typeof user.isActive);
-
     if (!user.isActive) {
       throw new UnauthorizedException('User account is deactivated');
     }
 
-    console.log('✅ User is active, verifying password...');
-
     // Verify password
     const isPasswordValid = await this.comparePassword(loginDto.password, user.password);
-
-    console.log('🔑 Password valid:', isPasswordValid);
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    console.log('📝 Updating last login...');
-
     // Update last login
     await user.update({ lastLogin: new Date() });
 
-    console.log('🎉 User logged in successfully:', user.id);
     this.logger.log(`User logged in successfully: ${user.id}`);
 
     // Generate JWT access token
     const expiresInEnv = process.env.JWT_EXPIRES_IN || '24h';
-    const secret = process.env.JWT_SECRET || 'fallback-secret';
+    const secret = process.env.JWT_SECRET;
+    if (!secret) throw new Error('JWT_SECRET environment variable is required');
 
     const payload = {
       sub: user.id,
@@ -434,30 +426,21 @@ export class UserService {
     const expiresSeconds = this.parseExpiresInToSeconds(expiresInEnv);
     const expiresAt = new Date(Date.now() + expiresSeconds * 1000);
 
-    console.log('🔄 Revoking previous tokens...');
-
     // Revoke previous active tokens for this user
     try {
       await this.userTokenModel.update(
         { revoked: true },
         { where: { userId: user.id, revoked: false } }
       );
-      console.log('✅ Previous tokens revoked');
     } catch (err) {
-      console.log('⚠️ Failed to revoke previous tokens:', err);
       this.logger.warn('Failed to revoke previous tokens', err);
     }
-
-    console.log('💾 Storing new token...');
 
     // Store only the hash of the token
     const tokenHash = this.hashToken(accessToken);
     try {
-       
       await this.userTokenModel.create({ userId: user.id, token: tokenHash, expiresAt, revoked: false } as any);
-      console.log('✅ Token stored successfully');
     } catch (err) {
-      console.log('❌ Failed to persist user token:', err);
       this.logger.error('Failed to persist user token', err);
       // Not throwing to avoid blocking login — but this can be adjusted
     }

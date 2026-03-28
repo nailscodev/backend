@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
-import { Op, WhereOptions, literal } from 'sequelize';
+import { Op, WhereOptions } from 'sequelize';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import { StaffResponseDto } from './dto/staff-response.dto';
@@ -8,6 +8,7 @@ import { StaffStatisticsResponseDto } from './dto/staff-statistics-response.dto'
 import { PaginatedStaffResponseDto } from './dto/paginated-staff-response.dto';
 import { StaffEntity } from '../infrastructure/persistence/entities/staff.entity';
 import { StaffRole, StaffStatus } from '../infrastructure/persistence/entities/staff.entity';
+import { StaffServiceEntity } from '../infrastructure/persistence/entities/staff-service.entity';
 import { ServiceEntity } from '../../services/infrastructure/persistence/entities/service.entity';
 import { BookingEntity } from '../../booking/infrastructure/persistence/entities/booking.entity';
 
@@ -33,6 +34,8 @@ export class StaffService {
   constructor(
     @InjectModel(StaffEntity)
     private readonly staffModel: typeof StaffEntity,
+    @InjectModel(StaffServiceEntity)
+    private readonly staffServiceModel: typeof StaffServiceEntity,
     @InjectModel(ServiceEntity)
     private readonly serviceModel: typeof ServiceEntity,
     @InjectModel(BookingEntity)
@@ -265,16 +268,23 @@ export class StaffService {
   async findStaffByServiceId(serviceId: string): Promise<StaffResponseDto[]> {
 
     try {
+      // Safe: resolve staff IDs via ORM (parameterized), then filter
+      const staffServiceRows = await this.staffServiceModel.findAll({
+        where: { serviceId },
+        attributes: ['staffId'],
+      });
+      const staffIds = staffServiceRows.map(r => r.staffId);
+
+      if (staffIds.length === 0) return [];
+
       const staff = await this.staffModel.findAll({
         where: {
           status: StaffStatus.ACTIVE,
           isBookable: true,
           isWebVisible: true,
-          id: {
-            [Op.in]: literal(`(SELECT staff_id FROM staff_services WHERE service_id = '${serviceId}')`)
-          }
+          id: { [Op.in]: staffIds },
         },
-        order: [['lastName', 'ASC'], ['firstName', 'ASC']]
+        order: [['lastName', 'ASC'], ['firstName', 'ASC']],
       });
 
       return await Promise.all(staff.map(s => this.mapToResponseDto(s)));
@@ -305,19 +315,23 @@ export class StaffService {
 
       // Find staff members who can perform AT LEAST ONE of the specified services
       // For VIP combo, two different technicians can each do one service
-      const staff = await this.staffModel.findAll({
-        where: {
-          status: StaffStatus.ACTIVE,
-          isBookable: true,
-          id: {
-            [Op.in]: literal(`(
-              SELECT DISTINCT staff_id FROM staff_services 
-              WHERE service_id IN ('${expandedServiceIds.join("','")}')
-            )`)
-          }
-        },
-        order: [['lastName', 'ASC'], ['firstName', 'ASC']]
+      // Safe: use ORM parameterized query — no string interpolation
+      const staffServiceRows = await this.staffServiceModel.findAll({
+        where: { serviceId: { [Op.in]: expandedServiceIds } },
+        attributes: ['staffId'],
       });
+      const staffIds = [...new Set(staffServiceRows.map(r => r.staffId))];
+
+      const staff = staffIds.length === 0
+        ? []
+        : await this.staffModel.findAll({
+            where: {
+              status: StaffStatus.ACTIVE,
+              isBookable: true,
+              id: { [Op.in]: staffIds },
+            },
+            order: [['lastName', 'ASC'], ['firstName', 'ASC']],
+          });
 
       this.logger.log(`Found ${staff.length} staff members who can perform at least one of ${expandedServiceIds.length} services`);
 

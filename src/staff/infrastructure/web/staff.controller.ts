@@ -7,7 +7,6 @@ import {
   Param,
   Delete,
   Query,
-  UseGuards,
   HttpStatus,
   ValidationPipe,
   ParseUUIDPipe,
@@ -38,16 +37,8 @@ import { StaffStatisticsResponseDto } from '../../application/dto/staff-statisti
 import { StaffRole, StaffStatus } from '../../domain/staff.types';
 import { AppCacheService } from '../../../shared/cache/cache.service';
 
-// Mock guard - replace with actual JWT guard when authentication is implemented
-class MockJwtGuard {
-  canActivate(): boolean {
-    return true;
-  }
-}
-
 @ApiTags('staff')
 @Controller('staff')
-@UseGuards(MockJwtGuard)
 @ApiBearerAuth()
 export class StaffController {
   private readonly logger = new Logger(StaffController.name);

@@ -30,12 +30,17 @@ RUN --mount=type=cache,target=/root/.npm \
 # Copy compiled app
 COPY --from=builder /app/dist ./dist
 
-# Create uploads directory
-RUN mkdir -p uploads/categories
+# Create uploads directory and non-root user
+RUN mkdir -p uploads/categories \
+    && addgroup -S app \
+    && adduser -S app -G app \
+    && chown -R app:app /app
 
 ENV NODE_ENV=production
 ENV PORT=3001
 
 EXPOSE 3001
+
+USER app
 
 CMD ["node", "dist/main.js"]

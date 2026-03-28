@@ -809,51 +809,54 @@ export class CsrfService implements ICsrfService {
     token: string,
     sessionId: string
   ): boolean {
-    console.log(`[CSRF DEBUG] Validating token sync - SessionId: ${sessionId}`);
-    console.log(`[CSRF DEBUG] Received token: ${token?.substring(0, 20)}...`);
-    
+    if (this.configuration.debugMode) {
+      this.logger.debug(`[CSRF] Validating token sync - SessionId: ${sessionId}`);
+    }
+
     try {
       // Basic input validation
       if (!token || typeof token !== 'string') {
-        console.log(`[CSRF DEBUG] Invalid token - type: ${typeof token}, empty: ${!token}`);
+        if (this.configuration.debugMode) {
+          this.logger.debug(`[CSRF] Invalid token - type: ${typeof token}, empty: ${!token}`);
+        }
         return false;
       }
 
       if (!sessionId || typeof sessionId !== 'string') {
-        console.log(`[CSRF DEBUG] Invalid sessionId - type: ${typeof sessionId}, empty: ${!sessionId}`);
+        if (this.configuration.debugMode) {
+          this.logger.debug(`[CSRF] Invalid sessionId - type: ${typeof sessionId}, empty: ${!sessionId}`);
+        }
         return false;
       }
 
       // Use the same decryption method as the async version
       const payload = this.decryptAndValidateTokenPayload(token);
       if (!payload) {
-        console.log(`[CSRF DEBUG] Failed to decrypt token payload`);
+        if (this.configuration.debugMode) {
+          this.logger.debug(`[CSRF] Failed to decrypt token payload`);
+        }
         return false;
       }
       
-      console.log(`[CSRF DEBUG] Decrypted payload:`, {
-        sessionId: payload.sessionId,
-        issuedAt: new Date(payload.issuedAt),
-        expiresAt: new Date(payload.expiresAt)
-      });
-
       // Check token expiration
       const now = Date.now();
       if (now > payload.expiresAt) {
-        console.log(`[CSRF DEBUG] Token expired - now: ${new Date(now).toISOString()}, expiresAt: ${new Date(payload.expiresAt).toISOString()}`);
+        if (this.configuration.debugMode) {
+          this.logger.debug(`[CSRF] Token expired - expiresAt: ${new Date(payload.expiresAt).toISOString()}`);
+        }
         return false;
       }
 
       // Validate session binding
       if (payload.sessionId !== sessionId) {
-        console.log(`[CSRF DEBUG] Session mismatch - payload: ${payload.sessionId}, provided: ${sessionId}`);
+        if (this.configuration.debugMode) {
+          this.logger.debug(`[CSRF] Session mismatch`);
+        }
         return false;
       }
 
-      console.log(`[CSRF DEBUG] Token validation successful`);
       return true;
     } catch (error) {
-      console.log(`[CSRF DEBUG] Validation error:`, (error as Error).message || 'Unknown error');
       this.logger.error('Synchronous token validation error', {
         error: CsrfErrorHandler.extractErrorInfo(error),
         sessionId,

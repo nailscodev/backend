@@ -71,7 +71,9 @@ export class AuthService {
       role: user.role,
     };
 
-    const accessToken = jwt.sign(payload, process.env.JWT_SECRET || 'fallback-secret', {
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) throw new Error('JWT_SECRET environment variable is required');
+    const accessToken = jwt.sign(payload, jwtSecret, {
       expiresIn: process.env.JWT_EXPIRES_IN || '24h',
     } as jwt.SignOptions);
 
@@ -90,7 +92,9 @@ export class AuthService {
 
   async validateToken(token: string): Promise<UserEntity | null> {
     try {
-      const payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as {
+      const jwtSecret = process.env.JWT_SECRET;
+      if (!jwtSecret) throw new Error('JWT_SECRET environment variable is required');
+      const payload = jwt.verify(token, jwtSecret) as {
         sub: string;
         username: string;
         email: string;
