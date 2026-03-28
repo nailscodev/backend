@@ -17,6 +17,12 @@ import { ServiceLangEntity } from '../services/infrastructure/persistence/entiti
 import { LanguageEntity } from '../shared/domain/entities/language.entity';
 import { ComboEligibleEntity } from '../services/infrastructure/persistence/entities/combo-eligible.entity';
 import { CategoryLangEntity } from '../categories/infrastructure/persistence/entities/category-lang.entity';
+import { RemovalStepEntity } from '../services/infrastructure/persistence/entities/removal-step.entity';
+import { ScreenRoleEntity } from '../common/entities/screen-role.entity';
+import { ManualAdjustment } from '../common/entities/manual-adjustment.entity';
+import { ReportEntity } from '../reports/infrastructure/persistence/entities/report.entity';
+import { PerformanceTestRunEntity } from '../performance-tests/performance-test-run.entity';
+import { CustomerEntity } from '../customers/infrastructure/persistence/entities/customer.entity';
 import { defineAssociations } from './associations';
 
 // Helper function to parse DATABASE_URL
@@ -64,7 +70,7 @@ function parseDatabaseUrl(url: string) {
               synchronize: false,
               logging: !isProduction,
               autoLoadModels: true,
-              models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity, CategoryLangEntity],
+              models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity, CategoryLangEntity, RemovalStepEntity, ScreenRoleEntity, ManualAdjustment, ReportEntity, PerformanceTestRunEntity, CustomerEntity],
               pool: {
                 max: 5,
                 min: 0,          // 0 = no idle connections kept; avoids Neon killing a stale 'warm' connection
@@ -100,7 +106,7 @@ function parseDatabaseUrl(url: string) {
           synchronize: false,
           logging: !isProduction,
           autoLoadModels: true,
-          models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity, CategoryLangEntity],
+          models: [UserEntity, UserTokenEntity, ServiceEntity, CategoryEntity, StaffEntity, StaffServiceEntity, BookingEntity, NotificationEntity, AddOnEntity, AddonIncompatibilityEntity, ServiceAddon, LanguageEntity, ServiceLangEntity, AddOnLangEntity, ComboEligibleEntity, CategoryLangEntity, RemovalStepEntity, ScreenRoleEntity, ManualAdjustment, ReportEntity, PerformanceTestRunEntity, CustomerEntity],
           pool: {
             max: 5,
             min: 0,

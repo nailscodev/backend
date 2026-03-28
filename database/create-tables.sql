@@ -496,9 +496,54 @@ CREATE INDEX IF NOT EXISTS idx_screen_roles_screen_id ON screen_roles(screen_id)
 CREATE INDEX IF NOT EXISTS idx_screen_roles_role ON screen_roles(role);
 
 -- Trigger para updated_at en screen_roles
-CREATE TRIGGER update_screen_roles_updated_at 
-BEFORE UPDATE ON screen_roles 
+CREATE TRIGGER update_screen_roles_updated_at
+BEFORE UPDATE ON screen_roles
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- =========================================================
+-- Query Optimization Indexes
+-- These indexes target the most frequent query patterns
+-- (status+date dashboard reports, availability checks, etc.)
+-- =========================================================
+
+-- 1. Bookings: partial composite for dashboard completed-booking reports (7x hotspot)
+CREATE INDEX IF NOT EXISTS idx_bookings_status_date
+  ON bookings (status, "appointmentDate")
+  WHERE "deletedAt" IS NULL;
+
+-- 2. Bookings: partial composite for upcoming appointments widget
+CREATE INDEX IF NOT EXISTS idx_bookings_upcoming
+  ON bookings (status, "appointmentDate", "startTime")
+  WHERE status IN ('pending', 'in_progress') AND "deletedAt" IS NULL;
+
+-- 3. Bookings: partial composite for all date-range ORM queries
+CREATE INDEX IF NOT EXISTS idx_bookings_not_deleted
+  ON bookings ("appointmentDate", status)
+  WHERE "deletedAt" IS NULL;
+
+-- 4. Staff: composite for availability lookups (runs on every booking check)
+CREATE INDEX IF NOT EXISTS idx_staff_availability
+  ON staff (status, "isBookable", "isWebVisible")
+  WHERE "deletedAt" IS NULL;
+
+-- 5. Services: composite for catalog browsing
+CREATE INDEX IF NOT EXISTS idx_services_catalog
+  ON services ("isActive", "displayOrder", "categoryId")
+  WHERE "deletedAt" IS NULL;
+
+-- 6. Customers: partial covering index for email lookups in booking flow
+CREATE INDEX IF NOT EXISTS idx_customers_active
+  ON customers (email, "createdAt" DESC)
+  WHERE "deletedAt" IS NULL;
+
+-- 7. Manual adjustments: composite for financial report GROUP BY date + paymentMethod
+CREATE INDEX IF NOT EXISTS idx_manual_adjustments_date_type
+  ON manual_adjustments ("createdAt" DESC, type, "paymentMethod");
+
+-- 8. Notifications: composite for status-based retry and cleanup queries
+CREATE INDEX IF NOT EXISTS idx_notifications_pending
+  ON notifications (status, "createdAt" DESC)
+  WHERE "deletedAt" IS NULL;
 
 -- Verificacion final
 SELECT 
