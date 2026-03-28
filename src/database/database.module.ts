@@ -1,4 +1,4 @@
-import { Module, OnModuleInit } from '@nestjs/common';
+import { Module, Logger, OnModuleInit } from '@nestjs/common';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { UserEntity } from '../common/entities/user.entity';
@@ -26,6 +26,7 @@ import { CustomerEntity } from '../customers/infrastructure/persistence/entities
 import { defineAssociations } from './associations';
 
 // Helper function to parse DATABASE_URL
+const dbLogger = new Logger('DatabaseModule');
 function parseDatabaseUrl(url: string) {
   // Support URLs with or without port: postgresql://user:pass@host:port/db or postgresql://user:pass@host/db
   const regex = /^postgres(?:ql)?:\/\/([^:]+):([^@]+)@([^:/]+)(?::(\d+))?\/(.+)$/;
@@ -59,7 +60,7 @@ function parseDatabaseUrl(url: string) {
         if (databaseUrl) {
           const dbConfig = parseDatabaseUrl(databaseUrl);
           if (dbConfig) {
-            console.log(`Connecting to database at ${dbConfig.host}:${dbConfig.port}/${dbConfig.database} (SSL: ${!disableSSL && isProduction})`);
+            dbLogger.debug(`Connecting to database (SSL: ${!disableSSL && isProduction})`);
             return {
               dialect: 'postgres',
               host: dbConfig.host,

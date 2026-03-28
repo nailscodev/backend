@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { Sequelize } from 'sequelize-typescript';
 import { QueryTypes } from 'sequelize';
 import { AppCacheService } from '../../../shared/cache/cache.service';
@@ -74,6 +74,10 @@ export class MultiServiceAvailabilityService {
     selectedTechnicianId?: string,
     servicesWithAddons?: any[]
   ): Promise<MultiServiceSlot[]> {
+
+    if (serviceIds.length > 4) {
+      throw new BadRequestException('Maximum 4 services per slot request');
+    }
 
     // Build a deterministic cache key covering all inputs that affect output
     const addonSig = (servicesWithAddons ?? [])
@@ -560,7 +564,10 @@ export class MultiServiceAvailabilityService {
    * Returns true if the ENTIRE range [startMin, endMin] is covered by at least one shift.
    */
   private isWithinShifts(shifts: Array<{ shiftStart: string; shiftEnd: string }> | undefined, startMin: number, endMin: number): boolean {
-    if (!shifts || shifts.length === 0) return true; // no shifts defined = always available
+    if (!shifts || shifts.length === 0) {
+      this.logger.warn('Staff has no shifts defined — treating as unavailable');
+      return false;
+    }
     
     const parseTime = (t: string): number => {
       const [h, m] = t.split(':').map(Number);

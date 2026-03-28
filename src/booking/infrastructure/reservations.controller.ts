@@ -255,15 +255,15 @@ export class ReservationsController {
     const maxLimit = 100;
     const actualLimit = Math.min(limit, maxLimit);
 
+    // Auto-update expired bookings before retrieving the list
+    await this.updateExpiredBookings();
+
     const { rows: bookings, count: total } = await this.bookingModel.findAndCountAll({
       where,
       offset: (page - 1) * actualLimit,
       limit: actualLimit,
       order: [['appointmentDate', 'ASC'], ['startTime', 'ASC']]
     });
-
-    // Auto-update expired bookings before retrieving the list
-    await this.updateExpiredBookings();
 
     return {
       success: true,
@@ -480,6 +480,9 @@ export class ReservationsController {
     if (!startDate || !endDate) {
       throw new BadRequestException('startDate and endDate are required');
     }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+      throw new BadRequestException('startDate and endDate must be in YYYY-MM-DD format');
+    }
 
     // Get completed bookings with payment method
     // Run all independent DB queries in parallel to avoid sequential round-trips
@@ -601,6 +604,9 @@ export class ReservationsController {
     if (!startDate || !endDate) {
       throw new BadRequestException('startDate and endDate are required');
     }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+      throw new BadRequestException('startDate and endDate must be in YYYY-MM-DD format');
+    }
 
     // Get daily revenue from completed bookings split by payment method
     const bookingsResult: any[] = await this.sequelize.query(
@@ -716,6 +722,9 @@ export class ReservationsController {
     if (!startDate || !endDate) {
       throw new BadRequestException('startDate and endDate are required');
     }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+      throw new BadRequestException('startDate and endDate must be in YYYY-MM-DD format');
+    }
 
     const result: any[] = await this.sequelize.query(
       `
@@ -778,6 +787,9 @@ export class ReservationsController {
   ): Promise<{ success: boolean; data: any[]; pagination: any }> {
     if (!startDate || !endDate) {
       throw new BadRequestException('startDate and endDate are required');
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+      throw new BadRequestException('startDate and endDate must be in YYYY-MM-DD format');
     }
 
     // Build WHERE conditions for bookings
@@ -1067,6 +1079,9 @@ export class ReservationsController {
     if (!startDate || !endDate) {
       throw new BadRequestException('startDate and endDate are required');
     }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+      throw new BadRequestException('startDate and endDate must be in YYYY-MM-DD format');
+    }
 
     const result: any[] = await this.sequelize.query(
       `
@@ -1127,6 +1142,9 @@ export class ReservationsController {
   ): Promise<{ success: boolean; data: TopStaffDto[] }> {
     if (!startDate || !endDate) {
       throw new BadRequestException('startDate and endDate are required');
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+      throw new BadRequestException('startDate and endDate must be in YYYY-MM-DD format');
     }
 
     const result: any[] = await this.sequelize.query(
@@ -1189,6 +1207,9 @@ export class ReservationsController {
   ): Promise<{ success: boolean; data: BookingsBySourceDto }> {
     if (!startDate || !endDate) {
       throw new BadRequestException('startDate and endDate are required');
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+      throw new BadRequestException('startDate and endDate must be in YYYY-MM-DD format');
     }
 
     const result: any[] = await this.sequelize.query(
@@ -2333,7 +2354,6 @@ export class ReservationsController {
   }
 
   @Public()
-  @Post()
   @ApiOperation({
     summary: 'Create a new booking',
     description: 'Creates a new booking with the provided information. Validates time availability and service details.',
@@ -2606,6 +2626,7 @@ export class ReservationsController {
       return booking;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new BadRequestException('Error confirming booking: ' + errorMessage);
     }
   }
 
