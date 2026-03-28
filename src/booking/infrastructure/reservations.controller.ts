@@ -1300,7 +1300,7 @@ export class ReservationsController {
   }
 
   @Get('available-slots')
-  @Header('Cache-Control', 'public, max-age=30, stale-while-revalidate=60')
+  @Header('Cache-Control', 'private, max-age=30, stale-while-revalidate=60')
   @ApiOperation({
     summary: 'Get available time slots',
     description: 'Retrieve available time slots for a specific date, excluding already booked times.',

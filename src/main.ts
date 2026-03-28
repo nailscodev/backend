@@ -2,7 +2,7 @@
 import * as Sentry from '@sentry/node';
 
 Sentry.init({
-  dsn: process.env.SENTRY_DSN || 'https://d21e2ba1c0ed7c5a7bcd51081bc77c97@o4510999499440128.ingest.us.sentry.io/4510999519887360',
+  dsn: process.env.SENTRY_DSN,
 
   environment: process.env.NODE_ENV || 'development',
 
@@ -50,7 +50,7 @@ async function bootstrap() {
   // Security headers — disable CSP in dev so Swagger UI loads without restriction
   app.use(
     helmet({
-      contentSecurityPolicy: process.env.NODE_ENV === 'production',
+      contentSecurityPolicy: process.env.NODE_ENV === 'development' ? false : undefined,
     }),
   );
 
