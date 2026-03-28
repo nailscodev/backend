@@ -544,6 +544,39 @@ CREATE INDEX IF NOT EXISTS idx_manual_adjustments_date_type
 CREATE INDEX IF NOT EXISTS idx_notifications_pending
   ON notifications (status, "createdAt" DESC);
 
+-- 9. Bookings: composite for staff availability checks
+CREATE INDEX IF NOT EXISTS idx_bookings_staff_date
+  ON bookings ("staffId", "appointmentDate");
+
+-- 10. Bookings: descending createdAt for date-range report queries
+CREATE INDEX IF NOT EXISTS idx_bookings_created_at_desc
+  ON bookings ("createdAt" DESC);
+
+-- =========================================================
+-- 19. PERFORMANCE_TEST_RUNS Table
+-- Persists performance/stress test run results for the backoffice
+-- =========================================================
+CREATE TABLE IF NOT EXISTS performance_test_runs (
+    id               UUID          PRIMARY KEY,
+    type             VARCHAR(20)   NOT NULL,
+    status           VARCHAR(20)   NOT NULL DEFAULT 'running',
+    started_at       TIMESTAMPTZ   NOT NULL,
+    completed_at     TIMESTAMPTZ,
+    progress         SMALLINT      NOT NULL DEFAULT 0,
+    scenario         TEXT,
+    target_endpoints JSONB,
+    summary          JSONB,
+    "createdAt"      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    "updatedAt"      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_perf_test_runs_status     ON performance_test_runs (status);
+CREATE INDEX IF NOT EXISTS idx_perf_test_runs_started_at ON performance_test_runs (started_at DESC);
+
+CREATE TRIGGER update_performance_test_runs_updated_at
+BEFORE UPDATE ON performance_test_runs
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- Verificacion final
 SELECT 
     'Tablas creadas exitosamente:' as resultado,

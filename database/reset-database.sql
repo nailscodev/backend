@@ -1,17 +1,17 @@
 -- Script para resetear completamente la base de datos
--- Ejecutar en pgAdmin o con: psql -U postgres -f reset-database.sql
+-- Funciona en Neon, Render, Fly Postgres y cualquier PostgreSQL cloud (no requiere DROP DATABASE)
+--
+-- Uso:
+--   psql $DATABASE_URL -f database/reset-database.sql
+--   psql $DATABASE_URL -f database/create-tables.sql
+--   psql $DATABASE_URL -f database/load-sample-data.sql   (opcional)
+--
+-- ADVERTENCIA: destruye TODOS los datos, tablas, índices y triggers del schema public.
 
--- Terminar conexiones activas
-SELECT pg_terminate_backend(pg_stat_activity.pid)
-FROM pg_stat_activity
-WHERE pg_stat_activity.datname = 'nailsandco'
-  AND pid <> pg_backend_pid();
+-- Eliminar y recrear el schema public (equivalente a DROP DATABASE sin desconectarse)
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA public;
 
--- Eliminar base de datos si existe
-DROP DATABASE IF EXISTS nailsandco;
-
--- Crear base de datos nueva (usando configuración por defecto)
-CREATE DATABASE nailsandco
-    WITH 
-    OWNER = postgres
-    ENCODING = 'UTF8';
+-- Restaurar permisos estándar
+GRANT ALL ON SCHEMA public TO postgres;
+GRANT ALL ON SCHEMA public TO public;
