@@ -528,7 +528,7 @@ CREATE INDEX IF NOT EXISTS idx_staff_availability
 
 -- 5. Services: composite for catalog browsing
 CREATE INDEX IF NOT EXISTS idx_services_catalog
-  ON services ("isActive", "displayOrder", "categoryId")
+  ON services ("isActive", "displayOrder", category_id)
   WHERE "deletedAt" IS NULL;
 
 -- 6. Customers: partial covering index for email lookups in booking flow
@@ -542,8 +542,7 @@ CREATE INDEX IF NOT EXISTS idx_manual_adjustments_date_type
 
 -- 8. Notifications: composite for status-based retry and cleanup queries
 CREATE INDEX IF NOT EXISTS idx_notifications_pending
-  ON notifications (status, "createdAt" DESC)
-  WHERE "deletedAt" IS NULL;
+  ON notifications (status, "createdAt" DESC);
 
 -- Verificacion final
 SELECT 
