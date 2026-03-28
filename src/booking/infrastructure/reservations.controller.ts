@@ -2763,10 +2763,10 @@ export class ReservationsController {
   private generateTimeSlots(): Array<{ time: string; available: boolean }> {
     const slots: Array<{ time: string; available: boolean }> = [];
     const startHour = 7;
-    const startMinute = 30;
+    const startMinute = 0;
     const endHour = 21;
     const endMinute = 30;
-    const intervalMinutes = 60; // 1 hour intervals
+    const intervalMinutes = 30; // 30 minute intervals
 
     const currentTime = new Date();
     currentTime.setHours(startHour, startMinute, 0, 0);

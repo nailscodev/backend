@@ -587,15 +587,15 @@ export class MultiServiceAvailabilityService {
   }
 
   /**
-   * Genera slots de tiempo base (business hours: 07:30 - 21:30)
+   * Genera slots de tiempo base (business hours: 07:00 - 21:30, intervalos 30 min)
    */
   private generateTimeSlots(): Array<{ time: string }> {
     const slots: Array<{ time: string }> = [];
     const startHour = 7;
-    const startMinute = 30;
+    const startMinute = 0;
     const endHour = 21;
     const endMinute = 30;
-    const intervalMinutes = 60; // Slots cada 1 hora
+    const intervalMinutes = 30; // Slots cada 30 minutos
 
     const currentTime = new Date();
     currentTime.setHours(startHour, startMinute, 0, 0);
