@@ -108,7 +108,9 @@ export class HealthController {
       databaseStatus = {
         status: 'error',
         responseTimeMs: responseTime,
-        error: error instanceof Error ? error.message : 'Unknown database error',
+        error: process.env.NODE_ENV === 'production'
+          ? 'Database connection failed'
+          : (error instanceof Error ? error.message : 'Unknown database error'),
       };
     }
 

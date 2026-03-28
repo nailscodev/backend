@@ -1,36 +1,34 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { ScreenRoleEntity } from '../entities/screen-role.entity';
 import { UserRole } from '../entities/user.entity';
 
 @Injectable()
 export class ScreenRoleService {
+  private readonly logger = new Logger(ScreenRoleService.name);
+
   constructor(
     @InjectModel(ScreenRoleEntity)
     private screenRoleModel: typeof ScreenRoleEntity,
   ) {}
 
   async getScreenIdsByRole(role: UserRole): Promise<string[]> {
-    console.log('🔍 Searching for screen roles with role:', role, 'type:', typeof role);
+    this.logger.debug(`Searching for screen roles with role: ${role} type: ${typeof role}`);
     
     // Let's also check what roles exist in the database
     const allRoles = await this.screenRoleModel.findAll({
       attributes: ['role'],
       group: ['role']
     });
-    console.log('📊 Available roles in database:', allRoles.map(r => r.role));
+    this.logger.debug(`Available roles in database: ${allRoles.map(r => r.role).join(', ')}`);
     
     const screenRoles = await this.screenRoleModel.findAll({
       where: { role },
       attributes: ['screenId'],
     });
 
-    console.log('🔍 Screen roles found for role', role, ':', screenRoles.length);
-    console.log('📋 First few screen roles:', screenRoles.slice(0, 3).map(sr => ({
-      id: sr.id,
-      screenId: sr.screenId,
-      role: sr.role
-    })));
+    this.logger.debug(`Screen roles found for role ${role}: ${screenRoles.length}`);
+    this.logger.debug(`First few screen roles: ${JSON.stringify(screenRoles.slice(0, 3).map(sr => ({ id: sr.id, screenId: sr.screenId, role: sr.role })))}`);
 
     return screenRoles
       .map(screenRole => screenRole.screenId)
@@ -39,17 +37,13 @@ export class ScreenRoleService {
 
   async getAllScreenRoles(): Promise<ScreenRoleEntity[]> {
     const allRoles = await this.screenRoleModel.findAll();
-    console.log('🗃️ Total screen roles in database:', allRoles.length);
-    console.log('📊 Sample roles:', allRoles.slice(0, 5).map(sr => ({
-      id: sr.id,
-      screenId: sr.screenId,
-      role: sr.role
-    })));
+    this.logger.debug(`Total screen roles in database: ${allRoles.length}`);
+    this.logger.debug(`Sample roles: ${JSON.stringify(allRoles.slice(0, 5).map(sr => ({ id: sr.id, screenId: sr.screenId, role: sr.role })))}`);
     return allRoles;
   }
 
   async setScreenPermissionsForRole(role: UserRole, screenIds: string[]): Promise<void> {
-    console.log('🔧 Setting permissions for role:', role, 'screens:', screenIds);
+    this.logger.debug(`Setting permissions for role: ${role} screens: ${screenIds.join(', ')}`);
     
     // Remove existing permissions for this role
     await this.screenRoleModel.destroy({
@@ -66,7 +60,7 @@ export class ScreenRoleService {
       await this.screenRoleModel.bulkCreate(screenRoles);
     }
     
-    console.log('✅ Permissions updated for role:', role);
+    this.logger.debug(`Permissions updated for role: ${role}`);
   }
 
   async getAllPermissionsByRole(): Promise<Record<string, string[]>> {

@@ -83,6 +83,7 @@ export class CustomerController {
   @Get('email/:email')
   @Public() // Allow public access for booking flow (check if customer exists)
   @SkipCsrf() // Read operation, skip CSRF
+  @StrictThrottle() // Prevent email enumeration attacks (5 req / 15 min per IP)
   @ApiOperation({ summary: 'Get customer by email' })
   @ApiParam({ name: 'email', description: 'Customer email' })
   @ApiResponse({

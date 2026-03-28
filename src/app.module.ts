@@ -57,7 +57,6 @@ import { PerformanceTestsModule } from './performance-tests/performance-tests.mo
     DatabaseModule,
     AppCacheModule,
     PerformanceTestsModule,
-    // AuthModule, // TODO: Implementar completamente
     CustomersModule,
     CategoriesModule,
     ServicesModule,

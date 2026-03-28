@@ -380,14 +380,6 @@ export class UserService {
       }
     });
 
-    console.log('🔍 USER FOUND:', user ? {
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      isActive: user.isActive,
-      role: user.role
-    } : 'NOT FOUND');
-
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }

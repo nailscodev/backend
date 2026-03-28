@@ -17,6 +17,7 @@ import {
   HttpCode,
   ConflictException,
   Inject,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -68,6 +69,8 @@ interface AvailableStaffMember {
 @ApiTags('bookings')
 @Controller('bookings')
 export class ReservationsController {
+  private readonly logger = new Logger(ReservationsController.name);
+
   constructor(
     @InjectModel(BookingEntity)
     private bookingModel: typeof BookingEntity,
@@ -1149,8 +1152,8 @@ export class ReservationsController {
       },
     );
 
-    console.log('Top Staff Query Result:', result);
-    console.log('Query parameters:', { startDate, endDate, limit });
+    this.logger.debug('Top Staff Query Result:', result);
+    this.logger.debug('Query parameters:', { startDate, endDate, limit });
 
     const topStaff = result.map(row => ({
       staffId: row.staffId,
@@ -1160,7 +1163,7 @@ export class ReservationsController {
       role: row.role || 'Technician',
     }));
 
-    console.log('Top Staff Mapped:', topStaff);
+    this.logger.debug('Top Staff Mapped:', topStaff);
 
     return {
       success: true,
@@ -1205,7 +1208,7 @@ export class ReservationsController {
       },
     );
 
-    console.log('Bookings by Source Query Result:', result);
+    this.logger.debug('Bookings by Source Query Result:', result);
 
     // Initialize counts
     let webCount = 0;
@@ -1616,11 +1619,11 @@ export class ReservationsController {
         throw new BadRequestException('Date must be in YYYY-MM-DD format');
       }
 
-      console.log(`\n📅 BACKOFFICE AVAILABILITY REQUEST:`);
-      console.log(`   Date: ${date}`);
-      console.log(`   Services: ${services.length}`);
-      console.log(`   Removals: ${removals.length}`);
-      console.log(`   Mode: ${isVIPCombo ? 'VIP COMBO (Simultaneous)' : 'CONSECUTIVE'}`);
+      this.logger.debug(`\n📅 BACKOFFICE AVAILABILITY REQUEST:`);
+      this.logger.debug(`   Date: ${date}`);
+      this.logger.debug(`   Services: ${services.length}`);
+      this.logger.debug(`   Removals: ${removals.length}`);
+      this.logger.debug(`   Mode: ${isVIPCombo ? 'VIP COMBO (Simultaneous)' : 'CONSECUTIVE'}`);
 
       // Get all active staff with proper typing
       interface StaffRecord {
@@ -1670,7 +1673,7 @@ export class ReservationsController {
         order: [['startTime', 'ASC']]
       });
 
-      console.log(`📋 Found ${existingBookings.length} existing bookings for ${date}:`, 
+      this.logger.debug(`📋 Found ${existingBookings.length} existing bookings for ${date}:`, 
         existingBookings.map(b => ({
           id: b.id,
           staffId: b.staffId,
@@ -1697,14 +1700,14 @@ export class ReservationsController {
         // If shifts is in new format (weekly structure)
         if (staffShifts && typeof staffShifts === 'object' && !Array.isArray(staffShifts)) {
           const dayKey = dayOfWeek.toLowerCase();
-          console.log(`🔍 Looking for day key: "${dayKey}" in staff shifts`);
+          this.logger.debug(`🔍 Looking for day key: "${dayKey}" in staff shifts`);
           
           const dayShifts = staffShifts[dayKey];
-          console.log(`📅 Raw day shifts for ${dayKey}:`, dayShifts);
+          this.logger.debug(`📅 Raw day shifts for ${dayKey}:`, dayShifts);
           
           // In the new format, dayShifts is directly an array of shift objects
           if (Array.isArray(dayShifts)) {
-            console.log(`✅ Found ${dayShifts.length} shifts for ${dayKey}`);
+            this.logger.debug(`✅ Found ${dayShifts.length} shifts for ${dayKey}`);
             return dayShifts.filter(shift => 
               shift && 
               typeof shift === 'object' && 
@@ -1713,13 +1716,13 @@ export class ReservationsController {
             );
           }
           
-          console.log(`❌ Day shifts is not an array for ${dayKey}:`, typeof dayShifts);
+          this.logger.debug(`❌ Day shifts is not an array for ${dayKey}:`, typeof dayShifts);
           return [];
         }
         
         // Fallback to legacy format (array of shifts for all days)
         if (staffShifts && Array.isArray(staffShifts)) {
-          console.log(`📋 Using legacy format, found ${staffShifts.length} shifts`);
+          this.logger.debug(`📋 Using legacy format, found ${staffShifts.length} shifts`);
           return staffShifts.filter(shift => 
             shift && 
             typeof shift === 'object' && 
@@ -1728,7 +1731,7 @@ export class ReservationsController {
           );
         }
         
-        console.log(`❌ No valid shifts format found`);
+        this.logger.debug(`❌ No valid shifts format found`);
         return [];
       };
 
@@ -1738,9 +1741,9 @@ export class ReservationsController {
           .map(s => s.staffId)
           .filter(id => id && id !== 'any');
 
-        console.log(`🔍 Looking for specific staff IDs:`, specificStaffIds);
-        console.log(`📊 Available staff count: ${filteredActiveStaff.length}`);
-        console.log(`📋 Available staff IDs:`, filteredActiveStaff.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })));
+        this.logger.debug(`🔍 Looking for specific staff IDs:`, specificStaffIds);
+        this.logger.debug(`📊 Available staff count: ${filteredActiveStaff.length}`);
+        this.logger.debug(`📋 Available staff IDs:`, filteredActiveStaff.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })));
 
         let earliestStart = '09:00:00';
         let latestEnd = '19:00:00';
@@ -1750,15 +1753,15 @@ export class ReservationsController {
           let foundSpecificHours = false;
           
           for (const staffId of specificStaffIds) {
-            console.log(`🔎 Searching for staff ID: ${staffId}`);
+            this.logger.debug(`🔎 Searching for staff ID: ${staffId}`);
             const staffData = filteredActiveStaff.find(s => s.id === staffId);
             
             if (staffData) {
-              console.log(`✅ Found staff: ${staffData.firstName} ${staffData.lastName}`);
-              console.log(`📋 Staff shifts data:`, JSON.stringify((staffData as any).shifts));
+              this.logger.debug(`✅ Found staff: ${staffData.firstName} ${staffData.lastName}`);
+              this.logger.debug(`📋 Staff shifts data:`, JSON.stringify((staffData as any).shifts));
               
               const dayShifts = getShiftsForStaffDay(staffData);
-              console.log(`📅 Day shifts for ${dayOfWeek}:`, dayShifts);
+              this.logger.debug(`📅 Day shifts for ${dayOfWeek}:`, dayShifts);
               
               if (dayShifts.length > 0) {
                 foundSpecificHours = true;
@@ -1768,36 +1771,36 @@ export class ReservationsController {
                   const shiftStart = shift.shiftStart.length === 5 ? `${shift.shiftStart}:00` : shift.shiftStart;
                   const shiftEnd = shift.shiftEnd.length === 5 ? `${shift.shiftEnd}:00` : shift.shiftEnd;
                   
-                  console.log(`⏰ Processing shift: ${shiftStart} - ${shiftEnd}`);
+                  this.logger.debug(`⏰ Processing shift: ${shiftStart} - ${shiftEnd}`);
                   
                   if (shiftStart < earliestStart) {
                     earliestStart = shiftStart;
-                    console.log(`📅 Updated earliest start to: ${earliestStart}`);
+                    this.logger.debug(`📅 Updated earliest start to: ${earliestStart}`);
                   }
                   if (shiftEnd > latestEnd) {
                     latestEnd = shiftEnd;
-                    console.log(`📅 Updated latest end to: ${latestEnd}`);
+                    this.logger.debug(`📅 Updated latest end to: ${latestEnd}`);
                   }
                 }
               } else {
-                console.log(`⚠️ No shifts found for staff ${staffData.firstName} on ${dayOfWeek}`);
+                this.logger.debug(`⚠️ No shifts found for staff ${staffData.firstName} on ${dayOfWeek}`);
               }
             } else {
-              console.log(`❌ Staff ID ${staffId} not found in filtered staff`);
+              this.logger.debug(`❌ Staff ID ${staffId} not found in filtered staff`);
             }
           }
           
           // If we found specific staff hours, use them; otherwise fall back to all staff
           if (foundSpecificHours) {
-            console.log(`✅ Using specific staff hours: ${earliestStart} - ${latestEnd}`);
+            this.logger.debug(`✅ Using specific staff hours: ${earliestStart} - ${latestEnd}`);
           } else {
-            console.log('🔍 No specific staff hours found, using hours from all available staff');
+            this.logger.debug('🔍 No specific staff hours found, using hours from all available staff');
           }
         }
 
         // If no specific staff or we need to expand the range, check all available staff
         if (specificStaffIds.length === 0 || specificStaffIds.some(id => id === 'any') || earliestStart === '09:00:00') {
-          console.log(`🌍 Checking all ${filteredActiveStaff.length} available staff for working hours`);
+          this.logger.debug(`🌍 Checking all ${filteredActiveStaff.length} available staff for working hours`);
           
           for (const staffData of filteredActiveStaff) {
             const dayShifts = getShiftsForStaffDay(staffData);
@@ -1815,7 +1818,7 @@ export class ReservationsController {
               }
             }
           }
-          console.log(`🌍 Final working hours from all staff: ${earliestStart} - ${latestEnd}`);
+          this.logger.debug(`🌍 Final working hours from all staff: ${earliestStart} - ${latestEnd}`);
         }
 
         return { earliestStart, latestEnd };
@@ -1838,9 +1841,9 @@ export class ReservationsController {
       const latestStartHour = Math.floor(latestStartMinutes / 60);
       const latestStartMin = latestStartMinutes % 60;
 
-      console.log(`⏰ Generating time slots from ${earliestStart} to ${latestEnd} based on staff schedules`);
-      console.log(`🕐 Max service duration: ${maxServiceDuration} minutes`);
-      console.log(`🕐 Latest start time: ${latestStartHour.toString().padStart(2, '0')}:${latestStartMin.toString().padStart(2, '0')} (to finish by ${latestEnd})`);
+      this.logger.debug(`⏰ Generating time slots from ${earliestStart} to ${latestEnd} based on staff schedules`);
+      this.logger.debug(`🕐 Max service duration: ${maxServiceDuration} minutes`);
+      this.logger.debug(`🕐 Latest start time: ${latestStartHour.toString().padStart(2, '0')}:${latestStartMin.toString().padStart(2, '0')} (to finish by ${latestEnd})`);
 
       // Generate time slots based on staff working hours (30-min intervals)
       const generateTimeSlots = () => {
@@ -1858,8 +1861,8 @@ export class ReservationsController {
           }
         }
         
-        console.log(`📅 Generated ${slots.length} time slots from ${slots[0]} to ${slots[slots.length - 1]}`);
-        console.log(`🎯 Last slot ${slots[slots.length - 1]} + ${maxServiceDuration}min = ends at ${addMinutesToTime(slots[slots.length - 1], maxServiceDuration)}`);
+        this.logger.debug(`📅 Generated ${slots.length} time slots from ${slots[0]} to ${slots[slots.length - 1]}`);
+        this.logger.debug(`🎯 Last slot ${slots[slots.length - 1]} + ${maxServiceDuration}min = ends at ${addMinutesToTime(slots[slots.length - 1], maxServiceDuration)}`);
         return slots;
       };
       
@@ -1928,7 +1931,7 @@ export class ReservationsController {
           return false;
         }
 
-        console.log(`\n🔍 Checking availability for staff ${staffId}:`, {
+        this.logger.debug(`\n🔍 Checking availability for staff ${staffId}:`, {
           requestedSlot: `${startTime} - ${endTime}`,
           existingBookingsForStaff: existingBookings.filter(b => b.staffId === staffId).length
         });
@@ -1939,18 +1942,18 @@ export class ReservationsController {
           const bookingStart = parseTime(String(booking.startTime));
           const bookingEnd = parseTime(String(booking.endTime));
 
-          console.log(`  📅 Existing booking: ${booking.startTime} - ${booking.endTime} (${bookingStart} - ${bookingEnd} minutes)`);
+          this.logger.debug(`  📅 Existing booking: ${booking.startTime} - ${booking.endTime} (${bookingStart} - ${bookingEnd} minutes)`);
 
           // Check overlap
           if (slotStart < bookingEnd && slotEnd > bookingStart) {
-            console.log(`  ❌ CONFLICT DETECTED: Slot overlaps with existing booking`);
+            this.logger.debug(`  ❌ CONFLICT DETECTED: Slot overlaps with existing booking`);
             return false;
           } else {
-            console.log(`  ✅ No conflict with this booking`);
+            this.logger.debug(`  ✅ No conflict with this booking`);
           }
         }
         
-        console.log(`  ✅ Staff ${staffId} is AVAILABLE for ${startTime} - ${endTime}`);
+        this.logger.debug(`  ✅ Staff ${staffId} is AVAILABLE for ${startTime} - ${endTime}`);
         return true;
       };
 
@@ -1981,7 +1984,7 @@ export class ReservationsController {
               // Specific staff requested
               if (assignedStaffIds.has(service.staffId)) {
                 // Staff already assigned to another service in this VIP combo
-                console.log(`  ❌ Staff ${service.staffId} already assigned to another service in VIP combo`);
+                this.logger.debug(`  ❌ Staff ${service.staffId} already assigned to another service in VIP combo`);
                 allServicesCanBeScheduled = false;
                 break;
               }
@@ -2012,7 +2015,7 @@ export class ReservationsController {
                 });
                 assignedStaffIds.add(availableStaff.id);
               } else {
-                console.log(`  ❌ No available staff found for service ${service.serviceId} at ${startTime} (${assignedStaffIds.size} staff already assigned)`);
+                this.logger.debug(`  ❌ No available staff found for service ${service.serviceId} at ${startTime} (${assignedStaffIds.size} staff already assigned)`);
                 allServicesCanBeScheduled = false;
                 break;
               }
@@ -2086,7 +2089,7 @@ export class ReservationsController {
         }
       }
 
-      console.log(`✅ Found ${availableSlots.length} available slots`);
+      this.logger.debug(`✅ Found ${availableSlots.length} available slots`);
 
       return {
         success: true,
@@ -2184,10 +2187,10 @@ export class ReservationsController {
         servicesWithAddons
       );
 
-      console.log(`\n🎯 CONTROLLER RESPONSE:`);
-      console.log(`   Found ${availableSlots.length} slots`);
+      this.logger.debug(`\n🎯 CONTROLLER RESPONSE:`);
+      this.logger.debug(`   Found ${availableSlots.length} slots`);
       if (availableSlots.length > 0) {
-        console.log(`   Sample slot structure:`, JSON.stringify(availableSlots[0], null, 2));
+        this.logger.debug(`   Sample slot structure:`, JSON.stringify(availableSlots[0], null, 2));
       }
 
       return {
@@ -2268,9 +2271,9 @@ export class ReservationsController {
 
       const serviceIds = servicesWithAddons.map(s => s.id);
 
-      console.log(`\n🌟 VIP COMBO REQUEST:`);
-      console.log(`   Selected Technician: ${selectedTechnicianId || 'none'}`);
-      console.log(`   Selected Service: ${selectedServiceId || 'none'}`);
+      this.logger.debug(`\n🌟 VIP COMBO REQUEST:`);
+      this.logger.debug(`   Selected Technician: ${selectedTechnicianId || 'none'}`);
+      this.logger.debug(`   Selected Service: ${selectedServiceId || 'none'}`);
 
       // Call the VIP combo availability service
       const availableSlots = await this.multiServiceAvailabilityService.findVIPComboSlots(
@@ -2281,8 +2284,8 @@ export class ReservationsController {
         selectedServiceId
       );
 
-      console.log(`\n🌟 VIP COMBO CONTROLLER RESPONSE:`);
-      console.log(`   Found ${availableSlots.length} simultaneous slots`);
+      this.logger.debug(`\n🌟 VIP COMBO CONTROLLER RESPONSE:`);
+      this.logger.debug(`   Found ${availableSlots.length} simultaneous slots`);
 
       return {
         success: true,
@@ -2360,7 +2363,7 @@ export class ReservationsController {
       // Handle "Any Available Technician" case - auto-assign optimal staff
       let assignedStaffId = createBookingDto.staffId;
       if (!createBookingDto.staffId || createBookingDto.staffId === 'any') {
-        console.log('🔄 Auto-assigning staff for "any" selection...');
+        this.logger.debug('🔄 Auto-assigning staff for "any" selection...');
         
         // Calculate duration in minutes from time strings
         const parseTimeToMinutes = (timeStr: string) => {
@@ -2380,7 +2383,7 @@ export class ReservationsController {
           
           if (optimalStaffResult.success && optimalStaffResult.staffId) {
             assignedStaffId = optimalStaffResult.staffId;
-            console.log(`✅ Auto-assigned staff: ${optimalStaffResult.staffName} (${assignedStaffId})`);
+            this.logger.debug(`✅ Auto-assigned staff: ${optimalStaffResult.staffName} (${assignedStaffId})`);
           } else {
             throw new BadRequestException('No staff members available at the requested time');
           }
@@ -2476,15 +2479,15 @@ export class ReservationsController {
     }
 
     try {
-      console.log('🔄 Updating booking with data:', JSON.stringify(updateBookingDto, null, 2));
-      console.log('📝 ServiceId received:', updateBookingDto.serviceId, 'Type:', typeof updateBookingDto.serviceId);
+      this.logger.debug('🔄 Updating booking with data:', JSON.stringify(updateBookingDto, null, 2));
+      this.logger.debug('📝 ServiceId received:', updateBookingDto.serviceId, 'Type:', typeof updateBookingDto.serviceId);
       
       // Handle addon updates explicitly
       const updateData: any = { ...updateBookingDto };
       
       // Handle addOnIds (includes both normal and removal addons)
       if ('addOnIds' in updateBookingDto) {
-        console.log('📝 Updating addOnIds (combined normal + removal):', updateBookingDto.addOnIds);
+        this.logger.debug('📝 Updating addOnIds (combined normal + removal):', updateBookingDto.addOnIds);
         updateData.addOnIds = updateBookingDto.addOnIds || null;
       }
       
@@ -2493,7 +2496,7 @@ export class ReservationsController {
       // Reload the booking to get updated values
       await booking.reload();
       
-      console.log('✅ Booking updated successfully. Final addOnIds:', booking.addOnIds);
+      this.logger.debug('✅ Booking updated successfully. Final addOnIds:', booking.addOnIds);
       
       return booking;
     } catch (error: unknown) {

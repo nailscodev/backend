@@ -80,11 +80,13 @@ async function bootstrap() {
 
   // CORS mejorado
   const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [
-    'http://localhost:3002',
-    'http://localhost:3001',
-    'http://localhost:3000',
-    'http://192.168.1.32:3002',
-    'http://127.0.0.1:3002',
+    ...(process.env.NODE_ENV !== 'production' ? [
+      'http://localhost:3002',
+      'http://localhost:3001',
+      'http://localhost:3000',
+      'http://192.168.1.32:3002',
+      'http://127.0.0.1:3002',
+    ] : []),
     'https://frontend-web-wt6y.onrender.com',
     'https://backoffice-web-so8xwa.fly.dev',
     'https://nailsco-frontend.fly.dev',

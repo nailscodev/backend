@@ -78,8 +78,9 @@ export class CustomThrottlerGuard implements CanActivate {
     const realIP = request.headers['x-real-ip'];
     
     if (typeof forwarded === 'string') {
-      // X-Forwarded-For can contain multiple IPs, use the first one
-      return forwarded.split(',')[0].trim();
+      // X-Forwarded-For can contain multiple IPs; use the rightmost (appended by the trusted proxy)
+      // to prevent spoofing via attacker-controlled leftmost entries.
+      return forwarded.split(',').pop()!.trim();
     }
     
     if (typeof realIP === 'string') {
