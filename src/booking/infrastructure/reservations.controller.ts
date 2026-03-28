@@ -10,6 +10,8 @@ import {
   Header,
   NotFoundException,
   BadRequestException,
+  HttpException,
+  InternalServerErrorException,
   HttpStatus,
   ValidationPipe,
   ParseUUIDPipe,
@@ -37,6 +39,7 @@ import { BookingStatus } from '../domain/value-objects/booking-status.vo';
 import { MultiServiceAvailabilityService } from '../application/services/multi-service-availability.service';
 import { SkipCsrf } from '../../common/decorators/csrf.decorator';
 import { Public } from '../../common/decorators/public.decorator';
+import { RequireAuth } from '../../common/decorators/require-auth.decorator';
 import { DashboardStatsDto } from './dto/dashboard-stats.dto';
 import { BestSellingServiceDto } from './dto/best-selling-service.dto';
 import { TopStaffDto } from './dto/top-staff.dto';
@@ -460,6 +463,7 @@ export class ReservationsController {
     };
   }
 
+  @RequireAuth()
   @Get('dashboard/stats')
   @Header('Cache-Control', 'private, max-age=60')
   @ApiOperation({
@@ -585,6 +589,7 @@ export class ReservationsController {
     };
   }
 
+  @RequireAuth()
   @Get('dashboard/revenue-over-time')
   @ApiOperation({
     summary: 'Get revenue over time',
@@ -702,6 +707,7 @@ export class ReservationsController {
     };
   }
 
+  @RequireAuth()
   @Get('dashboard/revenue-by-service')
   @ApiOperation({
     summary: 'Get revenue by service',
@@ -758,6 +764,7 @@ export class ReservationsController {
     };
   }
 
+  @RequireAuth()
   @Get('invoices')
   @ApiOperation({
     summary: 'Get all invoices',
@@ -1056,6 +1063,7 @@ export class ReservationsController {
     };
   }
 
+  @RequireAuth()
   @Get('dashboard/best-selling-services')
   @ApiOperation({
     summary: 'Get best selling services',
@@ -1122,6 +1130,7 @@ export class ReservationsController {
     };
   }
 
+  @RequireAuth()
   @Get('dashboard/top-staff')
   @ApiOperation({
     summary: 'Get top performing staff',
@@ -1189,6 +1198,7 @@ export class ReservationsController {
     };
   }
 
+  @RequireAuth()
   @Get('dashboard/bookings-by-source')
   @ApiOperation({
     summary: 'Get bookings by source',
@@ -1255,6 +1265,7 @@ export class ReservationsController {
     };
   }
 
+  @RequireAuth()
   @Get('upcoming')
   @ApiOperation({
     summary: 'Get upcoming bookings',
@@ -2486,7 +2497,10 @@ export class ReservationsController {
       return createdBooking;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new BadRequestException('Error creating booking: ' + errorMessage);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Booking creation failed: ' + errorMessage);
     }
   }
 
