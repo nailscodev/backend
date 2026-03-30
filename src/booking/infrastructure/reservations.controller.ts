@@ -1867,15 +1867,21 @@ export class ReservationsController {
       const endHour = parseInt(latestEnd.split(':')[0]);
       const endMinute = parseInt(latestEnd.split(':')[1]);
       
+      // Web booking flow uses a fixed closing time of 20:00 regardless of extended staff shifts.
+      // This keeps the public turnero aligned with the expected storefront schedule.
+      const WEB_CLOSING_MINUTES = 20 * 60;
+
       // Calculate the latest possible start time for a service to finish before closing
-      const latestEndMinutes = endHour * 60 + endMinute;
+      const latestEndMinutesFromShifts = endHour * 60 + endMinute;
+      const latestEndMinutes = Math.min(latestEndMinutesFromShifts, WEB_CLOSING_MINUTES);
       const latestStartMinutes = latestEndMinutes - maxServiceDuration;
       const latestStartHour = Math.floor(latestStartMinutes / 60);
       const latestStartMin = latestStartMinutes % 60;
 
       this.logger.debug(`⏰ Generating time slots from ${earliestStart} to ${latestEnd} based on staff schedules`);
       this.logger.debug(`🕐 Max service duration: ${maxServiceDuration} minutes`);
-      this.logger.debug(`🕐 Latest start time: ${latestStartHour.toString().padStart(2, '0')}:${latestStartMin.toString().padStart(2, '0')} (to finish by ${latestEnd})`);
+      this.logger.debug(`🕐 Latest shift end: ${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')} | Web closing cap: 20:00`);
+      this.logger.debug(`🕐 Latest start time: ${latestStartHour.toString().padStart(2, '0')}:${latestStartMin.toString().padStart(2, '0')} (to finish by ${Math.floor(latestEndMinutes / 60).toString().padStart(2, '0')}:${(latestEndMinutes % 60).toString().padStart(2, '0')}:00)`);
 
       // Generate time slots based on staff working hours (30-min intervals)
       const generateTimeSlots = () => {
@@ -1908,6 +1914,9 @@ export class ReservationsController {
       };
 
       const allTimeSlots = generateTimeSlots();
+      if (allTimeSlots.length === 0) {
+        this.logger.debug('⚠️ No time slots generated after applying duration and closing-time constraints');
+      }
       const availableSlots: any[] = [];
 
       // Helper: Check if staff is available in a time range
