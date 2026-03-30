@@ -528,7 +528,7 @@ export class ReservationsController {
            AND "appointmentDate" >= :startDate
            AND "appointmentDate" <= :endDate`,
         { replacements: { startDate, endDate }, type: QueryTypes.SELECT },
-      ) as Promise<any[]>,
+      ),
       this.sequelize.query(
         `SELECT COUNT(DISTINCT c.id) as count
          FROM customers c
@@ -539,7 +539,7 @@ export class ReservationsController {
            AND c."createdAt" >= :startDate
            AND c."createdAt" <= (:endDate || ' 23:59:59')::timestamp`,
         { replacements: { startDate, endDate }, type: QueryTypes.SELECT },
-      ) as Promise<any[]>,
+      ),
     ]);
 
     // Calculate cash and bank totals based on payment method
@@ -571,8 +571,8 @@ export class ReservationsController {
       }
     }
 
-    const distinctServices = parseInt((distinctServicesResult as any[])[0]?.count || '0');
-    const newCustomers = parseInt((newCustomersResult as any[])[0]?.count || '0');
+    const distinctServices = parseInt(distinctServicesResult[0]?.count || '0');
+    const newCustomers = parseInt(newCustomersResult[0]?.count || '0');
 
     return {
       success: true,
@@ -1042,7 +1042,7 @@ export class ReservationsController {
           now.getSeconds(),
           now.getMilliseconds()
         );
-      } catch (error) {
+      } catch {
         throw new BadRequestException('Invalid adjustmentDate format. Use YYYY-MM-DD');
       }
     }
@@ -1461,7 +1461,7 @@ export class ReservationsController {
         const slotOverlaps = slotStartMinutes < bookingEndMinutes && slotEndMinutes > bookingStartMinutes;
 
         if (slotOverlaps) {
-          bookedSlotsByStaff.get(staff)!.add(slot.time);
+          bookedSlotsByStaff.get(staff).add(slot.time);
         }
       });
     });
@@ -1543,6 +1543,7 @@ export class ReservationsController {
    * Returns available slots considering all services, addons, removals, and staff selection
    */
   @Public() // Called by turnero (public booking flow) without auth
+  @SkipCsrf() // Read-like operation (querying availability), no state change
   @Post('backoffice-availability')
   @ApiOperation({
     summary: 'Get available time slots for backoffice booking creation',
@@ -1651,11 +1652,11 @@ export class ReservationsController {
         throw new BadRequestException('Date must be in YYYY-MM-DD format');
       }
 
-      this.logger.debug(`\n📅 BACKOFFICE AVAILABILITY REQUEST:`);
-      this.logger.debug(`   Date: ${date}`);
-      this.logger.debug(`   Services: ${services.length}`);
-      this.logger.debug(`   Removals: ${removals.length}`);
-      this.logger.debug(`   Mode: ${isVIPCombo ? 'VIP COMBO (Simultaneous)' : 'CONSECUTIVE'}`);
+      console.log(`\n📅 BACKOFFICE AVAILABILITY REQUEST:`);
+      console.log(`   Date: ${date}`);
+      console.log(`   Services: ${services.length}`);
+      console.log(`   Removals: ${removals.length}`);
+      console.log(`   Mode: ${isVIPCombo ? 'VIP COMBO (Simultaneous)' : 'CONSECUTIVE'}`);
 
       // Get all active staff with proper typing
       interface StaffRecord {
@@ -1667,7 +1668,7 @@ export class ReservationsController {
       }
 
       const allActiveStaff = await this.sequelize.query<StaffRecord>(
-        `SELECT id, "firstName", "lastName", "workingDays", shifts FROM staff WHERE status = 'ACTIVE' AND "isBookable" = true AND "isWebVisible" = true`,
+        `SELECT id, "firstName", "lastName", "workingDays", shifts FROM staff WHERE status = 'ACTIVE' AND "isBookable" = true`,
         {
           type: QueryTypes.SELECT,
           raw: true
@@ -1681,16 +1682,6 @@ export class ReservationsController {
       const dayOfWeek = dayNames[requestedDate.getDay()];
       const dayAbbr = dayAbbreviations[dayOfWeek];
       const filteredActiveStaff = allActiveStaff.filter(staff => {
-        const staffShifts = (staff as any).shifts;
-
-        // New-format staff: shifts is a plain object keyed by lowercase day name (e.g. "monday").
-        // Use shifts as the SOLE source of truth — workingDays may be stale/inconsistent.
-        if (staffShifts && typeof staffShifts === 'object' && !Array.isArray(staffShifts)) {
-          const dayShifts = staffShifts[dayOfWeek.toLowerCase()];
-          return Array.isArray(dayShifts) && dayShifts.length > 0;
-        }
-
-        // Legacy-format staff: shifts is an array (or absent) — fall back to workingDays[].
         const wd = (staff as any).workingDays || [];
         return wd.includes(dayOfWeek) || wd.includes(dayAbbr);
       });
@@ -1705,7 +1696,7 @@ export class ReservationsController {
         order: [['startTime', 'ASC']]
       });
 
-      this.logger.debug(`📋 Found ${existingBookings.length} existing bookings for ${date}:`, 
+      console.log(`📋 Found ${existingBookings.length} existing bookings for ${date}:`, 
         existingBookings.map(b => ({
           id: b.id,
           staffId: b.staffId,
@@ -1732,14 +1723,14 @@ export class ReservationsController {
         // If shifts is in new format (weekly structure)
         if (staffShifts && typeof staffShifts === 'object' && !Array.isArray(staffShifts)) {
           const dayKey = dayOfWeek.toLowerCase();
-          this.logger.debug(`🔍 Looking for day key: "${dayKey}" in staff shifts`);
+          console.log(`🔍 Looking for day key: "${dayKey}" in staff shifts`);
           
           const dayShifts = staffShifts[dayKey];
-          this.logger.debug(`📅 Raw day shifts for ${dayKey}:`, dayShifts);
+          console.log(`📅 Raw day shifts for ${dayKey}:`, dayShifts);
           
           // In the new format, dayShifts is directly an array of shift objects
           if (Array.isArray(dayShifts)) {
-            this.logger.debug(`✅ Found ${dayShifts.length} shifts for ${dayKey}`);
+            console.log(`✅ Found ${dayShifts.length} shifts for ${dayKey}`);
             return dayShifts.filter(shift => 
               shift && 
               typeof shift === 'object' && 
@@ -1748,13 +1739,13 @@ export class ReservationsController {
             );
           }
           
-          this.logger.debug(`❌ Day shifts is not an array for ${dayKey}:`, typeof dayShifts);
+          console.log(`❌ Day shifts is not an array for ${dayKey}:`, typeof dayShifts);
           return [];
         }
         
         // Fallback to legacy format (array of shifts for all days)
         if (staffShifts && Array.isArray(staffShifts)) {
-          this.logger.debug(`📋 Using legacy format, found ${staffShifts.length} shifts`);
+          console.log(`📋 Using legacy format, found ${staffShifts.length} shifts`);
           return staffShifts.filter(shift => 
             shift && 
             typeof shift === 'object' && 
@@ -1763,7 +1754,7 @@ export class ReservationsController {
           );
         }
         
-        this.logger.debug(`❌ No valid shifts format found`);
+        console.log(`❌ No valid shifts format found`);
         return [];
       };
 
@@ -1773,9 +1764,9 @@ export class ReservationsController {
           .map(s => s.staffId)
           .filter(id => id && id !== 'any');
 
-        this.logger.debug(`🔍 Looking for specific staff IDs:`, specificStaffIds);
-        this.logger.debug(`📊 Available staff count: ${filteredActiveStaff.length}`);
-        this.logger.debug(`📋 Available staff IDs:`, filteredActiveStaff.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })));
+        console.log(`🔍 Looking for specific staff IDs:`, specificStaffIds);
+        console.log(`📊 Available staff count: ${filteredActiveStaff.length}`);
+        console.log(`📋 Available staff IDs:`, filteredActiveStaff.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })));
 
         let earliestStart = '09:00:00';
         let latestEnd = '19:00:00';
@@ -1785,15 +1776,15 @@ export class ReservationsController {
           let foundSpecificHours = false;
           
           for (const staffId of specificStaffIds) {
-            this.logger.debug(`🔎 Searching for staff ID: ${staffId}`);
+            console.log(`🔎 Searching for staff ID: ${staffId}`);
             const staffData = filteredActiveStaff.find(s => s.id === staffId);
             
             if (staffData) {
-              this.logger.debug(`✅ Found staff: ${staffData.firstName} ${staffData.lastName}`);
-              this.logger.debug(`📋 Staff shifts data:`, JSON.stringify((staffData as any).shifts));
+              console.log(`✅ Found staff: ${staffData.firstName} ${staffData.lastName}`);
+              console.log(`📋 Staff shifts data:`, JSON.stringify((staffData as any).shifts));
               
               const dayShifts = getShiftsForStaffDay(staffData);
-              this.logger.debug(`📅 Day shifts for ${dayOfWeek}:`, dayShifts);
+              console.log(`📅 Day shifts for ${dayOfWeek}:`, dayShifts);
               
               if (dayShifts.length > 0) {
                 foundSpecificHours = true;
@@ -1803,36 +1794,36 @@ export class ReservationsController {
                   const shiftStart = shift.shiftStart.length === 5 ? `${shift.shiftStart}:00` : shift.shiftStart;
                   const shiftEnd = shift.shiftEnd.length === 5 ? `${shift.shiftEnd}:00` : shift.shiftEnd;
                   
-                  this.logger.debug(`⏰ Processing shift: ${shiftStart} - ${shiftEnd}`);
+                  console.log(`⏰ Processing shift: ${shiftStart} - ${shiftEnd}`);
                   
                   if (shiftStart < earliestStart) {
                     earliestStart = shiftStart;
-                    this.logger.debug(`📅 Updated earliest start to: ${earliestStart}`);
+                    console.log(`📅 Updated earliest start to: ${earliestStart}`);
                   }
                   if (shiftEnd > latestEnd) {
                     latestEnd = shiftEnd;
-                    this.logger.debug(`📅 Updated latest end to: ${latestEnd}`);
+                    console.log(`📅 Updated latest end to: ${latestEnd}`);
                   }
                 }
               } else {
-                this.logger.debug(`⚠️ No shifts found for staff ${staffData.firstName} on ${dayOfWeek}`);
+                console.log(`⚠️ No shifts found for staff ${staffData.firstName} on ${dayOfWeek}`);
               }
             } else {
-              this.logger.debug(`❌ Staff ID ${staffId} not found in filtered staff`);
+              console.log(`❌ Staff ID ${staffId} not found in filtered staff`);
             }
           }
           
           // If we found specific staff hours, use them; otherwise fall back to all staff
           if (foundSpecificHours) {
-            this.logger.debug(`✅ Using specific staff hours: ${earliestStart} - ${latestEnd}`);
+            console.log(`✅ Using specific staff hours: ${earliestStart} - ${latestEnd}`);
           } else {
-            this.logger.debug('🔍 No specific staff hours found, using hours from all available staff');
+            console.log('🔍 No specific staff hours found, using hours from all available staff');
           }
         }
 
         // If no specific staff or we need to expand the range, check all available staff
         if (specificStaffIds.length === 0 || specificStaffIds.some(id => id === 'any') || earliestStart === '09:00:00') {
-          this.logger.debug(`🌍 Checking all ${filteredActiveStaff.length} available staff for working hours`);
+          console.log(`🌍 Checking all ${filteredActiveStaff.length} available staff for working hours`);
           
           for (const staffData of filteredActiveStaff) {
             const dayShifts = getShiftsForStaffDay(staffData);
@@ -1850,7 +1841,7 @@ export class ReservationsController {
               }
             }
           }
-          this.logger.debug(`🌍 Final working hours from all staff: ${earliestStart} - ${latestEnd}`);
+          console.log(`🌍 Final working hours from all staff: ${earliestStart} - ${latestEnd}`);
         }
 
         return { earliestStart, latestEnd };
@@ -1867,21 +1858,15 @@ export class ReservationsController {
       const endHour = parseInt(latestEnd.split(':')[0]);
       const endMinute = parseInt(latestEnd.split(':')[1]);
       
-      // Web booking flow uses a fixed closing time of 20:00 regardless of extended staff shifts.
-      // This keeps the public turnero aligned with the expected storefront schedule.
-      const WEB_CLOSING_MINUTES = 20 * 60;
-
       // Calculate the latest possible start time for a service to finish before closing
-      const latestEndMinutesFromShifts = endHour * 60 + endMinute;
-      const latestEndMinutes = Math.min(latestEndMinutesFromShifts, WEB_CLOSING_MINUTES);
+      const latestEndMinutes = endHour * 60 + endMinute;
       const latestStartMinutes = latestEndMinutes - maxServiceDuration;
       const latestStartHour = Math.floor(latestStartMinutes / 60);
       const latestStartMin = latestStartMinutes % 60;
 
-      this.logger.debug(`⏰ Generating time slots from ${earliestStart} to ${latestEnd} based on staff schedules`);
-      this.logger.debug(`🕐 Max service duration: ${maxServiceDuration} minutes`);
-      this.logger.debug(`🕐 Latest shift end: ${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')} | Web closing cap: 20:00`);
-      this.logger.debug(`🕐 Latest start time: ${latestStartHour.toString().padStart(2, '0')}:${latestStartMin.toString().padStart(2, '0')} (to finish by ${Math.floor(latestEndMinutes / 60).toString().padStart(2, '0')}:${(latestEndMinutes % 60).toString().padStart(2, '0')}:00)`);
+      console.log(`⏰ Generating time slots from ${earliestStart} to ${latestEnd} based on staff schedules`);
+      console.log(`🕐 Max service duration: ${maxServiceDuration} minutes`);
+      console.log(`🕐 Latest start time: ${latestStartHour.toString().padStart(2, '0')}:${latestStartMin.toString().padStart(2, '0')} (to finish by ${latestEnd})`);
 
       // Generate time slots based on staff working hours (30-min intervals)
       const generateTimeSlots = () => {
@@ -1899,8 +1884,8 @@ export class ReservationsController {
           }
         }
         
-        this.logger.debug(`📅 Generated ${slots.length} time slots from ${slots[0]} to ${slots[slots.length - 1]}`);
-        this.logger.debug(`🎯 Last slot ${slots[slots.length - 1]} + ${maxServiceDuration}min = ends at ${addMinutesToTime(slots[slots.length - 1], maxServiceDuration)}`);
+        console.log(`📅 Generated ${slots.length} time slots from ${slots[0]} to ${slots[slots.length - 1]}`);
+        console.log(`🎯 Last slot ${slots[slots.length - 1]} + ${maxServiceDuration}min = ends at ${addMinutesToTime(slots[slots.length - 1], maxServiceDuration)}`);
         return slots;
       };
       
@@ -1914,9 +1899,6 @@ export class ReservationsController {
       };
 
       const allTimeSlots = generateTimeSlots();
-      if (allTimeSlots.length === 0) {
-        this.logger.debug('⚠️ No time slots generated after applying duration and closing-time constraints');
-      }
       const availableSlots: any[] = [];
 
       // Helper: Check if staff is available in a time range
@@ -1972,7 +1954,7 @@ export class ReservationsController {
           return false;
         }
 
-        this.logger.debug(`\n🔍 Checking availability for staff ${staffId}:`, {
+        console.log(`\n🔍 Checking availability for staff ${staffId}:`, {
           requestedSlot: `${startTime} - ${endTime}`,
           existingBookingsForStaff: existingBookings.filter(b => b.staffId === staffId).length
         });
@@ -1983,18 +1965,18 @@ export class ReservationsController {
           const bookingStart = parseTime(String(booking.startTime));
           const bookingEnd = parseTime(String(booking.endTime));
 
-          this.logger.debug(`  📅 Existing booking: ${booking.startTime} - ${booking.endTime} (${bookingStart} - ${bookingEnd} minutes)`);
+          console.log(`  📅 Existing booking: ${booking.startTime} - ${booking.endTime} (${bookingStart} - ${bookingEnd} minutes)`);
 
           // Check overlap
           if (slotStart < bookingEnd && slotEnd > bookingStart) {
-            this.logger.debug(`  ❌ CONFLICT DETECTED: Slot overlaps with existing booking`);
+            console.log(`  ❌ CONFLICT DETECTED: Slot overlaps with existing booking`);
             return false;
           } else {
-            this.logger.debug(`  ✅ No conflict with this booking`);
+            console.log(`  ✅ No conflict with this booking`);
           }
         }
         
-        this.logger.debug(`  ✅ Staff ${staffId} is AVAILABLE for ${startTime} - ${endTime}`);
+        console.log(`  ✅ Staff ${staffId} is AVAILABLE for ${startTime} - ${endTime}`);
         return true;
       };
 
@@ -2025,7 +2007,7 @@ export class ReservationsController {
               // Specific staff requested
               if (assignedStaffIds.has(service.staffId)) {
                 // Staff already assigned to another service in this VIP combo
-                this.logger.debug(`  ❌ Staff ${service.staffId} already assigned to another service in VIP combo`);
+                console.log(`  ❌ Staff ${service.staffId} already assigned to another service in VIP combo`);
                 allServicesCanBeScheduled = false;
                 break;
               }
@@ -2056,7 +2038,7 @@ export class ReservationsController {
                 });
                 assignedStaffIds.add(availableStaff.id);
               } else {
-                this.logger.debug(`  ❌ No available staff found for service ${service.serviceId} at ${startTime} (${assignedStaffIds.size} staff already assigned)`);
+                console.log(`  ❌ No available staff found for service ${service.serviceId} at ${startTime} (${assignedStaffIds.size} staff already assigned)`);
                 allServicesCanBeScheduled = false;
                 break;
               }
@@ -2130,7 +2112,7 @@ export class ReservationsController {
         }
       }
 
-      this.logger.debug(`✅ Found ${availableSlots.length} available slots`);
+      console.log(`✅ Found ${availableSlots.length} available slots`);
 
       return {
         success: true,
