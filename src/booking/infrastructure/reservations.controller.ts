@@ -2146,6 +2146,83 @@ export class ReservationsController {
     }
   }
 
+  /**
+   * POST /bookings/frontendWeb-availability
+   * Turnero-only availability endpoint. Mirrors backoffice-availability logic
+   * but keeps a dedicated route for frontend-web traffic.
+   */
+  @Public()
+  @Post('frontendWeb-availability')
+  @ApiOperation({
+    summary: 'Get available time slots for frontend web turnero',
+    description: 'Same availability contract used by turnero, isolated from backoffice route usage.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        services: {
+          type: 'array',
+          description: 'Array of services with their configuration',
+          items: {
+            type: 'object',
+            properties: {
+              serviceId: { type: 'string' },
+              duration: { type: 'number' },
+              bufferTime: { type: 'number' },
+              staffId: { type: 'string', description: 'Staff ID or "any" for any available staff' },
+              addons: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    duration: { type: 'number' }
+                  }
+                }
+              }
+            }
+          }
+        },
+        removals: {
+          type: 'array',
+          description: 'Array of removal addons (applied to first service)',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              duration: { type: 'number' }
+            }
+          }
+        },
+        date: { type: 'string', description: 'Date in YYYY-MM-DD format' },
+        isVIPCombo: { type: 'boolean', description: 'True for simultaneous services, false for consecutive' }
+      },
+      required: ['services', 'date']
+    }
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Available time slots retrieved successfully for frontend web',
+  })
+  @HttpCode(HttpStatus.OK)
+  async getFrontendWebAvailability(
+    @Body() body: {
+      services: Array<{
+        serviceId: string;
+        duration: number;
+        bufferTime: number;
+        staffId?: string;
+        addons?: Array<{ id: string; duration: number }>;
+      }>;
+      removals?: Array<{ id: string; duration: number }>;
+      date: string;
+      isVIPCombo?: boolean;
+    },
+  ) {
+    return this.getBackofficeAvailability(body);
+  }
+
   @Post('multi-service-slots')
   @Public() // Allow public access for booking flow (combo packages without VIP)
   @ApiOperation({
