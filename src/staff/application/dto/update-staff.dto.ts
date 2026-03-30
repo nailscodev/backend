@@ -4,6 +4,8 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsOptional, IsDateString, IsNumber, IsString } from 'class-validator';
 
 export class UpdateStaffDto extends PartialType(CreateStaffDto) {
+  [key: string]: any;
+
   @ApiProperty({
     description: 'Date when staff member stopped working',
     example: '2025-12-31',

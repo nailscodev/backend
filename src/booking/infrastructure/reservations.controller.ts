@@ -67,6 +67,10 @@ interface AvailableStaffMember {
   workloadMinutes: number;
 }
 
+interface CountRow {
+  count: string | number;
+}
+
 // Force recompilation
 
 @ApiTags('bookings')
@@ -521,7 +525,7 @@ export class ReservationsController {
           appointmentDate: { [Op.between]: [startDate, endDate] },
         },
       }),
-      this.sequelize.query(
+      this.sequelize.query<CountRow>(
         `SELECT COUNT(DISTINCT "serviceId") as count
          FROM bookings
          WHERE status = 'completed'
@@ -529,7 +533,7 @@ export class ReservationsController {
            AND "appointmentDate" <= :endDate`,
         { replacements: { startDate, endDate }, type: QueryTypes.SELECT },
       ),
-      this.sequelize.query(
+      this.sequelize.query<CountRow>(
         `SELECT COUNT(DISTINCT c.id) as count
          FROM customers c
          INNER JOIN bookings b ON b."customerId" = c.id
@@ -571,8 +575,8 @@ export class ReservationsController {
       }
     }
 
-    const distinctServices = parseInt(distinctServicesResult[0]?.count || '0');
-    const newCustomers = parseInt(newCustomersResult[0]?.count || '0');
+    const distinctServices = parseInt(String(distinctServicesResult[0]?.count ?? '0'), 10);
+    const newCustomers = parseInt(String(newCustomersResult[0]?.count ?? '0'), 10);
 
     return {
       success: true,
