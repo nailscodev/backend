@@ -47,6 +47,7 @@ export const options = {
     // Scenario 1: availability check load
     availability_load: {
       executor: 'constant-vus',
+      exec: 'availabilityScenario',
       vus: 50,
       duration: '30s',
       tags: { scenario: 'availability' },
@@ -54,6 +55,7 @@ export const options = {
     // Scenario 2: concurrent booking creation (starts after 35s)
     concurrent_bookings: {
       executor: 'constant-vus',
+      exec: 'bookingCreationScenario',
       vus: 20,
       duration: '30s',
       startTime: '35s',
@@ -62,6 +64,7 @@ export const options = {
     // Scenario 3: combined GET burst (starts after 70s)
     combined_get_burst: {
       executor: 'ramping-vus',
+      exec: 'combinedGetBurst',
       startTime: '70s',
       stages: [
         { duration: '15s', target: 30 },

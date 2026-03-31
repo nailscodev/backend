@@ -19,7 +19,8 @@
  * Thresholds:
  *   p95 < 1000ms at ALL times (not just at start)
  *   Error rate < 1%
- *   Custom: latency in last 20% of test should not be > 2x than first 20%
+ *   Note: drift detection (last-20% vs first-20% latency) requires
+ *         post-processing of --out json output; it is not enforced here.
  *
  * Run:
  *   k6 run soak-test.js
