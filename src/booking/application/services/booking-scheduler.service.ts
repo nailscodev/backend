@@ -1,20 +1,21 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { QueryTypes } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
 import { BookingEntity } from '../../infrastructure/persistence/entities/booking.entity';
 
+const FIVE_MINUTES_MS = 5 * 60 * 1000;
+
 /**
  * BookingSchedulerService
  *
  * Handles time-based background tasks for bookings.
- * Extracted from the GET handlers to avoid running an expensive UPDATE
- * on every list/page request.
+ * Uses NestJS lifecycle hooks + setInterval — no external scheduler dependency.
  */
 @Injectable()
-export class BookingSchedulerService {
+export class BookingSchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BookingSchedulerService.name);
+  private intervalHandle: NodeJS.Timeout | null = null;
 
   constructor(
     @InjectModel(BookingEntity)
@@ -22,12 +23,25 @@ export class BookingSchedulerService {
     private readonly sequelize: Sequelize,
   ) {}
 
+  onModuleInit(): void {
+    this.intervalHandle = setInterval(
+      () => void this.updateExpiredBookings(),
+      FIVE_MINUTES_MS,
+    );
+  }
+
+  onModuleDestroy(): void {
+    if (this.intervalHandle) {
+      clearInterval(this.intervalHandle);
+      this.intervalHandle = null;
+    }
+  }
+
   /**
-   * Runs every 5 minutes.
+   * Runs every 5 minutes via setInterval.
    * Transitions any in_progress booking whose endTime has passed (Miami time)
    * to 'pending' (the UI-visible "completed but not yet reviewed" state).
    */
-  @Cron(CronExpression.EVERY_5_MINUTES)
   async updateExpiredBookings(): Promise<void> {
     try {
       const now = new Date();
