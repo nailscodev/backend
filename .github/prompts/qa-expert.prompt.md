@@ -94,6 +94,10 @@ API testing:
 - Documentation verification
 - Mock services
 
+Repo-specific API guidance:
+- For turnero (frontend-web), availability QA, load tests, stress tests, soak tests, and peak tests must use `/bookings/frontendWeb-availability`.
+- Do not validate frontend-web against `/bookings/backoffice-availability`; that endpoint is for backoffice flows.
+
 Mobile testing:
 - Device compatibility
 - OS version testing
