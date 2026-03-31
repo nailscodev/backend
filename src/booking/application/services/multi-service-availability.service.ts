@@ -381,99 +381,99 @@ export class MultiServiceAvailabilityService {
    */
   private async getStaffForServices(serviceIds: string[]): Promise<Map<string, Staff[]>> {
     const map = new Map<string, Staff[]>();
+    if (serviceIds.length === 0) return map;
 
-    for (const serviceId of serviceIds) {
-      // Buscar primero en staff_services
-      const serviceStaff = await this.sequelize.query<{
+    // ── Pass 1: batch-fetch staff for all IDs via staff_services ─────────────
+    const serviceStaffRows = await this.sequelize.query<{
+      service_id: string;
+      id: string;
+      firstName: string;
+      lastName: string;
+      workingDays: string[];
+      shifts: Array<{ shiftStart: string; shiftEnd: string }>;
+    }>(
+      `SELECT ss.service_id, s.id, s."firstName", s."lastName", s."workingDays", s.shifts
+       FROM staff s
+       INNER JOIN staff_services ss ON s.id = ss.staff_id
+       WHERE ss.service_id = ANY($1::uuid[])
+         AND s.status = 'ACTIVE'
+         AND s."isBookable" = true`,
+      { bind: [serviceIds], type: QueryTypes.SELECT },
+    );
+
+    for (const row of serviceStaffRows) {
+      const existing = map.get(row.service_id) ?? [];
+      existing.push({
+        id: row.id,
+        name: `${row.firstName} ${row.lastName}`,
+        workingDays: row.workingDays,
+        shifts: row.shifts,
+      });
+      map.set(row.service_id, existing);
+    }
+
+    // ── Pass 2: resolve IDs with no staff — they may be addon IDs ────────────
+    const missingIds = serviceIds.filter(id => !map.has(id));
+    if (missingIds.length === 0) return map;
+
+    const addonRows = await this.sequelize.query<{ id: string; name: string }>(
+      `SELECT id, name FROM addons WHERE id = ANY($1::uuid[])`,
+      { bind: [missingIds], type: QueryTypes.SELECT },
+    );
+
+    const maniAddonIds: string[] = [];
+    const pediAddonIds: string[] = [];
+    const addonIdSet = new Set<string>();
+
+    for (const addon of addonRows) {
+      addonIdSet.add(addon.id);
+      const lower = addon.name.toLowerCase();
+      if (lower.includes('- mani') || lower.includes('mani')) {
+        maniAddonIds.push(addon.id);
+      } else if (lower.includes('- pedi') || lower.includes('pedi')) {
+        pediAddonIds.push(addon.id);
+      } else {
+        map.set(addon.id, []);
+      }
+    }
+    // IDs not found in addons table either
+    for (const id of missingIds) {
+      if (!addonIdSet.has(id)) map.set(id, []);
+    }
+
+    // ── Pass 3: batch-fetch staff by category (mani / pedi) in parallel ──────
+    const fetchByCategory = async (category: string, addonIds: string[]): Promise<void> => {
+      if (addonIds.length === 0) return;
+      const rows = await this.sequelize.query<{
         id: string;
         firstName: string;
         lastName: string;
         workingDays: string[];
         shifts: Array<{ shiftStart: string; shiftEnd: string }>;
       }>(
-        `SELECT s.id, s."firstName", s."lastName", s."workingDays", s.shifts
+        `SELECT DISTINCT s.id, s."firstName", s."lastName", s."workingDays", s.shifts
          FROM staff s
          INNER JOIN staff_services ss ON s.id = ss.staff_id
-         WHERE ss.service_id = $1
+         INNER JOIN services srv ON ss.service_id = srv.id
+         INNER JOIN categories c ON srv.category_id = c.id
+         WHERE c.name = $1
            AND s.status = 'ACTIVE'
            AND s."isBookable" = true`,
-        {
-          bind: [serviceId],
-          type: QueryTypes.SELECT,
-        }
+        { bind: [category], type: QueryTypes.SELECT },
       );
+      const staffList = rows.map(s => ({
+        id: s.id,
+        name: `${s.firstName} ${s.lastName}`,
+        workingDays: s.workingDays,
+        shifts: s.shifts,
+      }));
+      for (const id of addonIds) map.set(id, staffList);
+    };
 
-      // Si no encontramos en services, buscar staff para addons
-      if (serviceStaff.length === 0) {
-        // Para addons (removal, nail art, etc.), buscar staff por categoría
-        // basado en el sufijo del nombre del addon (ej: "- Mani", "- Pedi")
-        const addonInfo = await this.sequelize.query<{
-          name: string;
-        }>(
-          `SELECT name FROM addons WHERE id = $1`,
-          {
-            bind: [serviceId],
-            type: QueryTypes.SELECT,
-          }
-        );
-
-        if (addonInfo.length > 0) {
-          const addonName = addonInfo[0].name.toLowerCase();
-          let categoryToFind = '';
-
-          // Determinar qué categoría buscar basado en el sufijo del addon
-          // Ejemplos: "Gel Removal - Mani", "Nail Art (10 M) - Mani", "Nail Art (15 M) - Pedi"
-          if (addonName.includes('- mani') || addonName.includes('mani')) {
-            categoryToFind = 'Manicure';
-          } else if (addonName.includes('- pedi') || addonName.includes('pedi')) {
-            categoryToFind = 'Pedicure';
-          }
-
-          if (categoryToFind) {
-            const addonStaff = await this.sequelize.query<{
-              id: string;
-              firstName: string;
-              lastName: string;
-              workingDays: string[];
-              shifts: Array<{ shiftStart: string; shiftEnd: string }>;
-            }>(
-              `SELECT DISTINCT s.id, s."firstName", s."lastName", s."workingDays", s.shifts
-               FROM staff s
-               INNER JOIN staff_services ss ON s.id = ss.staff_id
-               INNER JOIN services srv ON ss.service_id = srv.id
-               INNER JOIN categories c ON srv.category_id = c.id
-               WHERE c.name = $1
-                 AND s.status = 'ACTIVE'
-                 AND s."isBookable" = true`,
-              {
-                bind: [categoryToFind],
-                type: QueryTypes.SELECT,
-              }
-            );
-
-            const staffList = addonStaff.map(s => ({
-              id: s.id,
-              name: `${s.firstName} ${s.lastName}`,
-              workingDays: s.workingDays,
-              shifts: s.shifts,
-            }));
-            map.set(serviceId, staffList);
-          } else {
-            map.set(serviceId, []);
-          }
-        } else {
-          map.set(serviceId, []);
-        }
-      } else {
-        const staffList = serviceStaff.map(s => ({
-          id: s.id,
-          name: `${s.firstName} ${s.lastName}`,
-          workingDays: s.workingDays,
-          shifts: s.shifts,
-        }));
-        map.set(serviceId, staffList);
-      }
-    }
+    await Promise.all([
+      fetchByCategory('Manicure', maniAddonIds),
+      fetchByCategory('Pedicure', pediAddonIds),
+    ]);
 
     return map;
   }

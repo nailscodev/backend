@@ -207,6 +207,17 @@ CREATE INDEX IF NOT EXISTS idx_bookings_staff_id ON bookings("staffId");
 CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings("appointmentDate");
 CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
 
+-- Composite indexes for high-frequency query patterns (DBA audit v2)
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS idx_bookings_status_date ON bookings(status, "appointmentDate");
+CREATE INDEX IF NOT EXISTS idx_bookings_staff_date_status ON bookings("staffId", "appointmentDate", status);
+CREATE INDEX IF NOT EXISTS idx_bookings_date_time ON bookings("appointmentDate", "startTime");
+CREATE INDEX IF NOT EXISTS idx_bookings_customer_date ON bookings("customerId", "appointmentDate");
+CREATE INDEX IF NOT EXISTS idx_staff_status_bookable ON staff(status, "isBookable");
+CREATE INDEX IF NOT EXISTS idx_bookings_notes_trgm ON bookings USING GIN(notes gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_customers_email_trgm ON customers USING GIN(email gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_customers_created_at ON customers("createdAt");
+
 CREATE INDEX IF NOT EXISTS idx_addons_active ON addons("isActive");
 CREATE INDEX IF NOT EXISTS idx_addons_display_order ON addons("displayOrder");
 CREATE INDEX IF NOT EXISTS idx_addons_compatible_services ON addons USING GIN("compatibleServiceIds");

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { DatabaseModule } from './database/database.module';
@@ -54,6 +55,7 @@ import { PerformanceTestsModule } from './performance-tests/performance-tests.mo
         limit: 5, // Maximum 5 authentication attempts per 15 minutes
       },
     ]),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     AppCacheModule,
     PerformanceTestsModule,

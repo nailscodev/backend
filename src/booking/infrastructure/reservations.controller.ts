@@ -137,52 +137,6 @@ export class ReservationsController {
     }
   }
 
-  /**
-   * Auto-update all in_progress bookings that have passed their end time to pending status
-   * Uses Miami timezone for comparison
-   */
-  private async updateExpiredBookings(): Promise<void> {
-    try {
-      // Get current time in Miami timezone (America/New_York covers Miami)
-      const now = new Date();
-      const miamiTime = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/New_York', 
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-      }).formatToParts(now);
-
-      const currentMiamiDate = `${miamiTime.find(part => part.type === 'year')?.value}-${miamiTime.find(part => part.type === 'month')?.value}-${miamiTime.find(part => part.type === 'day')?.value}`;
-      const currentMiamiTime = `${miamiTime.find(part => part.type === 'hour')?.value}:${miamiTime.find(part => part.type === 'minute')?.value}:${miamiTime.find(part => part.type === 'second')?.value}`;
-      
-      // Update query using Miami time
-      await this.sequelize.query(`
-        UPDATE bookings 
-        SET status = 'pending'
-        WHERE status = 'in_progress' 
-          AND (
-            "appointmentDate" < :currentDate
-            OR (
-              "appointmentDate" = :currentDate 
-              AND "endTime" < :currentTime
-            )
-          )
-      `, {
-        replacements: { 
-          currentDate: currentMiamiDate,
-          currentTime: currentMiamiTime 
-        },
-        type: QueryTypes.UPDATE,
-      });
-    } catch (error) {
-      this.logger.error(`Error updating expired bookings: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-
   @RequireAuth()
   @Get()
   @ApiOperation({
@@ -263,9 +217,6 @@ export class ReservationsController {
     const maxLimit = 100;
     const actualLimit = Math.min(limit, maxLimit);
 
-    // Auto-update expired bookings before retrieving the list
-    await this.updateExpiredBookings();
-
     const { rows: bookings, count: total } = await this.bookingModel.findAndCountAll({
       where,
       offset: (page - 1) * actualLimit,
@@ -316,9 +267,6 @@ export class ReservationsController {
     @Query('customerId') customerId?: string,
     @Query('staffId') staffId?: string,
   ) {
-    // Auto-update expired bookings before retrieving the list
-    await this.updateExpiredBookings();
-
     // Build WHERE conditions
     const whereConditions: string[] = ['1=1'];
     const replacements: Record<string, any> = {};
@@ -494,88 +442,78 @@ export class ReservationsController {
       throw new BadRequestException('startDate and endDate must be in YYYY-MM-DD format');
     }
 
-    // Get completed bookings with payment method
-    // Run all independent DB queries in parallel to avoid sequential round-trips
-    const [
-      completedBookings,
-      manualAdjustments,
-      bookingsCount,
-      distinctServicesResult,
-      newCustomersResult,
-    ] = await Promise.all([
-      this.bookingModel.findAll({
-        where: {
-          status: BookingStatus.COMPLETED,
-          appointmentDate: { [Op.between]: [startDate, endDate] },
-        },
-        attributes: ['totalPrice', 'paymentMethod'],
-      }),
-      this.manualAdjustmentModel.findAll({
-        where: {
-          createdAt: {
-            [Op.between]: [
-              new Date(startDate + ' 00:00:00'),
-              new Date(endDate + ' 23:59:59'),
-            ],
-          },
-        },
-        attributes: ['amount', 'paymentMethod', 'type'],
-      }),
-      this.bookingModel.count({
-        where: {
-          status: BookingStatus.COMPLETED,
-          appointmentDate: { [Op.between]: [startDate, endDate] },
-        },
-      }),
-      this.sequelize.query<CountRow>(
-        `SELECT COUNT(DISTINCT "serviceId") as count
-         FROM bookings
-         WHERE status = 'completed'
-           AND "appointmentDate" >= :startDate
-           AND "appointmentDate" <= :endDate`,
-        { replacements: { startDate, endDate }, type: QueryTypes.SELECT },
-      ),
-      this.sequelize.query<CountRow>(
-        `SELECT COUNT(DISTINCT c.id) as count
-         FROM customers c
-         INNER JOIN bookings b ON b."customerId" = c.id
-         WHERE b.status = 'completed'
-           AND b."appointmentDate" >= :startDate
-           AND b."appointmentDate" <= :endDate
-           AND c."createdAt" >= :startDate
-           AND c."createdAt" <= (:endDate || ' 23:59:59')::timestamp`,
-        { replacements: { startDate, endDate }, type: QueryTypes.SELECT },
-      ),
-    ]);
+    // All aggregation done in SQL — no full-row fetches into Node.js memory
+    const [bookingAggRows, adjustmentAggRows, distinctServicesResult, newCustomersResult] =
+      await Promise.all([
+        // Aggregate cash / bank / count from completed bookings in one pass
+        this.sequelize.query<{
+          cash: string;
+          bank: string;
+          total: string;
+          bookings: string;
+        }>(
+          `SELECT
+             COALESCE(SUM(CASE WHEN "paymentMethod" = 'CASH' THEN "totalPrice" ELSE 0 END), 0) AS cash,
+             COALESCE(SUM(CASE WHEN "paymentMethod" = 'CARD' THEN "totalPrice" ELSE 0 END), 0) AS bank,
+             COALESCE(SUM("totalPrice"), 0)                                                     AS total,
+             COUNT(*)                                                                           AS bookings
+           FROM bookings
+           WHERE status = 'completed'
+             AND "appointmentDate" >= :startDate
+             AND "appointmentDate" <= :endDate`,
+          { replacements: { startDate, endDate }, type: QueryTypes.SELECT },
+        ),
+        // Aggregate manual adjustments in one pass
+        this.sequelize.query<{
+          cash: string;
+          bank: string;
+          total: string;
+        }>(
+          `SELECT
+             COALESCE(SUM(CASE WHEN "paymentMethod" = 'CASH'
+                              THEN CASE WHEN type = 'expense' THEN -amount ELSE amount END
+                              ELSE 0 END), 0) AS cash,
+             COALESCE(SUM(CASE WHEN "paymentMethod" = 'CARD'
+                              THEN CASE WHEN type = 'expense' THEN -amount ELSE amount END
+                              ELSE 0 END), 0) AS bank,
+             COALESCE(SUM(CASE WHEN type = 'expense' THEN -amount ELSE amount END), 0) AS total
+           FROM manual_adjustments
+           WHERE DATE("createdAt") >= :startDate
+             AND DATE("createdAt") <= :endDate`,
+          { replacements: { startDate, endDate }, type: QueryTypes.SELECT },
+        ),
+        this.sequelize.query<CountRow>(
+          `SELECT COUNT(DISTINCT "serviceId") AS count
+           FROM bookings
+           WHERE status = 'completed'
+             AND "appointmentDate" >= :startDate
+             AND "appointmentDate" <= :endDate`,
+          { replacements: { startDate, endDate }, type: QueryTypes.SELECT },
+        ),
+        this.sequelize.query<CountRow>(
+          `SELECT COUNT(DISTINCT c.id) AS count
+           FROM customers c
+           INNER JOIN bookings b ON b."customerId" = c.id
+           WHERE b.status = 'completed'
+             AND b."appointmentDate" >= :startDate
+             AND b."appointmentDate" <= :endDate
+             AND c."createdAt" >= :startDate
+             AND c."createdAt" <= (:endDate || ' 23:59:59')::timestamp`,
+          { replacements: { startDate, endDate }, type: QueryTypes.SELECT },
+        ),
+      ]);
 
-    // Calculate cash and bank totals based on payment method
-    let cash = 0;
-    let bank = 0;
-    let totalRevenue = 0;
+    const bRow = bookingAggRows[0];
+    const aRow = adjustmentAggRows[0];
 
-    for (const booking of completedBookings) {
-      const amount = parseFloat(String(booking.totalPrice || 0));
-      totalRevenue += amount;
-      if (booking.paymentMethod === 'CASH') {
-        cash += amount;
-      } else if (booking.paymentMethod === 'CARD') {
-        bank += amount;
-      }
-    }
+    const bookingCash = parseFloat(bRow?.cash ?? '0');
+    const bookingBank = parseFloat(bRow?.bank ?? '0');
+    const bookingsCount = parseInt(bRow?.bookings ?? '0', 10);
+    const bookingTotal = parseFloat(bRow?.total ?? '0');
 
-    // Calculate manual adjustments total and add to revenue/cash/bank
-    let manualAdjustmentsTotal = 0;
-    for (const adjustment of manualAdjustments) {
-      const amount = parseFloat(String(adjustment.amount || 0));
-      const adjustmentAmount = adjustment.type === 'expense' ? -amount : amount;
-      manualAdjustmentsTotal += adjustmentAmount;
-      totalRevenue += adjustmentAmount;
-      if (adjustment.paymentMethod === 'CASH') {
-        cash += adjustmentAmount;
-      } else if (adjustment.paymentMethod === 'CARD') {
-        bank += adjustmentAmount;
-      }
-    }
+    const adjCash = parseFloat(aRow?.cash ?? '0');
+    const adjBank = parseFloat(aRow?.bank ?? '0');
+    const manualAdjustmentsTotal = parseFloat(aRow?.total ?? '0');
 
     const distinctServices = parseInt(String(distinctServicesResult[0]?.count ?? '0'), 10);
     const newCustomers = parseInt(String(newCustomersResult[0]?.count ?? '0'), 10);
@@ -583,12 +521,12 @@ export class ReservationsController {
     return {
       success: true,
       data: {
-        cash,
-        bank,
-        totalRevenue,
+        cash: bookingCash + adjCash,
+        bank: bookingBank + adjBank,
+        totalRevenue: bookingTotal + manualAdjustmentsTotal,
         manualAdjustmentsTotal,
         bookings: bookingsCount,
-        completedTransactions: bookingsCount, // Same as bookings for clarity
+        completedTransactions: bookingsCount,
         distinctServices,
         newCustomers,
       },
@@ -738,6 +676,12 @@ export class ReservationsController {
       throw new BadRequestException('startDate and endDate must be in YYYY-MM-DD format');
     }
 
+    const langRowsRev = await this.sequelize.query<{ id: string }>(
+      `SELECT id FROM languages WHERE code = :lang LIMIT 1`,
+      { replacements: { lang }, type: QueryTypes.SELECT },
+    );
+    const langIdRev = langRowsRev[0]?.id ?? null;
+
     const result: any[] = await this.sequelize.query(
       `
       SELECT 
@@ -746,7 +690,7 @@ export class ReservationsController {
       FROM bookings b
       INNER JOIN services s ON b."serviceId" = s.id
       LEFT JOIN services_lang sl ON s.id = sl.service_id 
-        AND sl.language_id = (SELECT id FROM languages WHERE code = :lang LIMIT 1)
+        AND sl.language_id = :langId
       WHERE b.status = 'completed'
         AND b."appointmentDate" >= :startDate::date
         AND b."appointmentDate" <= :endDate::date
@@ -754,7 +698,7 @@ export class ReservationsController {
       ORDER BY SUM(b."totalPrice") DESC
       `,
       {
-        replacements: { startDate, endDate, lang },
+        replacements: { startDate, endDate, langId: langIdRev },
         type: QueryTypes.SELECT,
       },
     );
@@ -805,50 +749,69 @@ export class ReservationsController {
       throw new BadRequestException('startDate and endDate must be in YYYY-MM-DD format');
     }
 
-    // Build WHERE conditions for bookings
-    let bookingWhereConditions = `
-      WHERE b.status = 'completed'
-        AND b."appointmentDate" >= :startDate
-        AND b."appointmentDate" <= :endDate`;
-    
-    const replacements: any = { startDate, endDate, lang };
-    
+    // Resolve language ID once — avoids a correlated subquery per row
+    const langRows = await this.sequelize.query<{ id: string }>(
+      `SELECT id FROM languages WHERE code = :lang LIMIT 1`,
+      { replacements: { lang }, type: QueryTypes.SELECT },
+    );
+    const langId = langRows[0]?.id ?? null;
+
+    // ── Booking leg WHERE conditions ──────────────────────────────────────────
+    const bookingConditions: string[] = [
+      `b.status = 'completed'`,
+      `b."appointmentDate" >= :startDate`,
+      `b."appointmentDate" <= :endDate`,
+    ];
+    const rp: Record<string, any> = { startDate, endDate, langId, limit, offset: (page - 1) * limit };
+
     if (paymentMethod && paymentMethod !== 'All') {
-      bookingWhereConditions += ` AND b."paymentMethod" = :paymentMethod`;
-      replacements.paymentMethod = paymentMethod;
+      bookingConditions.push(`b."paymentMethod" = :paymentMethod`);
+      rp.paymentMethod = paymentMethod;
     }
-    
-    if (serviceId && serviceId !== 'All') {
-      if (serviceId === 'MANUAL_ADJUSTMENT') {
-        // If filtering by MANUAL_ADJUSTMENT, exclude all bookings
-        bookingWhereConditions += ` AND 1 = 0`;
-      } else {
-        // Filter by specific service ID
-        bookingWhereConditions += ` AND b."serviceId" = :serviceId`;
-        replacements.serviceId = serviceId;
-      }
+    const excludeBookings =
+      (serviceId && serviceId !== 'All' && serviceId === 'MANUAL_ADJUSTMENT') ||
+      transactionType === 'expense';
+    const includeSpecificService = serviceId && serviceId !== 'All' && serviceId !== 'MANUAL_ADJUSTMENT';
+    if (excludeBookings) {
+      bookingConditions.push(`1 = 0`);
+    } else if (includeSpecificService) {
+      bookingConditions.push(`b."serviceId" = :serviceId`);
+      rp.serviceId = serviceId;
     }
-    
-    // Filter by transaction type based on totalPrice value
-    if (transactionType && transactionType !== 'All') {
-      if (transactionType === 'expense') {
-        // If filtering by expense (totalPrice < 0), exclude bookings completely since they're always positive
-        bookingWhereConditions += ` AND 1 = 0`;
-      } else if (transactionType === 'income') {
-        // If filtering by income (totalPrice >= 0), include bookings since they're always positive
-        // No additional filter needed for bookings as they're always income
-      }
+
+    // ── Manual-adjustment leg WHERE conditions ────────────────────────────────
+    const adjConditions: string[] = [
+      `DATE(ma."createdAt") >= :startDate`,
+      `DATE(ma."createdAt") <= :endDate`,
+    ];
+    if (paymentMethod && paymentMethod !== 'All') {
+      adjConditions.push(`ma."paymentMethod" = :paymentMethod`);
     }
-    
-    // Get completed bookings with customer and service info
-    const bookingsResult: any[] = await this.sequelize.query(
-      `
-      SELECT 
+    const excludeAdj = includeSpecificService; // specific serviceId → no manual adjustments
+    const includeOnlyAdj = serviceId === 'MANUAL_ADJUSTMENT';
+    if (excludeAdj) {
+      adjConditions.push(`1 = 0`);
+    }
+    if (transactionType === 'income') {
+      adjConditions.push(`(CASE WHEN ma.type = 'expense' THEN -ma.amount ELSE ma.amount END) >= 0`);
+    } else if (transactionType === 'expense') {
+      adjConditions.push(`(CASE WHEN ma.type = 'expense' THEN -ma.amount ELSE ma.amount END) < 0`);
+    }
+    if (includeOnlyAdj) {
+      bookingConditions.push(`1 = 0`); // already excluded above, belt-and-suspenders
+    }
+
+    const bookingWhere = bookingConditions.join(' AND ');
+    const adjWhere = adjConditions.join(' AND ');
+
+    // ── UNION ALL + single paginated query ────────────────────────────────────
+    const unionSQL = `
+      SELECT
         b.id,
-        'booking' as "type",
-        CONCAT(c."firstName", ' ', c."lastName") as "customerName",
-        c.email as "customerEmail",
-        COALESCE(sl.title, s.name) as "serviceName",
+        'booking'                                             AS "type",
+        CONCAT(c."firstName", ' ', c."lastName")             AS "customerName",
+        c.email                                              AS "customerEmail",
+        COALESCE(sl.title, s.name)                           AS "serviceName",
         b."appointmentDate",
         b."startTime",
         b."endTime",
@@ -856,123 +819,49 @@ export class ReservationsController {
         b."totalPrice",
         b."createdAt"
       FROM bookings b
-      INNER JOIN customers c ON b."customerId" = c.id
-      INNER JOIN services s ON b."serviceId" = s.id
-      LEFT JOIN services_lang sl ON s.id = sl.service_id 
-        AND sl.language_id = (SELECT id FROM languages WHERE code = :lang LIMIT 1)
-      ${bookingWhereConditions}
-      ORDER BY b."appointmentDate" DESC, b."startTime" DESC
-      `,
-      {
-        replacements,
-        type: QueryTypes.SELECT,
-      },
-    );
+      INNER JOIN customers c  ON b."customerId" = c.id
+      INNER JOIN services  s  ON b."serviceId"  = s.id
+      LEFT  JOIN services_lang sl
+             ON s.id = sl.service_id AND sl.language_id = :langId
+      WHERE ${bookingWhere}
 
-    // Build WHERE conditions for manual adjustments
-    let adjustmentWhereConditions = `
-      WHERE DATE(ma."createdAt") >= :startDate
-        AND DATE(ma."createdAt") <= :endDate`;
-    
-    const adjustmentReplacements: any = { startDate, endDate };
-    
-    if (paymentMethod && paymentMethod !== 'All') {
-      adjustmentWhereConditions += ` AND ma."paymentMethod" = :paymentMethod`;
-      adjustmentReplacements.paymentMethod = paymentMethod;
-    }
-    
-    if (serviceId && serviceId !== 'All') {
-      if (serviceId === 'MANUAL_ADJUSTMENT') {
-        // If filtering by MANUAL_ADJUSTMENT, include all manual adjustments (no additional filter)
-        // This is the default behavior, so no extra condition needed
-      } else {
-        // If filtering by specific serviceId, exclude all manual adjustments since they don't have services
-        adjustmentWhereConditions += ` AND 1 = 0`;
-      }
-    }
-    
-    if (transactionType && transactionType !== 'All') {
-      if (transactionType === 'income') {
-        // Filter for income: totalPrice >= 0
-        // This means: CASE WHEN ma.type = 'expense' THEN -ma.amount ELSE ma.amount END >= 0
-        adjustmentWhereConditions += ` AND (CASE WHEN ma.type = 'expense' THEN -ma.amount ELSE ma.amount END) >= 0`;
-      } else if (transactionType === 'expense') {
-        // Filter for expense: totalPrice < 0  
-        // This means: CASE WHEN ma.type = 'expense' THEN -ma.amount ELSE ma.amount END < 0
-        adjustmentWhereConditions += ` AND (CASE WHEN ma.type = 'expense' THEN -ma.amount ELSE ma.amount END) < 0`;
-      }
-    }
-    
-    // Get manual adjustments
-    const adjustmentsResult: any[] = await this.sequelize.query(
-      `
-      SELECT 
+      UNION ALL
+
+      SELECT
         ma.id,
-        CASE 
-          WHEN ma.type = 'income' THEN 'adjustment_income'
-          ELSE 'adjustment_expense'
-        END as "type",
-        'Manual Adjustment' as "customerName",
-        '' as "customerEmail",
-        ma.description as "serviceName",
-        DATE(ma."createdAt") as "appointmentDate",
-        TO_CHAR(ma."createdAt", 'HH24:MI') as "startTime",
-        TO_CHAR(ma."createdAt", 'HH24:MI') as "endTime",
+        CASE WHEN ma.type = 'income' THEN 'adjustment_income' ELSE 'adjustment_expense' END AS "type",
+        'Manual Adjustment'                                   AS "customerName",
+        ''                                                    AS "customerEmail",
+        ma.description                                        AS "serviceName",
+        DATE(ma."createdAt")                                  AS "appointmentDate",
+        TO_CHAR(ma."createdAt", 'HH24:MI')                   AS "startTime",
+        TO_CHAR(ma."createdAt", 'HH24:MI')                   AS "endTime",
         ma."paymentMethod",
-        CASE 
-          WHEN ma.type = 'expense' THEN -ma.amount
-          ELSE ma.amount
-        END as "totalPrice",
+        CASE WHEN ma.type = 'expense' THEN -ma.amount ELSE ma.amount END AS "totalPrice",
         ma."createdAt"
       FROM manual_adjustments ma
-      ${adjustmentWhereConditions}
-      ORDER BY ma."createdAt" DESC
-      `,
-      {
-        replacements: adjustmentReplacements,
-        type: QueryTypes.SELECT,
-      },
-    );
+      WHERE ${adjWhere}
+    `;
 
-    // Combine and sort by appointmentDate + startTime (most recent first)
-    const allInvoices = [...bookingsResult, ...adjustmentsResult].sort((a, b) => {
-      // Both bookings and manual adjustments now have appointmentDate and startTime
-      // Convert to comparable timestamps
-      const dateStrA = a.appointmentDate instanceof Date 
-        ? a.appointmentDate.toISOString().split('T')[0]
-        : String(a.appointmentDate);
-      const dateStrB = b.appointmentDate instanceof Date 
-        ? b.appointmentDate.toISOString().split('T')[0]
-        : String(b.appointmentDate);
-      
-      // Handle startTime - could be "HH:MM:SS" or "HH:MM"
-      let timeStrA = '00:00';
-      let timeStrB = '00:00';
-      
-      if (typeof a.startTime === 'string') {
-        timeStrA = a.startTime.length > 5 ? a.startTime.substring(0, 5) : a.startTime;
-      }
-      if (typeof b.startTime === 'string') {
-        timeStrB = b.startTime.length > 5 ? b.startTime.substring(0, 5) : b.startTime;
-      }
-      
-      // Create full timestamps for comparison
-      const timestampA = new Date(`${dateStrA}T${timeStrA}:00`).getTime();
-      const timestampB = new Date(`${dateStrB}T${timeStrB}:00`).getTime();
-      
-      // Sort from most recent to oldest
-      return timestampB - timestampA;
-    });
+    const [countRows, dataRows] = await Promise.all([
+      this.sequelize.query<{ total: string }>(
+        `SELECT COUNT(*) AS total FROM (${unionSQL}) sub`,
+        { replacements: rp, type: QueryTypes.SELECT },
+      ),
+      this.sequelize.query(
+        `${unionSQL}
+         ORDER BY "appointmentDate" DESC, "startTime" DESC
+         LIMIT :limit OFFSET :offset`,
+        { replacements: rp, type: QueryTypes.SELECT },
+      ),
+    ]);
 
-    // Apply pagination
-    const total = allInvoices.length;
+    const total = parseInt(countRows[0]?.total ?? '0', 10);
     const totalPages = Math.ceil(total / limit);
-    const offset = (page - 1) * limit;
-    const paginatedInvoices = allInvoices.slice(offset, offset + limit);
 
     return {
       success: true,
-      data: paginatedInvoices,
+      data: dataRows,
       pagination: {
         page,
         limit,
@@ -1097,6 +986,12 @@ export class ReservationsController {
       throw new BadRequestException('startDate and endDate must be in YYYY-MM-DD format');
     }
 
+    const langRowsBest = await this.sequelize.query<{ id: string }>(
+      `SELECT id FROM languages WHERE code = :lang LIMIT 1`,
+      { replacements: { lang }, type: QueryTypes.SELECT },
+    );
+    const langIdBest = langRowsBest[0]?.id ?? null;
+
     const result: any[] = await this.sequelize.query(
       `
       SELECT 
@@ -1108,7 +1003,7 @@ export class ReservationsController {
       FROM bookings b
       INNER JOIN services s ON b."serviceId" = s.id
       LEFT JOIN services_lang sl ON s.id = sl.service_id 
-        AND sl.language_id = (SELECT id FROM languages WHERE code = :lang LIMIT 1)
+        AND sl.language_id = :langId
       WHERE b.status = 'completed'
         AND b."appointmentDate" >= :startDate
         AND b."appointmentDate" <= :endDate
@@ -1117,7 +1012,7 @@ export class ReservationsController {
       LIMIT :limit
       `,
       {
-        replacements: { startDate, endDate, limit, lang },
+        replacements: { startDate, endDate, limit, langId: langIdBest },
         type: QueryTypes.SELECT,
       },
     );
@@ -1290,6 +1185,12 @@ export class ReservationsController {
   ): Promise<{ success: boolean; data: UpcomingBookingDto[] }> {
     
 
+    const langRowsUp = await this.sequelize.query<{ id: string }>(
+      `SELECT id FROM languages WHERE code = :lang LIMIT 1`,
+      { replacements: { lang }, type: QueryTypes.SELECT },
+    );
+    const langIdUp = langRowsUp[0]?.id ?? null;
+
     const result: any[] = await this.sequelize.query(
       `
       SELECT 
@@ -1311,14 +1212,14 @@ export class ReservationsController {
       LEFT JOIN customers c ON b."customerId" = c.id
       LEFT JOIN services s ON b."serviceId" = s.id
       LEFT JOIN services_lang sl ON s.id = sl.service_id 
-        AND sl.language_id = (SELECT id FROM languages WHERE code = :lang LIMIT 1)
+        AND sl.language_id = :langId
       INNER JOIN staff st ON b."staffId" = st.id
       WHERE b.status IN ('pending', 'in_progress')
       ORDER BY b."appointmentDate" ASC, b."startTime" ASC
       LIMIT :limit
       `,
       {
-        replacements: { limit, lang },
+        replacements: { limit, langId: langIdUp },
         type: QueryTypes.SELECT,
       },
     );
