@@ -133,7 +133,7 @@ export class ReservationsController {
         html,
       });
     } catch (err) {
-      console.error('Failed to send booking confirmation email:', err);
+      this.logger.error(`Failed to send booking confirmation email: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -179,10 +179,11 @@ export class ReservationsController {
         type: QueryTypes.UPDATE,
       });
     } catch (error) {
-      console.error('Error updating expired bookings:', error);
+      this.logger.error(`Error updating expired bookings: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
+  @RequireAuth()
   @Get()
   @ApiOperation({
     summary: 'Get all bookings',
@@ -286,6 +287,7 @@ export class ReservationsController {
     };
   }
 
+  @RequireAuth()
   @Get('list')
   @ApiOperation({
     summary: 'Get bookings list with full details',
@@ -1338,6 +1340,7 @@ export class ReservationsController {
     };
   }
 
+  @RequireAuth()
   @Get('available-slots')
   @Header('Cache-Control', 'private, max-age=30, stale-while-revalidate=60')
   @ApiOperation({
@@ -1656,11 +1659,11 @@ export class ReservationsController {
         throw new BadRequestException('Date must be in YYYY-MM-DD format');
       }
 
-      console.log(`\n📅 BACKOFFICE AVAILABILITY REQUEST:`);
-      console.log(`   Date: ${date}`);
-      console.log(`   Services: ${services.length}`);
-      console.log(`   Removals: ${removals.length}`);
-      console.log(`   Mode: ${isVIPCombo ? 'VIP COMBO (Simultaneous)' : 'CONSECUTIVE'}`);
+      this.logger.debug(`\n📅 BACKOFFICE AVAILABILITY REQUEST:`);
+      this.logger.debug(`   Date: ${date}`);
+      this.logger.debug(`   Services: ${services.length}`);
+      this.logger.debug(`   Removals: ${removals.length}`);
+      this.logger.debug(`   Mode: ${isVIPCombo ? 'VIP COMBO (Simultaneous)' : 'CONSECUTIVE'}`);
 
       // Get all active staff with proper typing
       interface StaffRecord {
@@ -1700,14 +1703,7 @@ export class ReservationsController {
         order: [['startTime', 'ASC']]
       });
 
-      console.log(`📋 Found ${existingBookings.length} existing bookings for ${date}:`, 
-        existingBookings.map(b => ({
-          id: b.id,
-          staffId: b.staffId,
-          startTime: String(b.startTime),
-          endTime: String(b.endTime)
-        }))
-      );
+      this.logger.debug(`📋 Found ${existingBookings.length} existing bookings for ${date}`);
 
       // Calculate total duration for each service including addons and removals
       const servicesWithTotalDuration = services.map((service, index) => {
@@ -1727,14 +1723,14 @@ export class ReservationsController {
         // If shifts is in new format (weekly structure)
         if (staffShifts && typeof staffShifts === 'object' && !Array.isArray(staffShifts)) {
           const dayKey = dayOfWeek.toLowerCase();
-          console.log(`🔍 Looking for day key: "${dayKey}" in staff shifts`);
+          this.logger.debug(`🔍 Looking for day key: "${dayKey}" in staff shifts`);
           
           const dayShifts = staffShifts[dayKey];
-          console.log(`📅 Raw day shifts for ${dayKey}:`, dayShifts);
+          this.logger.debug(`📅 Raw day shifts for ${dayKey}: ${JSON.stringify(dayShifts)}`);
           
           // In the new format, dayShifts is directly an array of shift objects
           if (Array.isArray(dayShifts)) {
-            console.log(`✅ Found ${dayShifts.length} shifts for ${dayKey}`);
+            this.logger.debug(`✅ Found ${dayShifts.length} shifts for ${dayKey}`);
             return dayShifts.filter(shift => 
               shift && 
               typeof shift === 'object' && 
@@ -1743,13 +1739,13 @@ export class ReservationsController {
             );
           }
           
-          console.log(`❌ Day shifts is not an array for ${dayKey}:`, typeof dayShifts);
+          this.logger.debug(`❌ Day shifts is not an array for ${dayKey}: ${typeof dayShifts}`);
           return [];
         }
         
         // Fallback to legacy format (array of shifts for all days)
         if (staffShifts && Array.isArray(staffShifts)) {
-          console.log(`📋 Using legacy format, found ${staffShifts.length} shifts`);
+          this.logger.debug(`📋 Using legacy format, found ${staffShifts.length} shifts`);
           return staffShifts.filter(shift => 
             shift && 
             typeof shift === 'object' && 
@@ -1758,7 +1754,7 @@ export class ReservationsController {
           );
         }
         
-        console.log(`❌ No valid shifts format found`);
+        this.logger.debug(`❌ No valid shifts format found`);
         return [];
       };
 
@@ -1768,9 +1764,8 @@ export class ReservationsController {
           .map(s => s.staffId)
           .filter(id => id && id !== 'any');
 
-        console.log(`🔍 Looking for specific staff IDs:`, specificStaffIds);
-        console.log(`📊 Available staff count: ${filteredActiveStaff.length}`);
-        console.log(`📋 Available staff IDs:`, filteredActiveStaff.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })));
+        this.logger.debug(`🔍 Looking for specific staff IDs: ${JSON.stringify(specificStaffIds)}`);
+        this.logger.debug(`📊 Available staff count: ${filteredActiveStaff.length}`);
 
         let earliestStart = '09:00:00';
         let latestEnd = '19:00:00';
@@ -1780,15 +1775,14 @@ export class ReservationsController {
           let foundSpecificHours = false;
           
           for (const staffId of specificStaffIds) {
-            console.log(`🔎 Searching for staff ID: ${staffId}`);
+            this.logger.debug(`🔎 Searching for staff ID: ${staffId}`);
             const staffData = filteredActiveStaff.find(s => s.id === staffId);
             
             if (staffData) {
-              console.log(`✅ Found staff: ${staffData.firstName} ${staffData.lastName}`);
-              console.log(`📋 Staff shifts data:`, JSON.stringify((staffData as any).shifts));
+              this.logger.debug(`✅ Found staff: ${staffData.firstName} ${staffData.lastName}`);
               
               const dayShifts = getShiftsForStaffDay(staffData);
-              console.log(`📅 Day shifts for ${dayOfWeek}:`, dayShifts);
+              this.logger.debug(`📅 Day shifts for ${dayOfWeek}: ${JSON.stringify(dayShifts)}`);
               
               if (dayShifts.length > 0) {
                 foundSpecificHours = true;
@@ -1798,36 +1792,36 @@ export class ReservationsController {
                   const shiftStart = shift.shiftStart.length === 5 ? `${shift.shiftStart}:00` : shift.shiftStart;
                   const shiftEnd = shift.shiftEnd.length === 5 ? `${shift.shiftEnd}:00` : shift.shiftEnd;
                   
-                  console.log(`⏰ Processing shift: ${shiftStart} - ${shiftEnd}`);
+                  this.logger.debug(`⏰ Processing shift: ${shiftStart} - ${shiftEnd}`);
                   
                   if (shiftStart < earliestStart) {
                     earliestStart = shiftStart;
-                    console.log(`📅 Updated earliest start to: ${earliestStart}`);
+                    this.logger.debug(`📅 Updated earliest start to: ${earliestStart}`);
                   }
                   if (shiftEnd > latestEnd) {
                     latestEnd = shiftEnd;
-                    console.log(`📅 Updated latest end to: ${latestEnd}`);
+                    this.logger.debug(`📅 Updated latest end to: ${latestEnd}`);
                   }
                 }
               } else {
-                console.log(`⚠️ No shifts found for staff ${staffData.firstName} on ${dayOfWeek}`);
+                this.logger.debug(`⚠️ No shifts found for staff ${staffData.firstName} on ${dayOfWeek}`);
               }
             } else {
-              console.log(`❌ Staff ID ${staffId} not found in filtered staff`);
+              this.logger.debug(`❌ Staff ID ${staffId} not found in filtered staff`);
             }
           }
           
           // If we found specific staff hours, use them; otherwise fall back to all staff
           if (foundSpecificHours) {
-            console.log(`✅ Using specific staff hours: ${earliestStart} - ${latestEnd}`);
+            this.logger.debug(`✅ Using specific staff hours: ${earliestStart} - ${latestEnd}`);
           } else {
-            console.log('🔍 No specific staff hours found, using hours from all available staff');
+            this.logger.debug('🔍 No specific staff hours found, using hours from all available staff');
           }
         }
 
         // If no specific staff or we need to expand the range, check all available staff
         if (specificStaffIds.length === 0 || specificStaffIds.some(id => id === 'any') || earliestStart === '09:00:00') {
-          console.log(`🌍 Checking all ${filteredActiveStaff.length} available staff for working hours`);
+          this.logger.debug(`🌍 Checking all ${filteredActiveStaff.length} available staff for working hours`);
           
           for (const staffData of filteredActiveStaff) {
             const dayShifts = getShiftsForStaffDay(staffData);
@@ -1845,7 +1839,7 @@ export class ReservationsController {
               }
             }
           }
-          console.log(`🌍 Final working hours from all staff: ${earliestStart} - ${latestEnd}`);
+          this.logger.debug(`🌍 Final working hours from all staff: ${earliestStart} - ${latestEnd}`);
         }
 
         return { earliestStart, latestEnd };
@@ -1868,9 +1862,9 @@ export class ReservationsController {
       const latestStartHour = Math.floor(latestStartMinutes / 60);
       const latestStartMin = latestStartMinutes % 60;
 
-      console.log(`⏰ Generating time slots from ${earliestStart} to ${latestEnd} based on staff schedules`);
-      console.log(`🕐 Max service duration: ${maxServiceDuration} minutes`);
-      console.log(`🕐 Latest start time: ${latestStartHour.toString().padStart(2, '0')}:${latestStartMin.toString().padStart(2, '0')} (to finish by ${latestEnd})`);
+      this.logger.debug(`⏰ Generating time slots from ${earliestStart} to ${latestEnd} based on staff schedules`);
+      this.logger.debug(`🕐 Max service duration: ${maxServiceDuration} minutes`);
+      this.logger.debug(`🕐 Latest start time: ${latestStartHour.toString().padStart(2, '0')}:${latestStartMin.toString().padStart(2, '0')} (to finish by ${latestEnd})`);
 
       // Generate time slots based on staff working hours (30-min intervals)
       const generateTimeSlots = () => {
@@ -1888,8 +1882,8 @@ export class ReservationsController {
           }
         }
         
-        console.log(`📅 Generated ${slots.length} time slots from ${slots[0]} to ${slots[slots.length - 1]}`);
-        console.log(`🎯 Last slot ${slots[slots.length - 1]} + ${maxServiceDuration}min = ends at ${addMinutesToTime(slots[slots.length - 1], maxServiceDuration)}`);
+        this.logger.debug(`📅 Generated ${slots.length} time slots from ${slots[0]} to ${slots[slots.length - 1]}`);
+        this.logger.debug(`🎯 Last slot ${slots[slots.length - 1]} + ${maxServiceDuration}min = ends at ${addMinutesToTime(slots[slots.length - 1], maxServiceDuration)}`);
         return slots;
       };
       
@@ -1958,10 +1952,7 @@ export class ReservationsController {
           return false;
         }
 
-        console.log(`\n🔍 Checking availability for staff ${staffId}:`, {
-          requestedSlot: `${startTime} - ${endTime}`,
-          existingBookingsForStaff: existingBookings.filter(b => b.staffId === staffId).length
-        });
+        this.logger.debug(`\n🔍 Checking availability for staff ${staffId} for slot ${startTime} - ${endTime}`);
 
         for (const booking of existingBookings) {
           if (booking.staffId !== staffId) continue;
@@ -1969,18 +1960,16 @@ export class ReservationsController {
           const bookingStart = parseTime(String(booking.startTime));
           const bookingEnd = parseTime(String(booking.endTime));
 
-          console.log(`  📅 Existing booking: ${booking.startTime} - ${booking.endTime} (${bookingStart} - ${bookingEnd} minutes)`);
+          this.logger.debug(`  📅 Existing booking: ${booking.startTime} - ${booking.endTime}`);
 
           // Check overlap
           if (slotStart < bookingEnd && slotEnd > bookingStart) {
-            console.log(`  ❌ CONFLICT DETECTED: Slot overlaps with existing booking`);
+            this.logger.debug(`  ❌ CONFLICT: Slot overlaps with existing booking`);
             return false;
-          } else {
-            console.log(`  ✅ No conflict with this booking`);
           }
         }
         
-        console.log(`  ✅ Staff ${staffId} is AVAILABLE for ${startTime} - ${endTime}`);
+        this.logger.debug(`  ✅ Staff ${staffId} is AVAILABLE for ${startTime} - ${endTime}`);
         return true;
       };
 
@@ -2011,7 +2000,7 @@ export class ReservationsController {
               // Specific staff requested
               if (assignedStaffIds.has(service.staffId)) {
                 // Staff already assigned to another service in this VIP combo
-                console.log(`  ❌ Staff ${service.staffId} already assigned to another service in VIP combo`);
+                this.logger.debug(`  ❌ Staff ${service.staffId} already assigned to another service in VIP combo`);
                 allServicesCanBeScheduled = false;
                 break;
               }
@@ -2042,7 +2031,7 @@ export class ReservationsController {
                 });
                 assignedStaffIds.add(availableStaff.id);
               } else {
-                console.log(`  ❌ No available staff found for service ${service.serviceId} at ${startTime} (${assignedStaffIds.size} staff already assigned)`);
+                this.logger.debug(`  ❌ No available staff found for service ${service.serviceId} at ${startTime}`);
                 allServicesCanBeScheduled = false;
                 break;
               }
@@ -2116,7 +2105,7 @@ export class ReservationsController {
         }
       }
 
-      console.log(`✅ Found ${availableSlots.length} available slots`);
+      this.logger.debug(`✅ Found ${availableSlots.length} available slots`);
 
       return {
         success: true,
@@ -2127,7 +2116,7 @@ export class ReservationsController {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      console.error('❌ Error in getBackofficeAvailability:', errorMessage);
+      this.logger.error(`Error in getBackofficeAvailability: ${errorMessage}`);
       throw error;
     }
   }
@@ -2307,7 +2296,7 @@ export class ReservationsController {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      console.error('Error in getMultiServiceSlots:', errorMessage, error);
+      this.logger.error(`Error in getMultiServiceSlots: ${errorMessage}`);
       throw error;
     }
   }
@@ -2401,11 +2390,12 @@ export class ReservationsController {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      console.error('Error in getVIPComboSlots:', errorMessage, error);
+      this.logger.error(`Error in getVIPComboSlots: ${errorMessage}`);
       throw error;
     }
   }
 
+  @RequireAuth()
   @Get(':id')
   @ApiOperation({
     summary: 'Get booking by ID',
@@ -2491,8 +2481,24 @@ export class ReservationsController {
             throw new BadRequestException('No staff members available at the requested time');
           }
         } catch (error) {
-          console.error('❌ Staff auto-assignment failed:', error);
+          this.logger.error(`Staff auto-assignment failed: ${error instanceof Error ? error.message : String(error)}`);
           throw new BadRequestException('Unable to assign staff automatically. Please select a specific staff member or try a different time.');
+        }
+      }
+
+      // Compute totalPrice server-side — never trust the client-supplied value
+      let serverTotalPrice = 0;
+      if (createBookingDto.serviceId) {
+        const service = await this.serviceModel.findByPk(createBookingDto.serviceId, { attributes: ['price'] });
+        if (service) {
+          serverTotalPrice = Number((service as any).price) || 0;
+          if (createBookingDto.addOnIds?.length) {
+            const addOns = await this.addOnModel.findAll({
+              where: { id: createBookingDto.addOnIds },
+              attributes: ['price'],
+            });
+            serverTotalPrice += addOns.reduce((sum, a) => sum + (Number((a as any).price) || 0), 0);
+          }
         }
       }
 
@@ -2503,6 +2509,7 @@ export class ReservationsController {
         startTime: createBookingDto.startTime, // Just pass the time string "HH:MM:SS"
         endTime: createBookingDto.endTime, // Just pass the time string "HH:MM:SS"
         status: createBookingDto.status || 'in_progress',
+        totalPrice: serverTotalPrice, // server-computed, ignores any client-supplied value
       };
 
       // Atomic check-and-create: PostgreSQL advisory lock + SERIALIZABLE transaction.
@@ -2606,8 +2613,8 @@ export class ReservationsController {
       
       return booking;
     } catch (error: unknown) {
-      console.error('❌ Error updating booking:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error updating booking: ${errorMessage}`);
       throw new BadRequestException('Error updating booking: ' + errorMessage);
     }
   }
@@ -2624,6 +2631,7 @@ export class ReservationsController {
     return { message: `Booking with ID ${id} has been deleted` };
   }
 
+  @RequireAuth()
   @Get('config/buffer-time')
   @ApiOperation({ summary: 'Obtener configuración de buffer time global' })
   @ApiResponse({ 
@@ -2688,7 +2696,9 @@ export class ReservationsController {
     try {
       await booking.update({
         status: BookingStatus.CANCELLED,
-        notes: reason ? `${booking.notes ? booking.notes + ' | ' : ''}Cancelled: ${reason}` : booking.notes,
+        notes: reason
+          ? `${booking.notes ? booking.notes + ' | ' : ''}Cancelled: ${reason.replace(/<[^>]*>/g, '').substring(0, 500)}`
+          : booking.notes,
       });
       return booking;
     } catch (error: unknown) {
@@ -2716,11 +2726,10 @@ export class ReservationsController {
     }
   }
 
-  @Public()
   @Post('assign-optimal-staff')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Find optimal staff for "Any Artist" booking',
+    summary: 'Find optimal staff for "Any Artist" booking (internal — called during booking creation)',
     description: 'Assigns the best available staff member based on availability and workload for a specific date and time.',
   })
   @ApiBody({
@@ -3176,62 +3185,84 @@ export class ReservationsController {
       }>;
     }
   ) {
-    // Usar transacción para asegurar atomicidad
-    const transaction = await this.sequelize.transaction();
-
-    try {
-      // Verificar disponibilidad antes de crear
-      const verificationResult = await this.verifyMultiAvailability({
-        date: body.bookings[0].appointmentDate,
-        slots: body.bookings.map(b => ({
-          serviceId: b.serviceId,
-          staffId: b.staffId,
-          startTime: b.startTime,
-          endTime: b.endTime
-        }))
-      });
-
-      if (!verificationResult.available) {
-        throw new ConflictException({
-          message: 'One or more time slots are no longer available',
-          conflicts: verificationResult.conflicts
-        });
-      }
-
-      // Crear todos los bookings
-      const createdBookings: BookingEntity[] = [];
-
-      for (const bookingData of body.bookings) {
-        const booking = await this.bookingModel.create(
-          {
-            customerId: body.customerId,
-            serviceId: bookingData.serviceId,
-            staffId: bookingData.staffId,
-            appointmentDate: bookingData.appointmentDate,
-            startTime: new Date(bookingData.startTime),
-            endTime: new Date(bookingData.endTime),
-            totalPrice: bookingData.totalPrice,
-            status: BookingStatus.IN_PROGRESS,
-            notes: bookingData.notes || ''
-          } as any,
-          { transaction }
-        );
-
-        createdBookings.push(booking);
-      }
-
-      // Commit de la transacción
-      await transaction.commit();
-
-      return {
-        success: true,
-        bookings: createdBookings
-      };
-
-    } catch (error) {
-      // Rollback en caso de error
-      await transaction.rollback();
-      throw error;
+    if (!body.bookings || !Array.isArray(body.bookings) || body.bookings.length === 0) {
+      throw new BadRequestException('bookings must be a non-empty array');
     }
+    if (body.bookings.length > 20) {
+      throw new BadRequestException('Cannot create more than 20 bookings in a single request');
+    }
+    // Atomic check-and-create: SERIALIZABLE transaction + advisory lock per slot.
+    // Acquiring the lock before the conflict check prevents TOCTOU races where two
+    // concurrent requests for the same slot both pass the check and both insert.
+    const createdBookings = await this.sequelize.transaction(
+      { isolationLevel: Transaction.ISOLATION_LEVELS.SERIALIZABLE },
+      async (t) => {
+        // Acquire per-slot advisory locks first to serialise concurrent requests
+        for (const bookingData of body.bookings) {
+          const lockKey = `${bookingData.staffId}:${bookingData.appointmentDate}:${bookingData.startTime}`;
+          await this.sequelize.query(
+            'SELECT pg_advisory_xact_lock(hashtext(:lockKey))',
+            { replacements: { lockKey }, transaction: t },
+          );
+        }
+
+        // Verify availability INSIDE the locked transaction
+        const conflicts: Array<{ staffId: string; startTime: string }> = [];
+        for (const slot of body.bookings) {
+          const existingBookings = await this.bookingModel.findAll({
+            where: {
+              staffId: slot.staffId,
+              appointmentDate: slot.appointmentDate,
+              status: { [Op.in]: ['pending', 'in_progress'] },
+            },
+            lock: t.LOCK.UPDATE,
+            transaction: t,
+          });
+          for (const booking of existingBookings) {
+            const slotStart = new Date(slot.startTime);
+            const slotEnd = new Date(slot.endTime);
+            const bookingStart = new Date(booking.startTime);
+            const bookingEnd = new Date(booking.endTime);
+            if (slotStart < bookingEnd && slotEnd > bookingStart) {
+              conflicts.push({ staffId: slot.staffId, startTime: slot.startTime });
+              break;
+            }
+          }
+        }
+
+        if (conflicts.length > 0) {
+          throw new ConflictException({
+            message: 'One or more time slots are no longer available',
+            conflicts,
+          });
+        }
+
+        // Create all bookings within the secured transaction
+        const created: BookingEntity[] = [];
+        for (const bookingData of body.bookings) {
+          const booking = await this.bookingModel.create(
+            {
+              customerId: body.customerId,
+              serviceId: bookingData.serviceId,
+              staffId: bookingData.staffId,
+              appointmentDate: bookingData.appointmentDate,
+              startTime: new Date(bookingData.startTime),
+              endTime: new Date(bookingData.endTime),
+              totalPrice: bookingData.totalPrice,
+              status: BookingStatus.IN_PROGRESS,
+              notes: bookingData.notes || '',
+            } as any,
+            { transaction: t },
+          );
+          created.push(booking);
+        }
+        return created;
+      },
+    );
+
+    return {
+      success: true,
+      bookings: createdBookings,
+    };
   }
 }
