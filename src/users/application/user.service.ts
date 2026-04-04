@@ -8,7 +8,7 @@ import { InjectModel } from '@nestjs/sequelize';
 import { Op, WhereOptions } from 'sequelize';
 import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
@@ -77,8 +77,8 @@ export class UserService {
     }
 
     try {
-      // Generar una contraseña aleatoria segura
-      const randomPassword = Math.random().toString(36).slice(-10) + Date.now().toString(36);
+      // Generar una contraseña aleatoria segura (criptográficamente segura)
+      const randomPassword = randomBytes(16).toString('hex');
       const hashedPassword = await this.hashPassword(randomPassword);
 
       const userData = {
@@ -548,7 +548,7 @@ export class UserService {
       return;
     }
     // Generar token único y fecha de expiración (ejemplo: 1 hora)
-    const token = createHash('sha256').update(Date.now() + email + Math.random().toString()).digest('hex');
+    const token = createHash('sha256').update(randomBytes(32).toString('hex') + email + Date.now().toString()).digest('hex');
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
     // Guardar token en la tabla user_tokens
     await this.userTokenModel.create({

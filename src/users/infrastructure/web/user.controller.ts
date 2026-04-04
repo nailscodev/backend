@@ -17,6 +17,7 @@ import {
   Req,
   UnauthorizedException,
   Put,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -43,6 +44,9 @@ import { RequireAuth } from '../../../common/decorators/require-auth.decorator';
 import { Public } from '../../../common/decorators/public.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import type { CurrentUserData } from '../../../common/decorators/current-user.decorator';
+import { StrictThrottle } from '../../../common/decorators/throttle.decorator';
+import { Roles } from '../../../common/decorators/roles.decorator';
+import { RolesGuard } from '../../../common/guards/roles.guard';
 
 @ApiTags('users')
 @Controller('users')
@@ -284,8 +288,9 @@ export class UserController {
   }
 
   @Patch(':id')
+  @Roles('admin', 'manager')
+  @UseGuards(RolesGuard)
   @ApiOperation({
-    summary: 'Update user',
     description: 'Updates an existing user with the provided information. Only provided fields will be updated.',
   })
   @ApiParam({
@@ -340,6 +345,8 @@ export class UserController {
   }
 
   @Delete(':id')
+  @Roles('admin')
+  @UseGuards(RolesGuard)
   @ApiOperation({
     summary: 'Delete user',
     description: 'Permanently deletes a user from the system.',
@@ -377,6 +384,8 @@ export class UserController {
   }
 
   @Patch(':id/activate')
+  @Roles('admin', 'manager')
+  @UseGuards(RolesGuard)
   @ApiOperation({
     summary: 'Activate user',
     description: 'Activates a user account, allowing them to login and access the system.',
@@ -403,6 +412,8 @@ export class UserController {
   }
 
   @Patch(':id/deactivate')
+  @Roles('admin', 'manager')
+  @UseGuards(RolesGuard)
   @ApiOperation({
     summary: 'Deactivate user',
     description: 'Deactivates a user account, preventing them from logging in.',
@@ -494,6 +505,7 @@ export class UserController {
   }
 
   @Public() // This endpoint doesn't require JWT authentication
+  @StrictThrottle() // 5 requests per 15 minutes — brute force protection
   @Post('login')
   @ApiOperation({
     summary: 'User login',

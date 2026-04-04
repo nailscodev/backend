@@ -83,7 +83,9 @@ function parseDatabaseUrl(url: string) {
               dialectOptions: (isProduction && !disableSSL) ? {
                 ssl: {
                   require: true,
-                  rejectUnauthorized: false,
+                  // DB_REJECT_UNAUTHORIZED=false only if provider doesn't supply a verifiable cert.
+                  // Defaults to true in production for MITM protection.
+                  rejectUnauthorized: process.env.DB_REJECT_UNAUTHORIZED !== 'false',
                 },
                 // Keep TCP connection alive so Neon doesn't drop it
                 keepAlive: true,
