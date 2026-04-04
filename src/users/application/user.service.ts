@@ -738,7 +738,7 @@ export class UserService {
        
       if (Object.values(UserRole).includes(item.role)) {
          
-        roleCounts[item.role] = parseInt(item.count, 10);
+        roleCounts[item.role as UserRole] = parseInt(item.count, 10);
       }
     });
 
