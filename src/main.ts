@@ -92,6 +92,10 @@ async function bootstrap() {
     'https://nailsco-frontend.fly.dev',
   ];
 
+  if (process.env.NODE_ENV === 'production' && !process.env.ALLOWED_ORIGINS) {
+    logger.warn('ALLOWED_ORIGINS env var not set; using hardcoded fallback origins', { context: 'Bootstrap' });
+  }
+
   app.enableCors({
     origin: allowedOrigins,
     credentials: true,

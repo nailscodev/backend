@@ -16,6 +16,7 @@ import {
   HttpCode,
   Req,
   UnauthorizedException,
+  ForbiddenException,
   Put,
   UseGuards,
 } from '@nestjs/common';
@@ -340,7 +341,11 @@ export class UserController {
   async updateUser(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body(new ValidationPipe({ transform: true })) updateUserDto: UpdateUserDto,
+    @CurrentUser() currentUser: CurrentUserData,
   ): Promise<UserResponseDto> {
+    if (updateUserDto.role !== undefined && currentUser.role !== 'admin') {
+      throw new ForbiddenException('Only administrators can change user roles');
+    }
     return this.userService.updateUser(id, updateUserDto);
   }
 

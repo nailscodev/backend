@@ -547,20 +547,22 @@ export class UserService {
       // No revelar si el usuario existe o no
       return;
     }
-    // Generar token único y fecha de expiración (ejemplo: 1 hora)
-    const token = createHash('sha256').update(randomBytes(32).toString('hex') + email + Date.now().toString()).digest('hex');
+    // Generate a raw random token to send via email; store only its SHA-256 hash in the DB
+    // so a DB compromise cannot be used to hijack password resets directly.
+    const rawToken = randomBytes(32).toString('hex');
+    const hashedToken = this.hashToken(rawToken);
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
-    // Guardar token en la tabla user_tokens
+    // Store the HASH in user_tokens — never store the raw token
     await this.userTokenModel.create({
       userId: user.id,
-      token,
+      token: hashedToken,
       expiresAt,
       revoked: false,
     } as any);
-    // Send email with the recovery link
+    // Send email with the recovery link containing the RAW token
     try {
       const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
-      const resetUrl = `${frontendUrl}/reset-password/${token}`;
+      const resetUrl = `${frontendUrl}/reset-password/${rawToken}`;
       await this.mailService.sendMail({
         to: user.email,
         subject: 'Password Recovery',
@@ -575,8 +577,9 @@ export class UserService {
    * Restablece la contraseña usando un token de recuperación
    */
   async resetPassword(token: string, newPassword: string): Promise<void> {
-    // Buscar el token
-    const userToken = await this.userTokenModel.findOne({ where: { token, revoked: false } });
+    // Hash the incoming raw token before DB lookup — the DB stores hashed tokens only
+    const hashedToken = this.hashToken(token);
+    const userToken = await this.userTokenModel.findOne({ where: { token: hashedToken, revoked: false } });
     if (!userToken || userToken.expiresAt < new Date()) {
       throw new BadRequestException('Invalid or expired token');
     }

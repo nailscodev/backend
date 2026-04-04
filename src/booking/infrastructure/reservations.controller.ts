@@ -1368,7 +1368,7 @@ export class ReservationsController {
         const slotOverlaps = slotStartMinutes < bookingEndMinutes && slotEndMinutes > bookingStartMinutes;
 
         if (slotOverlaps) {
-          bookedSlotsByStaff.get(staff).add(slot.time);
+          bookedSlotsByStaff.get(staff)?.add(slot.time);
         }
       });
     });

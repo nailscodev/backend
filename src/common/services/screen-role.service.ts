@@ -57,7 +57,7 @@ export class ScreenRoleService {
         screenId
       }));
       
-      await this.screenRoleModel.bulkCreate(screenRoles);
+      await this.screenRoleModel.bulkCreate(screenRoles as any);
     }
     
     this.logger.debug(`Permissions updated for role: ${role}`);
