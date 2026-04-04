@@ -48,6 +48,7 @@ import type { CurrentUserData } from '../../../common/decorators/current-user.de
 import { StrictThrottle } from '../../../common/decorators/throttle.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../../common/guards/roles.guard';
+import { AuditService } from '../../../common/services/audit.service';
 
 @ApiTags('users')
 @Controller('users')
@@ -55,6 +56,7 @@ export class UserController {
   constructor(
     private readonly userService: UserService,
     private readonly screenRoleService: ScreenRoleService,
+    private readonly auditService: AuditService,
   ) {}
 
   @Post()
@@ -346,7 +348,11 @@ export class UserController {
     if (updateUserDto.role !== undefined && currentUser.role !== 'admin') {
       throw new ForbiddenException('Only administrators can change user roles');
     }
-    return this.userService.updateUser(id, updateUserDto);
+    const result = await this.userService.updateUser(id, updateUserDto);
+    if (updateUserDto.role !== undefined) {
+      this.auditService.log({ action: 'user.role_changed', actorId: currentUser.id, actorRole: currentUser.role, resourceType: 'User', resourceId: id, metadata: { newRole: updateUserDto.role } });
+    }
+    return result;
   }
 
   @Delete(':id')
@@ -380,12 +386,11 @@ export class UserController {
   @HttpCode(HttpStatus.OK)
   async deleteUser(
     @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() currentUser: CurrentUserData,
   ): Promise<{ message: string; deleted: boolean }> {
     const deleted = await this.userService.deleteUser(id);
-    return {
-      message: 'User deleted successfully',
-      deleted,
-    };
+    this.auditService.log({ action: 'user.deleted', actorId: currentUser.id, actorRole: currentUser.role, resourceType: 'User', resourceId: id });
+    return { message: 'User deleted successfully', deleted };
   }
 
   @Patch(':id/activate')
@@ -412,8 +417,11 @@ export class UserController {
   })
   async activateUser(
     @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() currentUser: CurrentUserData,
   ): Promise<UserResponseDto> {
-    return this.userService.activateUser(id);
+    const result = await this.userService.activateUser(id);
+    this.auditService.log({ action: 'user.activated', actorId: currentUser.id, actorRole: currentUser.role, resourceType: 'User', resourceId: id });
+    return result;
   }
 
   @Patch(':id/deactivate')
@@ -440,8 +448,11 @@ export class UserController {
   })
   async deactivateUser(
     @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() currentUser: CurrentUserData,
   ): Promise<UserResponseDto> {
-    return this.userService.deactivateUser(id);
+    const result = await this.userService.deactivateUser(id);
+    this.auditService.log({ action: 'user.deactivated', actorId: currentUser.id, actorRole: currentUser.role, resourceType: 'User', resourceId: id });
+    return result;
   }
 
   @Patch(':id/change-password')

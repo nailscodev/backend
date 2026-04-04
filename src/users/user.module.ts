@@ -7,11 +7,13 @@ import { UserService } from './application/user.service';
 import { UserController } from './infrastructure/web/user.controller';
 import { ScreenRoleService } from '../common/services/screen-role.service';
 import { MailModule } from '../common/services/mail.module';
+import { AuditModule } from '../common/audit.module';
 
 @Module({
   imports: [
     SequelizeModule.forFeature([UserEntity, UserTokenEntity, ScreenRoleEntity]),
     MailModule,
+    AuditModule,
   ],
   controllers: [UserController],
   providers: [UserService, ScreenRoleService],

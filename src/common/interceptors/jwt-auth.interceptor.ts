@@ -50,7 +50,42 @@ export interface AuthenticatedRequest extends Request {
 @Injectable()
 export class JwtAuthInterceptor implements NestInterceptor {
   private readonly logger = new Logger(JwtAuthInterceptor.name);
-  
+
+  // In-memory TTL cache: avoids a DB round-trip on every authenticated request.
+  // Key: SHA-256 hash of the raw Bearer token.
+  // TTL: 60 s — a revoked token may still pass for up to 1 minute (acceptable tradeoff).
+  // On explicit logout the entry is removed immediately via invalidateCachedToken().
+  private readonly tokenCache = new Map<string, {
+    user: { id: number; username: string; email: string; role: string };
+    expiresAt: number;
+  }>();
+  private readonly CACHE_TTL_MS = 60_000;
+  private readonly MAX_CACHE_SIZE = 1_000;
+
+  private getCachedUser(tokenHash: string) {
+    const entry = this.tokenCache.get(tokenHash);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) {
+      this.tokenCache.delete(tokenHash);
+      return null;
+    }
+    return entry.user;
+  }
+
+  private setCachedUser(tokenHash: string, user: { id: number; username: string; email: string; role: string }) {
+    if (this.tokenCache.size >= this.MAX_CACHE_SIZE) {
+      // Evict oldest entry (insertion order)
+      const firstKey = this.tokenCache.keys().next().value;
+      if (firstKey !== undefined) this.tokenCache.delete(firstKey);
+    }
+    this.tokenCache.set(tokenHash, { user, expiresAt: Date.now() + this.CACHE_TTL_MS });
+  }
+
+  /** Call this when a token is explicitly revoked (logout). */
+  invalidateCachedToken(tokenHash: string) {
+    this.tokenCache.delete(tokenHash);
+  }
+
   /**
    * Endpoints that don't require authentication
    * Add paths that should be public here
@@ -166,7 +201,15 @@ export class JwtAuthInterceptor implements NestInterceptor {
       // Hash the token to compare with database
       const tokenHash = this.hashToken(token);
 
-      // Check if token exists in database and is not revoked
+      // Cache-first lookup — skip DB on cache hit (cache TTL: 60 s)
+      const cachedUser = this.getCachedUser(tokenHash);
+      if (cachedUser) {
+        request.user = cachedUser;
+        this.logger.debug(`[cache hit] Authenticated user ${cachedUser.username} for ${request.method} ${request.path}`);
+        return;
+      }
+
+      // Cache miss — query DB
       const userToken = await this.userTokenModel.findOne({
         where: {
           userId: decoded.sub,
@@ -198,13 +241,18 @@ export class JwtAuthInterceptor implements NestInterceptor {
         throw new UnauthorizedException('User account is inactive');
       }
 
-      // Attach user information to request
-      request.user = {
+      const userPayload = {
         id: parseInt(user.id, 10),
         username: user.username,
         email: user.email,
         role: user.role,
       };
+
+      // Populate cache for subsequent requests with this token
+      this.setCachedUser(tokenHash, userPayload);
+
+      // Attach user information to request
+      request.user = userPayload;
 
       this.logger.debug(`Authenticated user ${user.username} for ${request.method} ${request.path}`);
 

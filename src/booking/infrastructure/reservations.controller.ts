@@ -49,6 +49,7 @@ import { BookingListItemDto } from './dto/booking-list-item.dto';
 import { ManualAdjustment } from '../../common/entities/manual-adjustment.entity';
 import { BookingConfig } from '../../common/config/booking.config';
 import { MailService } from '../../common/services/mail.service';
+import { AuditService } from '../../common/services/audit.service';
 import { CustomerEntity } from '../../customers/infrastructure/persistence/entities/customer.entity';
 import { ServiceEntity } from '../../services/infrastructure/persistence/entities/service.entity';
 import { AddOnEntity } from '../../addons/infrastructure/persistence/entities/addon.entity';
@@ -93,6 +94,7 @@ export class ReservationsController {
     private multiServiceAvailabilityService: MultiServiceAvailabilityService,
     @Inject(MailService)
     private mailService: MailService,
+    private auditService: AuditService,
   ) { }
 
   private async sendBookingConfirmationEmail(booking: BookingEntity, dto: CreateBookingDto): Promise<void> {
@@ -2385,19 +2387,19 @@ export class ReservationsController {
         }
       }
 
-      // Compute totalPrice server-side — never trust the client-supplied value
+      // Compute totalPrice server-side — never trust the client-supplied value.
+      // Fetch service price and add-on prices in parallel to cut one DB round-trip.
       let serverTotalPrice = 0;
       if (createBookingDto.serviceId) {
-        const service = await this.serviceModel.findByPk(createBookingDto.serviceId, { attributes: ['price'] });
+        const [service, addOns] = await Promise.all([
+          this.serviceModel.findByPk(createBookingDto.serviceId, { attributes: ['price'] }),
+          createBookingDto.addOnIds?.length
+            ? this.addOnModel.findAll({ where: { id: createBookingDto.addOnIds }, attributes: ['price'] })
+            : Promise.resolve([]),
+        ]);
         if (service) {
           serverTotalPrice = Number((service as any).price) || 0;
-          if (createBookingDto.addOnIds?.length) {
-            const addOns = await this.addOnModel.findAll({
-              where: { id: createBookingDto.addOnIds },
-              attributes: ['price'],
-            });
-            serverTotalPrice += addOns.reduce((sum, a) => sum + (Number((a as any).price) || 0), 0);
-          }
+          serverTotalPrice += addOns.reduce((sum, a) => sum + (Number((a as any).price) || 0), 0);
         }
       }
 
@@ -2599,6 +2601,7 @@ export class ReservationsController {
           ? `${booking.notes ? booking.notes + ' | ' : ''}Cancelled: ${reason.replace(/<[^>]*>/g, '').substring(0, 500)}`
           : booking.notes,
       });
+      this.auditService.log({ action: 'booking.cancelled', actorId: 'system', actorRole: 'system', resourceType: 'Booking', resourceId: id, metadata: { reason } });
       return booking;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -2618,6 +2621,7 @@ export class ReservationsController {
       await booking.update({
         status: BookingStatus.IN_PROGRESS,
       });
+      this.auditService.log({ action: 'booking.confirmed', actorId: 'system', actorRole: 'system', resourceType: 'Booking', resourceId: id });
       return booking;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
