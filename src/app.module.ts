@@ -3,7 +3,6 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { DatabaseModule } from './database/database.module';
-// import { AuthModule } from './auth/auth.module'; // TODO: Implementar completamente
 import { CustomersModule } from './customers/customer.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ServicesModule } from './services/services.module';

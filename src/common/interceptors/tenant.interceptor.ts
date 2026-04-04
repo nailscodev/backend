@@ -4,6 +4,7 @@ import {
   ExecutionContext,
   CallHandler,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { Request } from 'express';
@@ -29,6 +30,8 @@ import { TenantContextService } from '../../shared/domain/tenant-context.service
  */
 @Injectable()
 export class TenantInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(TenantInterceptor.name);
+
   /**
    * Creates a new instance of TenantInterceptor
    * @param tenantContextService - Service for managing tenant context
@@ -71,7 +74,7 @@ export class TenantInterceptor implements NestInterceptor {
       // If we reach here, it means tenant validation is required but service is not available
       // This is likely a configuration error, but we'll allow the request to continue
       // for development purposes
-      console.warn('TenantContextService is not initialized, but tenant validation was required');
+      this.logger.warn('TenantContextService is not initialized, but tenant validation was required');
       return next.handle();
     }
     
