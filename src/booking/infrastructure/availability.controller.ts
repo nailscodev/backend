@@ -388,7 +388,14 @@ export class AvailabilityController {
       const dayAbbr = dayAbbreviations[dayOfWeek];
       const filteredActiveStaff = allActiveStaff.filter(staff => {
         const wd = (staff as any).workingDays || [];
-        return wd.includes(dayOfWeek) || wd.includes(dayAbbr);
+        if (wd.includes(dayOfWeek) || wd.includes(dayAbbr)) return true;
+        // Fallback: new-format staff may have empty workingDays[] but valid shifts object
+        const sh = (staff as any).shifts;
+        if (sh && typeof sh === 'object' && !Array.isArray(sh)) {
+          const dayShifts = sh[dayOfWeek.toLowerCase()];
+          return Array.isArray(dayShifts) && dayShifts.length > 0;
+        }
+        return false;
       });
 
       // Get existing bookings for the date

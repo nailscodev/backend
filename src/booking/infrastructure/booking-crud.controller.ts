@@ -120,6 +120,60 @@ export class BookingCrudController {
     }
   }
 
+  /**
+   * Validates that [startTime, endTime) on appointmentDate falls within an active
+   * shift for the given staff member.  Handles both the new weekly-keyed JSONB
+   * format `{ monday: [{shiftStart, shiftEnd}] }` and the legacy flat-array format.
+   */
+  private async checkStaffShift(
+    staffId: string,
+    appointmentDate: string,
+    startTime: string,
+    endTime: string,
+  ): Promise<{ valid: boolean; reason?: string }> {
+    const staffRows = await this.sequelize.query<{ shifts: any }>(  
+      `SELECT shifts FROM staff WHERE id = :staffId LIMIT 1`,
+      { replacements: { staffId }, type: QueryTypes.SELECT, raw: true },
+    );
+    if (!staffRows.length) return { valid: false, reason: 'Staff member not found' };
+
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayOfWeek = dayNames[new Date(`${appointmentDate}T12:00:00`).getDay()];
+
+    const parseTime = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    };
+
+    let rawShifts = staffRows[0].shifts;
+    if (typeof rawShifts === 'string') {
+      try { rawShifts = JSON.parse(rawShifts); } catch { rawShifts = null; }
+    }
+
+    let dayShifts: Array<{ shiftStart: string; shiftEnd: string }> = [];
+    if (rawShifts && typeof rawShifts === 'object' && !Array.isArray(rawShifts)) {
+      // New weekly format: { monday: [{shiftStart, shiftEnd}], ... }
+      dayShifts = rawShifts[dayOfWeek] || [];
+    } else if (Array.isArray(rawShifts)) {
+      // Legacy flat-array format — applies to all days
+      dayShifts = rawShifts;
+    }
+
+    if (dayShifts.length === 0) {
+      return { valid: false, reason: `Staff does not work on ${dayOfWeek}` };
+    }
+
+    const slotStart = parseTime(startTime.substring(0, 5));
+    const slotEnd   = parseTime(endTime.substring(0, 5));
+    const withinShift = dayShifts.some(
+      s => slotStart >= parseTime(s.shiftStart) && slotEnd <= parseTime(s.shiftEnd),
+    );
+
+    return withinShift
+      ? { valid: true }
+      : { valid: false, reason: 'Requested time is outside staff working hours' };
+  }
+
   @RequireAuth()
   @Get()
   @ApiOperation({
@@ -540,6 +594,22 @@ export class BookingCrudController {
           );
         }
 
+        // Validate that each slot falls within the assigned staff member's shift hours
+        for (const slot of body.bookings) {
+          const toHHMM = (t: string) => (t.includes('T') ? t.split('T')[1] : t).substring(0, 5);
+          const shiftCheck = await this.checkStaffShift(
+            slot.staffId,
+            slot.appointmentDate,
+            toHHMM(slot.startTime),
+            toHHMM(slot.endTime),
+          );
+          if (!shiftCheck.valid) {
+            throw new BadRequestException(
+              `Booking at ${toHHMM(slot.startTime)}: ${shiftCheck.reason ?? 'Requested time is outside staff working hours'}`,
+            );
+          }
+        }
+
         // Verify availability INSIDE the locked transaction
         const conflicts: Array<{ staffId: string; startTime: string }> = [];
         for (const slot of body.bookings) {
@@ -679,14 +749,21 @@ export class BookingCrudController {
     };
     const requestStartMinutes = parseTimeToMinutes(time);
     const requestEndMinutes = requestStartMinutes + duration;
+    // Pre-format end time as HH:MM for the shift helper
+    const requestEndTimeStr = `${String(Math.floor(requestEndMinutes / 60)).padStart(2, '0')}:${String(requestEndMinutes % 60).padStart(2, '0')}`;
 
     // Find staff members who are available at the requested time
     const availableStaff: AvailableStaffMember[] = [];
 
     for (const staff of allActiveStaff) {
+      // Skip staff whose shift does not cover the requested slot
+      const shiftCheck = await this.checkStaffShift(staff.id, date, time, requestEndTimeStr);
+      if (!shiftCheck.valid) continue;
+
       // Fetch all non-cancelled bookings for this staff on the requested date,
       // then compare times as plain minutes — no UTC Date objects.
       const dayBookings = await this.sequelize.query<{ startTime: string; endTime: string }>(
+
         `SELECT "startTime", "endTime" FROM bookings
          WHERE "staffId" = :staffId AND "appointmentDate" = :date
            AND status NOT IN ('cancelled', 'CANCELLED')`,
@@ -865,6 +942,18 @@ export class BookingCrudController {
         status: createBookingDto.status || 'in_progress',
         totalPrice: serverTotalPrice, // server-computed, ignores any client-supplied value
       };
+
+      // Reject bookings that fall outside the staff member's shift hours
+      if (!assignedStaffId) throw new InternalServerErrorException('Staff ID could not be resolved');
+      const shiftCheck = await this.checkStaffShift(
+        assignedStaffId,
+        appointmentDate,
+        createBookingDto.startTime,
+        createBookingDto.endTime,
+      );
+      if (!shiftCheck.valid) {
+        throw new BadRequestException(shiftCheck.reason ?? 'Requested time is outside staff working hours');
+      }
 
       // Atomic check-and-create: PostgreSQL advisory lock + SERIALIZABLE transaction.
       // Advisory lock is keyed on staffId:date:startTime — concurrent requests for the
