@@ -20,7 +20,7 @@ import { AuditModule } from '../common/audit.module';
     MailModule,
     AuditModule,
   ],
-  controllers: [BookingCrudController, DashboardController, AvailabilityController],
+  controllers: [DashboardController, AvailabilityController, BookingCrudController],
   providers: [MultiServiceAvailabilityService, BookingSchedulerService],
   exports: [
     SequelizeModule
