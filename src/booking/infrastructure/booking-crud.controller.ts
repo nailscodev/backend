@@ -917,10 +917,15 @@ export class BookingCrudController {
         }
       }
 
-      // Compute totalPrice server-side — never trust the client-supplied value.
-      // Fetch service price and add-on prices in parallel to cut one DB round-trip.
+      // Use frontend price if provided, otherwise calculate server-side
       let serverTotalPrice = 0;
-      if (createBookingDto.serviceId) {
+      
+      if (createBookingDto.totalPrice) {
+        // Frontend provided a price - use it and apply 6% service fee
+        serverTotalPrice = Math.round(createBookingDto.totalPrice * 1.06 * 100) / 100;
+        this.logger.debug(`Using frontend price: base=${createBookingDto.totalPrice}, with service fee=${serverTotalPrice}`);
+      } else if (createBookingDto.serviceId) {
+        // No frontend price - calculate server-side as fallback
         const [service, addOns] = await Promise.all([
           this.serviceModel.findByPk(createBookingDto.serviceId, { attributes: ['price'] }),
           createBookingDto.addOnIds?.length
@@ -928,10 +933,12 @@ export class BookingCrudController {
             : Promise.resolve([]),
         ]);
         if (service) {
-          serverTotalPrice = Number((service as any).price) || 0;
-          serverTotalPrice += addOns.reduce((sum, a) => sum + (Number((a as any).price) || 0), 0);
-          // Apply 6% service fee — store fee-inclusive price
+          const servicePrice = Number((service as any).price) || 0;
+          const addOnsPrice = addOns.reduce((sum, a) => sum + (Number((a as any).price) || 0), 0);
+          serverTotalPrice = servicePrice + addOnsPrice;
+          // Apply 6% service fee
           serverTotalPrice = Math.round(serverTotalPrice * 1.06 * 100) / 100;
+          this.logger.debug(`Using server calculated price: base=${servicePrice + addOnsPrice}, with service fee=${serverTotalPrice}`);
         }
       }
 
@@ -942,7 +949,7 @@ export class BookingCrudController {
         startTime: createBookingDto.startTime, // Just pass the time string "HH:MM:SS"
         endTime: createBookingDto.endTime, // Just pass the time string "HH:MM:SS"
         status: createBookingDto.status || 'in_progress',
-        totalPrice: serverTotalPrice, // server-computed, ignores any client-supplied value
+        totalPrice: serverTotalPrice, // Uses frontend price for VIP combos, otherwise server-calculated
       };
 
       // Reject bookings that fall outside the staff member's shift hours
