@@ -930,6 +930,8 @@ export class BookingCrudController {
         if (service) {
           serverTotalPrice = Number((service as any).price) || 0;
           serverTotalPrice += addOns.reduce((sum, a) => sum + (Number((a as any).price) || 0), 0);
+          // Apply 6% service fee — store fee-inclusive price
+          serverTotalPrice = Math.round(serverTotalPrice * 1.06 * 100) / 100;
         }
       }
 
