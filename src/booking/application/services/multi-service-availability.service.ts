@@ -1195,9 +1195,18 @@ export class MultiServiceAvailabilityService {
             });
 
             if (isSelectedAvailable) {
-              // Selected technician IS available → Use them directly
-              assigned = selectedStaff;
-              if (debugSlot) this.logger.log(`   Multi-service: ✅ Using selected technician ${selectedStaff.name} (available)`);
+              // Also verify the selected technician's shift covers this sub-slot
+              const smStart = currentStart.getHours() * 60 + currentStart.getMinutes();
+              const smEnd   = currentEnd.getHours()   * 60 + currentEnd.getMinutes();
+              if (this.isWithinShifts(selectedStaff.shifts, smStart, smEnd)) {
+                // Selected technician IS available AND within shift → Use them directly
+                assigned = selectedStaff;
+                if (debugSlot) this.logger.log(`   Multi-service: ✅ Using selected technician ${selectedStaff.name} (available & within shift)`);
+              } else {
+                // Available but outside shift → fall back to workload-based selection
+                if (debugSlot) this.logger.log(`   Multi-service: ⚠️ Selected technician ${selectedStaff.name} is outside shift hours, using alternative`);
+                staffToConsider = candidateStaff.filter(s => s.id !== selectedStaff.id);
+              }
             } else {
               // Selected technician is BUSY → Use workload-based selection
               if (debugSlot) this.logger.log(`   Multi-service: ⚠️ Selected technician ${selectedStaff.name} is busy, using alternative`);
