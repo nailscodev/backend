@@ -560,22 +560,66 @@ export class MultiServiceAvailabilityService {
   }
 
   /**
+   * Normalizes raw staff shifts (weekly JSONB object OR legacy flat array) to a flat array
+   * of shifts for the specific day of the given Date.
+   *
+   * Weekly format (DB default): { monday: [{shiftStart, shiftEnd}], tuesday: [], ... }
+   * Legacy flat format:          [{shiftStart, shiftEnd}, ...]
+   */
+  private normalizeShiftsForDay(
+    rawShifts: any,
+    date: Date,
+  ): Array<{ shiftStart: string; shiftEnd: string }> {
+    if (!rawShifts) return [];
+
+    // Weekly JSONB object format (current DB format)
+    if (typeof rawShifts === 'object' && !Array.isArray(rawShifts)) {
+      const dayName = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+      const dayShifts = rawShifts[dayName];
+      return Array.isArray(dayShifts) ? dayShifts : [];
+    }
+
+    // Legacy flat array format
+    if (Array.isArray(rawShifts)) {
+      return rawShifts.filter(
+        (s: any) => s && typeof s === 'object' && s.shiftStart && s.shiftEnd,
+      );
+    }
+
+    return [];
+  }
+
+  /**
    * Checks if a time range (in minutes of day) falls entirely within a staff member's shifts.
    * Returns true if the ENTIRE range [startMin, endMin] is covered by at least one shift.
+   *
+   * Accepts either the weekly JSONB object or the legacy flat array; pass `date` so the
+   * correct day's shifts can be extracted from a weekly object.
    */
-  private isWithinShifts(shifts: Array<{ shiftStart: string; shiftEnd: string }> | undefined, startMin: number, endMin: number): boolean {
-    if (!shifts || shifts.length === 0) {
-      this.logger.warn('Staff has no shifts defined — treating as unavailable');
+  private isWithinShifts(
+    shifts: any,
+    startMin: number,
+    endMin: number,
+    date?: Date,
+  ): boolean {
+    const shiftsArray: Array<{ shiftStart: string; shiftEnd: string }> = date
+      ? this.normalizeShiftsForDay(shifts, date)
+      : Array.isArray(shifts)
+        ? shifts
+        : [];
+
+    if (!shiftsArray || shiftsArray.length === 0) {
+      this.logger.warn('Staff has no shifts defined for this day — treating as unavailable');
       return false;
     }
-    
+
     const parseTime = (t: string): number => {
       const [h, m] = t.split(':').map(Number);
       return h * 60 + m;
     };
 
     // The entire slot must fit within a single shift
-    return shifts.some(shift => {
+    return shiftsArray.some(shift => {
       const shiftStartMin = parseTime(shift.shiftStart);
       const shiftEndMin = parseTime(shift.shiftEnd);
       return startMin >= shiftStartMin && endMin <= shiftEndMin;
@@ -1198,7 +1242,7 @@ export class MultiServiceAvailabilityService {
               // Also verify the selected technician's shift covers this sub-slot
               const smStart = currentStart.getHours() * 60 + currentStart.getMinutes();
               const smEnd   = currentEnd.getHours()   * 60 + currentEnd.getMinutes();
-              if (this.isWithinShifts(selectedStaff.shifts, smStart, smEnd)) {
+              if (this.isWithinShifts(selectedStaff.shifts, smStart, smEnd, currentStart)) {
                 // Selected technician IS available AND within shift → Use them directly
                 assigned = selectedStaff;
                 if (debugSlot) this.logger.log(`   Multi-service: ✅ Using selected technician ${selectedStaff.name} (available & within shift)`);
@@ -1340,7 +1384,7 @@ export class MultiServiceAvailabilityService {
       // Check shift schedule: the entire slot must fit within one of the staff's shifts
       const slotStartMin = start.getHours() * 60 + start.getMinutes();
       const slotEndMin = end.getHours() * 60 + end.getMinutes();
-      if (!this.isWithinShifts(staff.shifts, slotStartMin, slotEndMin)) {
+      if (!this.isWithinShifts(staff.shifts, slotStartMin, slotEndMin, start)) {
         if (debugSlot) {
           this.logger.log(`    ${staff.name}: ❌ Outside shift hours`);
         }
