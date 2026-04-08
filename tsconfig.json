@@ -1,8 +1,6 @@
 {
   "compilerOptions": {
     "module": "commonjs",
-    "moduleResolution": "node",
-    "ignoreDeprecations": "5.0",
     "esModuleInterop": true,
     "declaration": true,
     "removeComments": true,
