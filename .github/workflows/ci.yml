@@ -312,7 +312,7 @@ jobs:
               p95  = v('http_req_duration', 'p(95)')
               p99  = v('http_req_duration', 'p(99)')
               avg  = v('http_req_duration', 'avg')
-              err  = v('http_req_failed',   'rate')
+              err  = v('error_rate',        'rate')
               rps  = v('http_reqs',         'rate')
               reqs = v('http_reqs',         'count')
               def ms(x): return f"{float(x):.0f}ms" if x is not None else "N/A"
