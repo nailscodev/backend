@@ -308,7 +308,9 @@ jobs:
               m = d.get('metrics', {})
               def v(key, sub): 
                 node = m.get(key, {})
-                return node.get(sub) or node.get('values', {}).get(sub)
+                direct = node.get(sub)
+                if direct is not None: return direct
+                return node.get('values', {}).get(sub)
               p95  = v('http_req_duration', 'p(95)')
               p99  = v('http_req_duration', 'p(99)')
               avg  = v('http_req_duration', 'avg')
