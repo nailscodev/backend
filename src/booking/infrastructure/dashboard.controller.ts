@@ -440,8 +440,8 @@ export class DashboardController {
         c.email                                              AS "customerEmail",
         COALESCE(sl.title, s.name)                           AS "serviceName",
         b."appointmentDate",
-        b."startTime",
-        b."endTime",
+        TO_CHAR(b."startTime", 'HH24:MI')                    AS "startTime",
+        TO_CHAR(b."endTime", 'HH24:MI')                      AS "endTime",
         b."paymentMethod",
         b."totalPrice",
         b."createdAt"
@@ -843,7 +843,8 @@ export class DashboardController {
         message: 'Buffer time actualizado exitosamente'
       };
     } catch (error) {
-      throw new BadRequestException(error.message);
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      throw new BadRequestException(message);
     }
   }
 }
