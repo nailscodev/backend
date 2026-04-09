@@ -153,12 +153,12 @@ describe('MultiServiceAvailabilityService', () => {
   // ─── generateTimeSlots ────────────────────────────────────────────────────
 
   describe('generateTimeSlots (private)', () => {
-    it('generates 30-minute interval slots starting at 07:00', () => {
+    it('generates 15-minute interval slots starting at 07:00', () => {
       const slots: Array<{ time: string }> = (service as any).generateTimeSlots();
 
       expect(slots[0].time).toBe('07:00');
-      expect(slots[1].time).toBe('07:30');
-      expect(slots[2].time).toBe('08:00');
+      expect(slots[1].time).toBe('07:15');
+      expect(slots[2].time).toBe('07:30');
     });
 
     it('ends at 21:30', () => {
@@ -166,10 +166,10 @@ describe('MultiServiceAvailabilityService', () => {
       expect(slots[slots.length - 1].time).toBe('21:30');
     });
 
-    it('returns 30 slots for the full 07:00–21:30 window', () => {
+    it('returns 59 slots for the full 07:00–21:30 window', () => {
       const slots: Array<{ time: string }> = (service as any).generateTimeSlots();
-      // (21:30 – 07:00) / 0.5h = 29 intervals +1 = 30 slots
-      expect(slots.length).toBe(30);
+      // (21:30 – 07:00) / 0.25h = 58 intervals +1 = 59 slots
+      expect(slots.length).toBe(59);
     });
   });
 

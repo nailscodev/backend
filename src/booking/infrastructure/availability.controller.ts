@@ -571,7 +571,7 @@ export class AvailabilityController {
       this.logger.debug(`🕐 Max service duration: ${maxServiceDuration} minutes`);
       this.logger.debug(`🕐 Latest start time: ${latestStartHour.toString().padStart(2, '0')}:${latestStartMin.toString().padStart(2, '0')} (to finish by ${latestEnd})`);
 
-      // Generate time slots based on staff working hours (30-min intervals)
+      // Generate time slots based on staff working hours (15-min intervals)
       const generateTimeSlots = () => {
         const slots: string[] = [];
         let currentHour = startHour;
@@ -580,7 +580,7 @@ export class AvailabilityController {
         while (currentHour < latestStartHour || (currentHour === latestStartHour && currentMinute <= latestStartMin)) {
           slots.push(`${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}:00`);
           
-          currentMinute += 30;
+          currentMinute += 15;
           if (currentMinute >= 60) {
             currentHour++;
             currentMinute = 0;
@@ -1333,7 +1333,7 @@ export class AvailabilityController {
     const startMinute = 0;
     const endHour = 21;
     const endMinute = 30;
-    const intervalMinutes = 30; // 30 minute intervals
+    const intervalMinutes = 15; // 15 minute intervals
 
     const currentTime = new Date();
     currentTime.setHours(startHour, startMinute, 0, 0);
