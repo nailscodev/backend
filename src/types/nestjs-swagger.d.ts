@@ -225,7 +225,7 @@ declare module '@nestjs/swagger' {
     addTag(name: string, description?: string, externalDocs?: unknown): this;
     addExtension(extensionKey: string, extensionProperties: unknown): this;
     addSecurity(name: string, options: unknown): this;
-    addSecurityRequirements(name: string | unknown, requirements?: string[]): this;
+    addSecurityRequirements(name: string | Record<string, string[]>, requirements?: string[]): this;
     addBearerAuth(options?: unknown, name?: string): this;
     addOAuth2(options?: unknown, name?: string): this;
     addApiKey(options?: unknown, name?: string): this;
