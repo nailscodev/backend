@@ -101,6 +101,7 @@ export default function () {
 export function handleSummary(data) {
   return {
     'reports/load-test-summary.json': JSON.stringify(data, null, 2),
+    '../../k6-reports/load-summary.json': JSON.stringify(data, null, 2),
     stdout: textSummary(data),
   };
 }

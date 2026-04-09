@@ -82,5 +82,8 @@ export default function () {
 }
 
 export function handleSummary(data) {
-  return { 'reports/stress-test-summary.json': JSON.stringify(data, null, 2) };
+  return {
+    'reports/stress-test-summary.json': JSON.stringify(data, null, 2),
+    '../../k6-reports/stress-summary.json': JSON.stringify(data, null, 2),
+  };
 }

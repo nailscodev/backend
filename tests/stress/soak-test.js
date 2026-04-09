@@ -91,5 +91,8 @@ export function handleSummary(data) {
   const total = data.metrics.http_reqs?.values?.count ?? 0;
 
   console.log(`Soak completed: ${total} requests | p95=${p95}ms p99=${p99}ms | errors=${errPct}%`);
-  return { 'reports/soak-test-summary.json': JSON.stringify(data, null, 2) };
+  return {
+    'reports/soak-test-summary.json': JSON.stringify(data, null, 2),
+    '../../k6-reports/soak-summary.json': JSON.stringify(data, null, 2),
+  };
 }

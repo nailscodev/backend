@@ -85,5 +85,8 @@ export function handleSummary(data) {
   const spikeP95 = data.metrics.latency_during_spike?.values?.['p(95)']?.toFixed(0) ?? 'N/A';
   const baseP95  = data.metrics.latency_baseline?.values?.['p(95)']?.toFixed(0) ?? 'N/A';
   console.log(`Spike p95: ${spikeP95}ms | Baseline p95: ${baseP95}ms`);
-  return { 'reports/spike-test-summary.json': JSON.stringify(data, null, 2) };
+  return {
+    'reports/spike-test-summary.json': JSON.stringify(data, null, 2),
+    '../../k6-reports/spike-summary.json': JSON.stringify(data, null, 2),
+  };
 }

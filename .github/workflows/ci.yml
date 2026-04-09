@@ -227,6 +227,7 @@ jobs:
           K6_WEB_DASHBOARD: "true"
           K6_WEB_DASHBOARD_OPEN: "false"
           K6_WEB_DASHBOARD_EXPORT: "../../k6-reports/load-report.html"
+          K6_SUMMARY_TREND_STATS: "avg,min,med,max,p(90),p(95),p(99)"
         run: |
           cd tests/stress
           k6 run load-test.js \
@@ -243,6 +244,7 @@ jobs:
           K6_WEB_DASHBOARD: "true"
           K6_WEB_DASHBOARD_OPEN: "false"
           K6_WEB_DASHBOARD_EXPORT: "../../k6-reports/stress-report.html"
+          K6_SUMMARY_TREND_STATS: "avg,min,med,max,p(90),p(95),p(99)"
         run: |
           cd tests/stress
           k6 run stress-test.js \
@@ -259,6 +261,7 @@ jobs:
           K6_WEB_DASHBOARD: "true"
           K6_WEB_DASHBOARD_OPEN: "false"
           K6_WEB_DASHBOARD_EXPORT: "../../k6-reports/spike-report.html"
+          K6_SUMMARY_TREND_STATS: "avg,min,med,max,p(90),p(95),p(99)"
         run: |
           cd tests/stress
           k6 run spike-test.js \
@@ -275,6 +278,7 @@ jobs:
           K6_WEB_DASHBOARD: "true"
           K6_WEB_DASHBOARD_OPEN: "false"
           K6_WEB_DASHBOARD_EXPORT: "../../k6-reports/soak-report.html"
+          K6_SUMMARY_TREND_STATS: "avg,min,med,max,p(90),p(95),p(99)"
         run: |
           cd tests/stress
           k6 run soak-test.js \
