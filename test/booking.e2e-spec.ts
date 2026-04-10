@@ -199,9 +199,9 @@ describe('Booking System E2E Tests', () => {
   // TEST CASE 2: Multi-Service Booking (Consecutive) WITHOUT VIP Combo
   // ============================================================================
   describe('Case 2: Multi-Service Booking (Consecutive)', () => {
-    // Sofia doesn't work Tuesdays; Isabella/Camila don't work Sundays.
-    // Skip day 0 (Sun) and day 2 (Tue) so both are always available.
-    const testDate = getWorkingDate(2, [0, 2]);
+    // Luna (does Manicure + Pedicure, Mon-Sun) is used because the single-tech
+    // algorithm requires ONE technician to be qualified for ALL services in the block.
+    const testDate = getTestDate(2);
     const createdBookingIds: string[] = [];
 
     it('should get multi-service slots for consecutive booking', async () => {
@@ -214,7 +214,7 @@ describe('Booking System E2E Tests', () => {
             { id: testData.services.basicSpaPedicure, duration: 45 },
           ],
           date: testDate,
-          selectedTechnicianId: testData.staff.sofia, // Sofia does Pedicure; other tech handles Manicure
+          selectedTechnicianId: testData.staff.luna, // Luna does both Manicure + Pedicure
         })
         .expect(200);
 
@@ -223,10 +223,12 @@ describe('Booking System E2E Tests', () => {
       expect(Array.isArray(response.body.data.data)).toBe(true);
       expect(response.body.data.data.length).toBeGreaterThan(0);
 
-      // Each slot should have 2 service assignments
+      // Each slot should have 2 service assignments, both assigned to Luna
       const firstSlot = response.body.data.data[0];
       expect(firstSlot.services.length).toBe(2);
       expect(firstSlot.available).toBe(true);
+      expect(firstSlot.services[0].staffId).toBe(testData.staff.luna);
+      expect(firstSlot.services[1].staffId).toBe(testData.staff.luna);
     });
 
     it('should verify slot availability with permutations', async () => {
@@ -240,7 +242,7 @@ describe('Booking System E2E Tests', () => {
             { id: testData.services.basicSpaPedicure, duration: 45 },
           ],
           date: testDate,
-          selectedTechnicianId: testData.staff.sofia,
+          selectedTechnicianId: testData.staff.luna,
         });
 
       expect(slotsResp.body.data.data.length).toBeGreaterThan(0);
@@ -260,7 +262,7 @@ describe('Booking System E2E Tests', () => {
           ],
           date: testDate,
           startTime,
-          selectedTechnicianId: testData.staff.sofia,
+          selectedTechnicianId: testData.staff.luna,
         })
         .expect(201); // POST endpoints return 201 by default in NestJS
 
@@ -282,7 +284,7 @@ describe('Booking System E2E Tests', () => {
             { id: testData.services.basicSpaPedicure, duration: 45 },
           ],
           date: testDate,
-          selectedTechnicianId: testData.staff.sofia,
+          selectedTechnicianId: testData.staff.luna,
         });
 
       // Use first available slot (avoid hardcoded time dependency)
