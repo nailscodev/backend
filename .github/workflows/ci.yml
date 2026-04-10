@@ -343,7 +343,7 @@ jobs:
             badge = "✅" if ok else "⚠️"
             p95_cell = f"**{d['ms_p95']}**" + ("" if p95_ok else " ⚠️")
             err_cell  = d['pct_err'] + ("" if err_ok  else " ⚠️")
-            rows_md.append(f"| {badge} {name} | {profile} | {d['ms_avg']} | {p95_cell} | {d['ms_p99']} | {err_cell} | {d['rps_s']} req/s | {d['count']} |")
+            rows_md.append(f"| {badge} | {name} | {profile} | {d['ms_avg']} | {p95_cell} | {d['ms_p99']} | {err_cell} | {d['rps_s']} req/s | {d['count']} |")
             rows_summary.append((name, badge, d, p95_ok, err_ok, html_file))
 
           overall = "✅ All tests passed" if all_pass else "⚠️ Some thresholds exceeded"
