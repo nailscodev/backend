@@ -952,6 +952,26 @@ export class BookingCrudController {
         totalPrice: serverTotalPrice, // Uses frontend price for VIP combos, otherwise server-calculated
       };
 
+      // Reject bookings for time slots that have already passed (Eastern / Miami time)
+      {
+        const nowParts = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/New_York',
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', hour12: false,
+        }).formatToParts(new Date());
+        const p = Object.fromEntries(nowParts.map(pt => [pt.type, pt.value]));
+        const todayEastern = `${p.year}-${p.month}-${p.day}`;
+        const nowMinutesEastern = parseInt(p.hour) * 60 + parseInt(p.minute);
+        if (appointmentDate === todayEastern) {
+          const [slotH, slotM] = createBookingDto.startTime.split(':').map(Number);
+          const slotMinutes = slotH * 60 + slotM;
+          const GRACE_PERIOD_MINUTES = 15;
+          if (slotMinutes + GRACE_PERIOD_MINUTES < nowMinutesEastern) {
+            throw new BadRequestException('Cannot book a time slot that has already passed');
+          }
+        }
+      }
+
       // Reject bookings that fall outside the staff member's shift hours
       if (!assignedStaffId) throw new InternalServerErrorException('Staff ID could not be resolved');
       const shiftCheck = await this.checkStaffShift(

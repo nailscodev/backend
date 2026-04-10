@@ -602,6 +602,23 @@ export class AvailabilityController {
       };
 
       const allTimeSlots = generateTimeSlots();
+
+      // Filter out slots that have already passed when querying for today (Eastern / Miami time)
+      const nowPartsEastern = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+      }).formatToParts(new Date());
+      const nowPartsMap = Object.fromEntries(nowPartsEastern.map(p => [p.type, p.value]));
+      const todayEastern = `${nowPartsMap.year}-${nowPartsMap.month}-${nowPartsMap.day}`;
+      const nowMinutesEastern = parseInt(nowPartsMap.hour) * 60 + parseInt(nowPartsMap.minute);
+      const timeSlots = date === todayEastern
+        ? allTimeSlots.filter(slot => {
+            const [h, m] = slot.split(':').map(Number);
+            return h * 60 + m >= nowMinutesEastern;
+          })
+        : allTimeSlots;
+
       const availableSlots: any[] = [];
 
       // Helper: Check if staff is available in a time range
@@ -688,7 +705,7 @@ export class AvailabilityController {
       };
 
       // Process each time slot
-      for (const startTime of allTimeSlots) {
+      for (const startTime of timeSlots) {
         if (isVIPCombo) {
           // VIP COMBO: All services start at the same time with different staff
           const maxDuration = Math.max(...servicesWithTotalDuration.map(s => s.totalDuration));
