@@ -718,18 +718,6 @@ export class MultiServiceAvailabilityService {
         slotsNoStaff++;
       }
 
-      // 🔒 IMPORTANT: If a specific technician was selected, they MUST be assigned to at least one service
-      // If the selected technician is not in any assignment, reject this slot
-      if (assignments && selectedTechnicianId) {
-        const selectedTechnicianAssigned = assignments.some(a => a.staffId === selectedTechnicianId);
-        if (!selectedTechnicianAssigned) {
-          const slotTimeStr = `${String(slotStart.getHours()).padStart(2, '0')}:${String(slotStart.getMinutes()).padStart(2, '0')}`;
-          this.logger.log(`   ❌ [${slotTimeStr}] Rejected: Selected technician not available for any service they can do`);
-          slotsNoStaff++;
-          assignments = null; // Mark as invalid
-        }
-      }
-
       if (assignments) {
         // Formatear en hora local para consistencia
         const formatLocalTime = (date: Date): string => {
@@ -771,9 +759,13 @@ export class MultiServiceAvailabilityService {
   }
 
   /**
-   * Intenta asignar técnicos para un slot específico
-   * ALGORITMO DE PERMUTACIONES: Prueba todas las combinaciones de orden de servicios
-   * para encontrar una configuración válida donde el técnico seleccionado participe
+   * Intenta asignar técnicos para un slot específico.
+   *
+   * Con técnico seleccionado: usa tryAssignSingleTechnicianForAllServices — un solo
+   * técnico cubre todos los servicios consecutivamente (sin permutaciones de orden).
+   *
+   * Sin técnico seleccionado: prueba cada técnico calificado (puede hacer todos los
+   * servicios) por menor carga de trabajo y retorna la primera asignación válida.
    */
   private tryAssignStaffForSlot(
     services: Service[],
@@ -786,91 +778,119 @@ export class MultiServiceAvailabilityService {
     const slotTimeStr = `${String(startTime.getHours()).padStart(2, '0')}:${String(startTime.getMinutes()).padStart(2, '0')}`;
     const isDebugSlot = ['10:30', '11:30', '12:30', '13:30', '14:30', '15:30', '16:30', '17:30', '18:30'].includes(slotTimeStr);
 
-    if (isDebugSlot) {
-      this.logger.log(`\n🔍 [DEBUG ${slotTimeStr}] Evaluando slot con permutaciones...`);
-    }
-
-    // Generar TODAS las permutaciones válidas de servicios (respetando grupos removal+servicio)
-    const servicePermutations = this.generateAllValidPermutations(services);
-
-    if (isDebugSlot) {
-      this.logger.log(`   📋 Permutaciones a probar: ${servicePermutations.length}`);
-      servicePermutations.forEach((perm, idx) => {
-        this.logger.log(`      ${idx + 1}. ${perm.map(s => s.name.substring(0, 20)).join(' → ')}`);
-      });
-    }
-
-    // Si hay un técnico seleccionado, primero probar permutaciones donde pueda participar
     if (selectedTechnicianId) {
-      // Identificar servicios que el técnico seleccionado puede hacer
-      const servicesSelectedCanDo = services.filter(s => {
-        const staff = staffByService.get(s.id) || [];
-        return staff.some(st => st.id === selectedTechnicianId);
-      });
-
-      if (isDebugSlot && servicesSelectedCanDo.length > 0) {
-        this.logger.log(`   👤 Técnico seleccionado puede hacer: ${servicesSelectedCanDo.map(s => s.name).join(', ')}`);
-      }
-
-      // Ordenar permutaciones: priorizar las que ponen servicios del técnico seleccionado
-      // en momentos donde podría estar disponible
-      const prioritizedPermutations = this.prioritizePermutationsForTechnician(
-        servicePermutations,
-        servicesSelectedCanDo,
-        bookings,
-        startTime,
-        selectedTechnicianId,
-        isDebugSlot ? slotTimeStr : undefined
-      );
-
-      for (const orderedServices of prioritizedPermutations) {
-        const result = this.tryAssignStaffInOrder(
-          orderedServices,
-          staffByService,
-          bookings,
-          startTime,
-          selectedTechnicianId,
-          isDebugSlot ? slotTimeStr : undefined
-        );
-
-        if (result) {
-          // Verificar que el técnico seleccionado esté asignado a al menos un servicio
-          const selectedIsAssigned = result.some(a => a.staffId === selectedTechnicianId);
-          if (selectedIsAssigned) {
-            if (isDebugSlot) {
-              this.logger.log(`   ✅ Permutación exitosa CON técnico seleccionado`);
-            }
-            return result;
-          } else if (isDebugSlot) {
-            this.logger.log(`   ⚠️ Permutación válida pero SIN técnico seleccionado, intentando otra...`);
-          }
-        }
-      }
-
-      // Si ninguna permutación incluye al técnico seleccionado, retornar null
+      // Single-tech path: bypass permutations entirely
       if (isDebugSlot) {
-        this.logger.log(`   ❌ Ninguna permutación permite al técnico seleccionado participar`);
+        this.logger.log(`\n🔍 [DEBUG ${slotTimeStr}] Single-tech path for ${selectedTechnicianId}`);
       }
+      const result = this.tryAssignSingleTechnicianForAllServices(
+        services, staffByService, bookings, startTime, selectedTechnicianId
+      );
+      if (isDebugSlot) {
+        this.logger.log(result ? `   ✅ Single-tech assignment succeeded` : `   ❌ Single-tech assignment failed`);
+      }
+      return result;
+    }
+
+    // No specific tech — find the lowest-workload qualified tech that can cover all services
+    if (isDebugSlot) {
+      this.logger.log(`\n🔍 [DEBUG ${slotTimeStr}] Any-tech path, checking qualified staff...`);
+    }
+
+    // Collect techs qualified for ALL services (appear in every service's staffByService list)
+    const candidateSets = services.map(s => new Set((staffByService.get(s.id) || []).map(st => st.id)));
+    const qualifiedIds = (staffByService.get(services[0]?.id) || [])
+      .map(st => st.id)
+      .filter(id => candidateSets.every(set => set.has(id)));
+
+    if (qualifiedIds.length === 0) {
+      if (isDebugSlot) this.logger.log(`   ❌ No staff qualifies for all services`);
       return null;
     }
 
-    // Sin técnico seleccionado: probar todas las permutaciones y retornar la primera válida
-    for (const orderedServices of servicePermutations) {
-      const result = this.tryAssignStaffInOrder(
-        orderedServices,
-        staffByService,
-        bookings,
-        startTime,
-        selectedTechnicianId,
-        isDebugSlot ? slotTimeStr : undefined
-      );
+    // Sort by ascending workload (total booked minutes today)
+    const workloadOf = (id: string) =>
+      bookings.filter(b => b.staffId === id).reduce((s, b) => s + (b.endTime.getTime() - b.startTime.getTime()) / 60000, 0);
 
+    const sortedIds = [...qualifiedIds].sort((a, b) => workloadOf(a) - workloadOf(b));
+
+    // For each candidate, try assigning all services in original order
+    for (const techId of sortedIds) {
+      const result = this.tryAssignSingleTechnicianForAllServices(
+        services, staffByService, bookings, startTime, techId
+      );
       if (result) {
+        if (isDebugSlot) this.logger.log(`   ✅ Assigned to ${techId} (min-workload)`);
         return result;
       }
     }
 
+    if (isDebugSlot) this.logger.log(`   ❌ No qualified tech free for this slot`);
     return null;
+  }
+
+  /**
+   * Trata de asignar UN SOLO técnico a TODOS los servicios en orden original consecutivo.
+   * Retorna null si el técnico no está calificado para algún servicio,
+   * tiene conflicto de agenda, o está fuera de turno en cualquier sub-slot.
+   */
+  private tryAssignSingleTechnicianForAllServices(
+    services: Service[],
+    staffByService: Map<string, Staff[]>,
+    bookings: Booking[],
+    startTime: Date,
+    techId: string
+  ): StaffAssignment[] | null {
+
+    const formatLocalTime = (d: Date): string => {
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    };
+
+    const assignments: StaffAssignment[] = [];
+    let currentStart = new Date(startTime);
+    const techBookings = bookings.filter(b => b.staffId === techId);
+
+    for (const service of services) {
+      const duration = this.getServiceTotalDuration(service);
+      const currentEnd = new Date(currentStart.getTime() + duration * 60000);
+
+      // 1. Tech must be qualified for this service
+      const candidates = staffByService.get(service.id) || [];
+      if (!candidates.some(st => st.id === techId)) {
+        this.logger.debug(`   tryAssignSingle: tech ${techId} not qualified for ${service.name}`);
+        return null;
+      }
+
+      // 2. No booking conflict
+      if (this.hasConflict(techBookings, currentStart, currentEnd)) {
+        this.logger.debug(`   tryAssignSingle: conflict for ${service.name} at ${formatLocalTime(currentStart)}`);
+        return null;
+      }
+
+      // 3. Within shift for this sub-slot
+      const techStaff = candidates.find(st => st.id === techId)!;
+      const smStart = currentStart.getHours() * 60 + currentStart.getMinutes();
+      const smEnd   = currentEnd.getHours()   * 60 + currentEnd.getMinutes();
+      if (!this.isWithinShifts(techStaff.shifts, smStart, smEnd, currentStart)) {
+        this.logger.debug(`   tryAssignSingle: outside shift for ${service.name}`);
+        return null;
+      }
+
+      assignments.push({
+        serviceId: service.id,
+        serviceName: service.name,
+        staffId: techId,
+        staffName: techStaff.name,
+        startTime: formatLocalTime(currentStart),
+        endTime: formatLocalTime(currentEnd),
+        duration,
+      });
+
+      currentStart = currentEnd;
+    }
+
+    return assignments;
   }
 
   /**

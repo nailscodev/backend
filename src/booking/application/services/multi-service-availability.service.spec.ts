@@ -247,4 +247,199 @@ describe('MultiServiceAvailabilityService', () => {
       expect((service as any).hasConflict(bookings, newStart, newEnd)).toBe(false);
     });
   });
+
+  // ─── tryAssignSingleTechnicianForAllServices ──────────────────────────────
+
+  describe('tryAssignSingleTechnicianForAllServices (private) – single-tech path', () => {
+    // Helpers to build minimal Service and Staff objects
+    const makeService = (id: string, name: string, duration = 60): any => ({
+      id, name, duration, bufferTime: 0, categoryId: 'cat-1', price: 0, addOns: [],
+    });
+
+    const makeStaff = (id: string, name: string): any => ({
+      id,
+      name,
+      workingDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+      // Weekly JSONB format: all days have a full-day shift
+      shifts: {
+        monday: [{ shiftStart: '08:00', shiftEnd: '21:00' }],
+        tuesday: [{ shiftStart: '08:00', shiftEnd: '21:00' }],
+        wednesday: [{ shiftStart: '08:00', shiftEnd: '21:00' }],
+        thursday: [{ shiftStart: '08:00', shiftEnd: '21:00' }],
+        friday: [{ shiftStart: '08:00', shiftEnd: '21:00' }],
+        saturday: [{ shiftStart: '08:00', shiftEnd: '21:00' }],
+        sunday: [],
+      },
+    });
+
+    const call = (
+      svc: MultiServiceAvailabilityService,
+      services: any[],
+      staffByService: Map<string, any[]>,
+      bookings: any[],
+      startTime: Date,
+      techId: string,
+    ) => (svc as any).tryAssignSingleTechnicianForAllServices(
+      services,
+      staffByService,
+      bookings,
+      startTime,
+      techId,
+    );
+
+    it('returns all assignments pointing to the selected tech when qualified and no conflicts', () => {
+      const tech = makeStaff('tech-1', 'Alice Smith');
+      const svc1 = makeService('svc-1', 'Manicure', 45);
+      const svc2 = makeService('svc-2', 'Pedicure', 60);
+
+      const staffByService = new Map([
+        ['svc-1', [tech]],
+        ['svc-2', [tech]],
+      ]);
+
+      // Wednesday 2026-04-01 10:00
+      const startTime = new Date('2026-04-01T10:00:00');
+      const result = call(service, [svc1, svc2], staffByService, [], startTime, 'tech-1');
+
+      expect(result).not.toBeNull();
+      expect(result).toHaveLength(2);
+      // Both assignments point to the same tech
+      expect(result![0].staffId).toBe('tech-1');
+      expect(result![1].staffId).toBe('tech-1');
+      // Second service starts exactly when first ends
+      expect(result![1].startTime).toBe(result![0].endTime);
+    });
+
+    it('returns null when the tech is not qualified for one of the services', () => {
+      const tech = makeStaff('tech-1', 'Alice Smith');
+      const svc1 = makeService('svc-1', 'Manicure', 45);
+      const svc2 = makeService('svc-2', 'Pedicure', 60);
+
+      // Tech can only do svc-1, NOT svc-2
+      const staffByService = new Map([
+        ['svc-1', [tech]],
+        ['svc-2', []], // empty → not qualified
+      ]);
+
+      const startTime = new Date('2026-04-01T10:00:00');
+      const result = call(service, [svc1, svc2], staffByService, [], startTime, 'tech-1');
+
+      expect(result).toBeNull();
+    });
+
+    it('returns null when the tech has a booking conflict during the second sub-slot', () => {
+      const tech = makeStaff('tech-1', 'Alice Smith');
+      const svc1 = makeService('svc-1', 'Manicure', 45);  // 10:00 – 10:45
+      const svc2 = makeService('svc-2', 'Pedicure', 60);  // 10:45 – 11:45
+
+      const staffByService = new Map([
+        ['svc-1', [tech]],
+        ['svc-2', [tech]],
+      ]);
+
+      // Existing booking overlaps the second sub-slot (10:50 – 11:30)
+      const bookings = [{
+        staffId: 'tech-1',
+        startTime: new Date('2026-04-01T10:50:00'),
+        endTime: new Date('2026-04-01T11:30:00'),
+      }];
+
+      const startTime = new Date('2026-04-01T10:00:00');
+      const result = call(service, [svc1, svc2], staffByService, bookings, startTime, 'tech-1');
+
+      expect(result).toBeNull();
+    });
+
+    it('returns null when the tech is outside their shift during the second sub-slot', () => {
+      const tech = makeStaff('tech-1', 'Alice Smith');
+      // Override shift: only 08:00–11:00, so a service starting at 10:45 and ending at 11:45 won't fit
+      tech.shifts = {
+        wednesday: [{ shiftStart: '08:00', shiftEnd: '11:00' }],
+        monday: [], tuesday: [], thursday: [], friday: [], saturday: [], sunday: [],
+      };
+
+      const svc1 = makeService('svc-1', 'Manicure', 45);  // 10:00 – 10:45 (fits)
+      const svc2 = makeService('svc-2', 'Pedicure', 60);  // 10:45 – 11:45 (exceeds shift end 11:00)
+
+      const staffByService = new Map([
+        ['svc-1', [tech]],
+        ['svc-2', [tech]],
+      ]);
+
+      const startTime = new Date('2026-04-01T10:00:00');
+      const result = call(service, [svc1, svc2], staffByService, [], startTime, 'tech-1');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  // ─── tryAssignStaffForSlot (any-tech path via new algorithm) ─────────────
+
+  describe('tryAssignStaffForSlot (private) – any-tech min-workload path', () => {
+    const makeService = (id: string, name: string, duration = 60): any => ({
+      id, name, duration, bufferTime: 0, categoryId: 'cat-1', price: 0, addOns: [],
+    });
+
+    const makeStaff = (id: string, name: string): any => ({
+      id, name,
+      workingDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+      shifts: {
+        wednesday: [{ shiftStart: '08:00', shiftEnd: '21:00' }],
+        monday: [], tuesday: [], thursday: [], friday: [], saturday: [], sunday: [],
+      },
+    });
+
+    const call = (
+      svc: MultiServiceAvailabilityService,
+      services: any[],
+      staffByService: Map<string, any[]>,
+      bookings: any[],
+      startTime: Date,
+    ) => (svc as any).tryAssignStaffForSlot(services, staffByService, bookings, startTime, undefined);
+
+    it('picks the lowest-workload qualified tech when no tech is specified', () => {
+      const techA = makeStaff('tech-a', 'Alice');
+      const techB = makeStaff('tech-b', 'Bob');
+      const svc1 = makeService('svc-1', 'Manicure', 60);
+      const svc2 = makeService('svc-2', 'Pedicure', 60);
+
+      const staffByService = new Map([
+        ['svc-1', [techA, techB]],
+        ['svc-2', [techA, techB]],
+      ]);
+
+      // Bob has an existing 60-min booking earlier today → higher workload
+      const bookings = [{
+        staffId: 'tech-b',
+        startTime: new Date('2026-04-01T08:00:00'),
+        endTime: new Date('2026-04-01T09:00:00'),
+      }];
+
+      const startTime = new Date('2026-04-01T10:00:00');
+      const result = call(service, [svc1, svc2], staffByService, bookings, startTime);
+
+      expect(result).not.toBeNull();
+      // Alice (lower workload = 0 min) should be chosen
+      expect(result![0].staffId).toBe('tech-a');
+      expect(result![1].staffId).toBe('tech-a');
+    });
+
+    it('returns null when no single tech qualifies for all services', () => {
+      const techA = makeStaff('tech-a', 'Alice');
+      const techB = makeStaff('tech-b', 'Bob');
+      const svc1 = makeService('svc-1', 'Manicure', 60);
+      const svc2 = makeService('svc-2', 'Pedicure', 60);
+
+      // Alice can only do svc-1, Bob can only do svc-2 → no single tech covers both
+      const staffByService = new Map([
+        ['svc-1', [techA]],
+        ['svc-2', [techB]],
+      ]);
+
+      const startTime = new Date('2026-04-01T10:00:00');
+      const result = call(service, [svc1, svc2], staffByService, [], startTime);
+
+      expect(result).toBeNull();
+    });
+  });
 });

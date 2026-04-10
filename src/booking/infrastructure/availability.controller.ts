@@ -410,6 +410,63 @@ export class AvailabilityController {
 
       this.logger.debug(`📋 Found ${existingBookings.length} existing bookings for ${date}`);
 
+      // Pre-compute workload (total booked minutes today) per staff — used for min-workload selection
+      const workloadMap = new Map<string, number>();
+      for (const staffMember of filteredActiveStaff) {
+        const minutes = (existingBookings as any[])
+          .filter(b => b.staffId === staffMember.id)
+          .reduce((sum: number, b: any) => {
+            const parseMin = (t: string) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + m; };
+            return sum + (parseMin(String(b.endTime)) - parseMin(String(b.startTime)));
+          }, 0);
+        workloadMap.set(staffMember.id, minutes);
+      }
+
+      // For consecutive multi-service bookings we require ONE single tech to cover ALL services.
+      // Detect a globally selected technician (any service carrying a concrete staffId).
+      const globalStaffId = services.find(s => s.staffId && s.staffId !== 'any')?.staffId;
+
+      // When no specific tech is selected ("any"), compute the set of techs who are qualified
+      // to perform EVERY single service / removal in this request so we can later pick the best one.
+      // We query staff_services for each serviceId; a tech qualifies only if they appear in all.
+      let qualifiedTechs: typeof filteredActiveStaff = filteredActiveStaff;
+      if (!globalStaffId && !isVIPCombo) {
+        const allServiceIds = [
+          ...services.map(s => s.serviceId),
+          ...removals.map(r => r.id),
+        ].filter(Boolean);
+
+        if (allServiceIds.length > 0) {
+          // Fetch staff→service mappings in one query
+          const staffServiceRows = await this.sequelize.query<{ staff_id: string; service_id: string }>(
+            `SELECT ss.staff_id, ss.service_id
+             FROM staff_services ss
+             WHERE ss.service_id = ANY($1::uuid[])`,
+            { bind: [allServiceIds], type: QueryTypes.SELECT },
+          );
+
+          // Build a map: staffId → Set of serviceIds they can do
+          const staffServiceMap = new Map<string, Set<string>>();
+          for (const row of staffServiceRows) {
+            if (!staffServiceMap.has(row.staff_id)) staffServiceMap.set(row.staff_id, new Set());
+            staffServiceMap.get(row.staff_id)!.add(row.service_id);
+          }
+
+          // A tech qualifies if their service set covers ALL requested service IDs
+          // (removals are addons — if no staff_services row exists we skip the check for them)
+          const requiredServiceIds = services.map(s => s.serviceId);
+          qualifiedTechs = filteredActiveStaff.filter(staffMember => {
+            const canDo = staffServiceMap.get(staffMember.id) ?? new Set<string>();
+            return requiredServiceIds.every(id => canDo.has(id));
+          });
+
+          // Sort qualified techs ascending by workload (least busy first)
+          qualifiedTechs.sort((a, b) => (workloadMap.get(a.id) ?? 0) - (workloadMap.get(b.id) ?? 0));
+
+          this.logger.debug(`🔧 Qualified techs (can do all services, sorted by workload): ${qualifiedTechs.map(s => `${s.firstName} ${s.lastName}`).join(', ') || 'none'}`);
+        }
+      }
+
       // Calculate total duration for each service including addons and removals
       const servicesWithTotalDuration = services.map((service, index) => {
         const addonsDuration = (service.addons || []).reduce((sum, addon) => sum + addon.duration, 0);
@@ -769,60 +826,59 @@ export class AvailabilityController {
             });
           }
         } else {
-          // CONSECUTIVE: Services one after another
-          let currentStartTime = startTime;
-          const staffAssignments: any[] = [];
-          let allServicesCanBeScheduled = true;
+          // CONSECUTIVE: ONE single technician handles ALL services back-to-back.
+          // With a specific tech: verify every sub-slot is available for that tech.
+          // With "any": pick the lowest-workload qualified tech who can cover all sub-slots.
 
-          for (const service of servicesWithTotalDuration) {
-            const serviceEndTime = addMinutes(currentStartTime, service.totalDuration);
+          const totalDuration = servicesWithTotalDuration.reduce((sum, s) => sum + s.totalDuration, 0);
 
-            if (service.staffId && service.staffId !== 'any') {
-              // Specific staff requested
-              if (isStaffAvailable(service.staffId, currentStartTime, serviceEndTime)) {
-                const staffInfo = filteredActiveStaff.find(s => s.id === service.staffId);
-                staffAssignments.push({
-                  serviceId: service.serviceId,
-                  staffId: service.staffId,
-                  staffName: staffInfo ? `${staffInfo.firstName} ${staffInfo.lastName}` : 'Unknown',
-                  startTime: currentStartTime,
-                  endTime: serviceEndTime
-                });
-              } else {
-                allServicesCanBeScheduled = false;
-                break;
-              }
-            } else {
-              // Any staff - find first available
-              const availableStaff = filteredActiveStaff.find(s => 
-                isStaffAvailable(s.id, currentStartTime, serviceEndTime)
-              );
-              
-              if (availableStaff) {
-                staffAssignments.push({
-                  serviceId: service.serviceId,
-                  staffId: availableStaff.id,
-                  staffName: `${availableStaff.firstName} ${availableStaff.lastName}`,
-                  startTime: currentStartTime,
-                  endTime: serviceEndTime
-                });
-              } else {
-                allServicesCanBeScheduled = false;
-                break;
-              }
+          // Build the consecutive sub-slot schedule for a given techId
+          const tryTechForSlot = (techId: string): any[] | null => {
+            let currentTime = startTime;
+            const assignments: any[] = [];
+
+            for (const service of servicesWithTotalDuration) {
+              const serviceEnd = addMinutes(currentTime, service.totalDuration);
+              if (!isStaffAvailable(techId, currentTime, serviceEnd)) return null;
+              const staffInfo = filteredActiveStaff.find(s => s.id === techId);
+              assignments.push({
+                serviceId: service.serviceId,
+                staffId: techId,
+                staffName: staffInfo ? `${staffInfo.firstName} ${staffInfo.lastName}` : 'Unknown',
+                startTime: currentTime,
+                endTime: serviceEnd,
+              });
+              currentTime = serviceEnd;
             }
+            return assignments;
+          };
 
-            currentStartTime = serviceEndTime;
-          }
-
-          if (allServicesCanBeScheduled) {
-            const totalDuration = servicesWithTotalDuration.reduce((sum, s) => sum + s.totalDuration, 0);
-            availableSlots.push({
-              startTime,
-              endTime: currentStartTime,
-              totalDuration,
-              staffAssignments
-            });
+          if (globalStaffId) {
+            // Specific tech was selected — enforce them for all services
+            const assignments = tryTechForSlot(globalStaffId);
+            if (assignments) {
+              availableSlots.push({
+                startTime,
+                endTime: addMinutes(startTime, totalDuration),
+                totalDuration,
+                staffAssignments: assignments,
+              });
+            }
+          } else {
+            // "Any" — try qualified techs in ascending workload order; use first that fits
+            let assigned: any[] | null = null;
+            for (const tech of qualifiedTechs) {
+              assigned = tryTechForSlot(tech.id);
+              if (assigned) break;
+            }
+            if (assigned) {
+              availableSlots.push({
+                startTime,
+                endTime: addMinutes(startTime, totalDuration),
+                totalDuration,
+                staffAssignments: assigned,
+              });
+            }
           }
         }
       }
