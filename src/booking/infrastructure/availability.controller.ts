@@ -660,21 +660,8 @@ export class AvailabilityController {
 
       const allTimeSlots = generateTimeSlots();
 
-      // Filter out slots that have already passed when querying for today (Eastern / Miami time)
-      const nowPartsEastern = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/New_York',
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', hour12: false,
-      }).formatToParts(new Date());
-      const nowPartsMap = Object.fromEntries(nowPartsEastern.map(p => [p.type, p.value]));
-      const todayEastern = `${nowPartsMap.year}-${nowPartsMap.month}-${nowPartsMap.day}`;
-      const nowMinutesEastern = parseInt(nowPartsMap.hour) * 60 + parseInt(nowPartsMap.minute);
-      const timeSlots = date === todayEastern
-        ? allTimeSlots.filter(slot => {
-            const [h, m] = slot.split(':').map(Number);
-            return h * 60 + m >= nowMinutesEastern;
-          })
-        : allTimeSlots;
+      // Allow all time slots (including past times for same day)
+      const timeSlots = allTimeSlots;
 
       const availableSlots: any[] = [];
 
