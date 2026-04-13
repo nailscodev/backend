@@ -199,9 +199,10 @@ describe('Booking System E2E Tests', () => {
   // TEST CASE 2: Multi-Service Booking (Consecutive) WITHOUT VIP Combo
   // ============================================================================
   describe('Case 2: Multi-Service Booking (Consecutive)', () => {
-    // Luna (does Manicure + Pedicure, Mon-Sun) is used because the single-tech
+    // Luna (does Manicure + Pedicure, Wed-Sun only) is used because the single-tech
     // algorithm requires ONE technician to be qualified for ALL services in the block.
-    const testDate = getTestDate(2);
+    // Skip Sun(0), Mon(1), Tue(2) — Luna does not work those days.
+    const testDate = getWorkingDate(2, [0, 1, 2]);
     const createdBookingIds: string[] = [];
 
     it('should get multi-service slots for consecutive booking', async () => {
