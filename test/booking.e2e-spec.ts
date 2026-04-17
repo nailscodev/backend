@@ -457,8 +457,8 @@ describe('Booking System E2E Tests', () => {
   // TEST CASE 4: Combo Package Booking (Regular Pack, etc.)
   // ============================================================================
   describe('Case 4: Combo Package Booking', () => {
-    // Skip Sundays (0) and Tuesdays (2): Isabella/Camila don't work Sun, Sofia doesn't work Tue
-    const testDate = getWorkingDate(4, [0, 2]);
+    // Skip Mondays (1) and Tuesdays (2): Luna (only tech for mani+pedi combo) works Wed–Sun, not Mon/Tue
+    const testDate = getWorkingDate(4, [1, 2]);
     const createdBookingIds: string[] = [];
 
     it('should get combo/package services', async () => {
