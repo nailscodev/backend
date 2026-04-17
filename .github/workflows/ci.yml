@@ -559,6 +559,13 @@ jobs:
 
       - name: Setup flyctl
         uses: superfly/flyctl-actions/setup-flyctl@master
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Authenticate Docker to Fly registry
+        run: flyctl auth docker
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
       - name: Run deploy
         run: flyctl deploy --local-only --strategy=immediate --config fly.prod.toml
