@@ -2,7 +2,7 @@ name: Backend CI/CD
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, production]
   pull_request:
     branches: [main]
 
@@ -592,7 +592,7 @@ jobs:
           sleep 30
           echo "Checking backend health..."
           for i in $(seq 1 10); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://nailsco-backend-prod.fly.dev/api/v1/health" || echo "000")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://nailsco-api-prod.fly.dev/api/v1/health" || echo "000")
             if [ "$STATUS" = "200" ]; then
               echo "✅ Backend is healthy (attempt $i)"
               exit 0
@@ -616,7 +616,7 @@ jobs:
         run: |
           cd tests/stress
           k6 run load-test.js \
-            --env BASE_URL=https://nailsco-backend-prod.fly.dev \
+            --env BASE_URL=https://nailsco-api-prod.fly.dev \
             2>&1 | tee ../../k6-reports/load-output.txt
           echo "exit_code=$?" >> $GITHUB_OUTPUT
         continue-on-error: true
@@ -632,7 +632,7 @@ jobs:
         run: |
           cd tests/stress
           k6 run stress-test.js \
-            --env BASE_URL=https://nailsco-backend-prod.fly.dev \
+            --env BASE_URL=https://nailsco-api-prod.fly.dev \
             2>&1 | tee ../../k6-reports/stress-output.txt
           echo "exit_code=$?" >> $GITHUB_OUTPUT
         continue-on-error: true
@@ -648,7 +648,7 @@ jobs:
         run: |
           cd tests/stress
           k6 run spike-test.js \
-            --env BASE_URL=https://nailsco-backend-prod.fly.dev \
+            --env BASE_URL=https://nailsco-api-prod.fly.dev \
             2>&1 | tee ../../k6-reports/spike-output.txt
           echo "exit_code=$?" >> $GITHUB_OUTPUT
         continue-on-error: true
@@ -664,7 +664,7 @@ jobs:
         run: |
           cd tests/stress
           k6 run soak-test.js \
-            --env BASE_URL=https://nailsco-backend-prod.fly.dev \
+            --env BASE_URL=https://nailsco-api-prod.fly.dev \
             --env DURATION=2m \
             2>&1 | tee ../../k6-reports/soak-output.txt
           echo "exit_code=$?" >> $GITHUB_OUTPUT
